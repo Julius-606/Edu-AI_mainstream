@@ -2,18 +2,35 @@ package com.example.edu_ai.ui.screens.student
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StudentDashboard(onLogout: () -> Unit) {
+fun StudentDashboard(
+    onLogout: () -> Unit,
+    onLaunchModule: () -> Unit,
+    viewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    // Refresh data when the screen is first shown
+    LaunchedEffect(Unit) {
+        viewModel.refreshDashboard("STUDENT_001") // Using mock ID for now
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -29,51 +46,68 @@ fun StudentDashboard(onLogout: () -> Unit) {
             )
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                Text("Welcome back, Future Doc!", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Text("Status: Year 4 - Redemption Arc 🔥", color = MaterialTheme.colorScheme.primary)
+        if (uiState.isLoading && uiState.user == null) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
             }
-
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Current PnL (Win Rate)", fontWeight = FontWeight.Bold)
-                        Text("📈 78.4% Accuracy in Internal Medicine", fontSize = 18.sp)
-                        Text("⚠️ Warning: Stop-loss getting tight in Biochemistry", color = MaterialTheme.colorScheme.error)
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                uiState.error?.let { error ->
+                    item {
+                        Text(text = "Error: $error", color = MaterialTheme.colorScheme.error)
                     }
                 }
-            }
 
-            item {
-                Button(
-                    onClick = { /* TODO: Navigate to Chaos Room! */ },
-                    modifier = Modifier.fillMaxWidth().height(60.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                ) {
-                    Text("LAUNCH AI CHAOS ENGINE 🧠", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            item {
-                Text("Active Contracts (Units)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            }
-
-            // Mock list of active units
-            val units = listOf("Biochemistry II", "General Surgery", "Community Health", "Internal Medicine I")
-            items(units.size) { index ->
-                Card(modifier = Modifier.fillMaxWidth()) {
+                item {
                     Text(
-                        text = "📘 ${units[index]}",
-                        modifier = Modifier.padding(16.dp),
-                        fontWeight = FontWeight.Medium
+                        text = "Welcome back, ${uiState.user?.username ?: "Future Doc"}!",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
                     )
+                    Text(
+                        text = "Status: ${uiState.user?.semesterStatus ?: "Year 4 - Redemption Arc 🔥"}",
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Current PnL (Win Rate)", fontWeight = FontWeight.Bold)
+                            Text("📈 AI Persona: ${uiState.user?.aiPersona ?: "N/A"}", fontSize = 18.sp)
+                            Text("Sensory Mode: ${uiState.user?.sensoryMode ?: "N/A"}", color = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+                }
+
+                item {
+                    Button(
+                        onClick = onLaunchModule,
+                        modifier = Modifier.fillMaxWidth().height(60.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                    ) {
+                        Text("LAUNCH MODULE 🧠", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                item {
+                    Text("Active Contracts (Units)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                }
+
+                items(uiState.units) { unit ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "📘 ${unit.unitName}",
+                            modifier = Modifier.padding(16.dp),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
