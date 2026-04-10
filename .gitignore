@@ -1,0 +1,41 @@
+#🙈 IGNORE LIST
+
+pycache/
+*.py[cod]
+*$py.class
+
+🔧 Environment
+
+venv/
+.env
+.DS_Store
+
+#☁️ Cloud Credentials (NEVER COMMIT THESE)
+
+bot_memory_*.json
+*.json
+credentials.json
+config.json
+
+*.env
+#📉 Logs
+
+*.log
+logs.txt
+
+#📊 Data Files
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties

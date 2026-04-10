@@ -1,0 +1,2303 @@
+================================================================================
+SYSTEM INSTRUCTIONS FOR PROJECT ORBIT (THE JARVIS PROTOCOL)
+================================================================================
+DATE: 2026-04-10 11:24:42
+STATUS: VERSION 3.1 (STABILITY UPGRADE)
+
+INSTRUCTIONS FOR THE AI ASSISTANT:
+1. SINGLE SOURCE OF TRUTH: This snapshot is the Holy Grail. Use it for all context.
+2. EDIT PROTOCOL: 
+   - State the target file path clearly.
+   - Maintain the header Identity as this is what I use to distinguish between files.
+   - Increment VERSION (Major.Minor.Patch) in the IDENTITY header for each file.
+   - For files > 700 lines, use the "DIFF" approach (10 lines context).
+3. DELIMITER AWARENESS: Files are wrapped in unique delimiters:
+   >>>--- START_FILE_BLOCK: [path] and  <<<--- END_FILE_BLOCK: [path].
+   Use these to anchor your parsing and avoid "fumbling" lines.
+4. VIBE CHECK: Maintain all comments, imports, and docstrings. No "creative deletion."
+5. PROJECT STRUCTURE: Refer to the FILE MANIFEST below for the full architecture.
+
+================================================================================
+FILE MANIFEST (TABLE OF CONTENTS)
+================================================================================
+- backend\database.py [v1.1.0]
+- backend\main.py [v1.1.0]
+- backend\migrate_data.py [v1.1.0]
+- backend\models.py [v1.1.0]
+- backend\schemas.py [v1.1.0]
+- backend\__init__.py [v1.0.0]
+- build.gradle.kts [v1.0.0]
+- logs.txt [v1.0.0]
+- requirements.txt [v1.0.0]
+- run.txt [v1.0.0]
+- settings.gradle.kts [v1.0.0]
+- app\build.gradle.kts [v1.0.0]
+- app\src\androidTest\java\com\example\edu_ai\ExampleInstrumentedTest.kt [v1.0.0]
+- app\src\main\AndroidManifest.xml [v1.0.0]
+- app\src\main\java\com\example\edu_ai\MainActivity.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\data\local\EduAIDao.kt [v1.1.0]
+- app\src\main\java\com\example\edu_ai\data\local\EduAIDatabase.kt [v1.1.0]
+- app\src\main\java\com\example\edu_ai\data\local\QuizHistoryEntity.kt [v1.1.0]
+- app\src\main\java\com\example\edu_ai\data\local\UnitEntity.kt [v1.1.0]
+- app\src\main\java\com\example\edu_ai\data\local\UserEntity.kt [v1.1.0]
+- app\src\main\java\com\example\edu_ai\data\remote\ApiModels.kt [v1.1.0]
+- app\src\main\java\com\example\edu_ai\data\remote\EduAIApi.kt [v1.1.0]
+- app\src\main\java\com\example\edu_ai\data\remote\RetrofitClient.kt [v1.1.0]
+- app\src\main\java\com\example\edu_ai\repository\EduAIRepository.kt [v1.1.0]
+- app\src\main\java\com\example\edu_ai\ui\navigation\AppNavigation.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\screens\LoginScreen.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\screens\student\StudentDashboard.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\screens\teacher\TeacherDashboard.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\theme\Color.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\theme\Theme.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\theme\Type.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\theme\screens\LoginScreen.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\theme\screens\StudentDashboard.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\theme\screens\TeacherDashboard.kt [v1.0.0]
+- app\src\main\res\drawable\ic_launcher_background.xml [v1.0.0]
+- app\src\main\res\drawable\ic_launcher_foreground.xml [v1.0.0]
+- app\src\main\res\mipmap-anydpi-v26\ic_launcher.xml [v1.0.0]
+- app\src\main\res\mipmap-anydpi-v26\ic_launcher_round.xml [v1.0.0]
+- app\src\main\res\values\colors.xml [v1.0.0]
+- app\src\main\res\values\strings.xml [v1.0.0]
+- app\src\main\res\values\themes.xml [v1.0.0]
+- app\src\main\res\xml\backup_rules.xml [v1.0.0]
+- app\src\main\res\xml\data_extraction_rules.xml [v1.0.0]
+- app\src\test\java\com\example\edu_ai\ExampleUnitTest.kt [v1.0.0]
+
+================================================================================
+FULL PROJECT CONTENT BEGINS BELOW
+================================================================================
+
+>>>--- START_FILE_BLOCK: backend\database.py
+################################################################################
+FILE: backend\database.py
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+# IDENTITY: backend/database.py
+# VERSION: 1.1.0
+# ⚙️ GEAR 1.2: The Local Database (SQLite)
+# This is our base currency. It handles the local ledger of all our data.
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+
+# SQLite database file will be created in the local directory (survives KPLC blackouts)
+SQLALCHEMY_DATABASE_URL = "sqlite:///./edu_ai_vault.db"
+
+# Setting up the engine. connect_args are needed for SQLite to allow multiple threads
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+)
+
+# SessionLocal is the actual database session we use to query and save data
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Base class for our database models
+Base = declarative_base()
+
+# Dependency to get the DB session in our FastAPI routes
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+ <<<--- END_FILE_BLOCK: backend\database.py
+
+>>>--- START_FILE_BLOCK: backend\main.py
+################################################################################
+FILE: backend\main.py
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+# IDENTITY: backend/main.py
+# VERSION: 1.1.0
+# ⚙️ GEAR 2: The API Routes (Executing the Trades)
+
+import os
+
+import google.generativeai as genai
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+
+try:
+    from .database import Base, engine, get_db
+    from . import models as models
+    from . import schemas as schemas
+except ImportError:
+    from database import Base, engine, get_db
+    import models as models
+    import schemas as schemas
+
+# Create database tables if they don't exist
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Edu_AI Prop Firm Backend", version="1.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_FALLBACK_KEY_HERE")
+genai.configure(api_key=GEMINI_KEY)
+ai_model = genai.GenerativeModel("gemini-1.5-flash")
+
+@app.get("/")
+def read_root():
+    return {"status": "Bullish 📈", "message": "Edu_AI Backend v1.1.0 is Online."}
+
+@app.get("/api/user/{user_id}/dashboard", response_model=schemas.DashboardResponse)
+def get_dashboard(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    active_units = db.query(models.Unit).filter(
+        models.Unit.owner_id == user_id, 
+        models.Unit.is_active == True
+    ).all()
+    unit_names = [u.name for u in active_units]
+
+    quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user_id).all()
+    total_quizzes = len(quizzes)
+    average_pnl = sum([q.pnl for q in quizzes]) / total_quizzes if total_quizzes > 0 else 0.0
+
+    return schemas.DashboardResponse(
+        username=user.username,
+        role=user.role,
+        sensory_mode=user.sensory_mode,
+        semester_status=user.semester_status,
+        difficulty=user.difficulty,
+        ai_persona=user.ai_persona,
+        active_units=unit_names,
+        average_pnl=round(average_pnl, 2),
+        total_quizzes=total_quizzes
+    )
+
+@app.put("/api/user/{user_id}/preferences")
+def update_preferences(user_id: int, prefs: schemas.UserPreferencesUpdate, db: Session = Depends(get_db)):
+    """Updates user UI/UX preferences."""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    
+    if prefs.sensory_mode:
+        user.sensory_mode = prefs.sensory_mode
+    if prefs.ai_persona:
+        user.ai_persona = prefs.ai_persona
+        
+    db.commit()
+    return {"status": "Success", "message": "Preferences updated."}
+
+@app.post("/api/chaos/generate_case", response_model=schemas.ChaosResponse)
+def generate_medical_case(request: schemas.ChaosRequest, db: Session = Depends(get_db)):
+    """Generates case, tailoring to user history if necessary."""
+    
+    # 1. Fetch user memory to personalize the prompt
+    user = db.query(models.User).filter(models.User.id == request.student_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Student not found.")
+        
+    # Check history for weak spots in this unit
+    weak_spots = ""
+    history = db.query(models.QuizHistory).filter(
+        models.QuizHistory.owner_id == request.student_id,
+        models.QuizHistory.unit_name == request.unit,
+        models.QuizHistory.pnl < 50.0 # If they scored less than 50%
+    ).all()
+    
+    if history:
+         weak_spots = "NOTE: Student previously struggled with this unit. Ensure the case reinforces core pathophysiological concepts."
+
+    focus = f" specifically focusing on {request.focus_area}" if request.focus_area else ""
+    
+    prompt = f"""
+    ACT AS: {user.ai_persona}.
+    TASK: Present a "Medical Mystery" case study for a student.
+    TOPIC: {request.unit}{focus}.
+    DIFFICULTY: {request.difficulty}.
+    {weak_spots}
+    
+    Format the output beautifully using Markdown. Include Patient Demographics, Vitals, Labs, 
+    and a clinical presentation. End by asking the student for their differential diagnosis.
+    Adapt the language to be accessible but rigorous.
+    """
+    
+    try:
+        response = ai_model.generate_content(prompt)
+        return schemas.ChaosResponse(case_study=response.text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI connection failed: {str(e)}")
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8000"))
+
+    uvicorn.run(app, host=host, port=port)
+
+ <<<--- END_FILE_BLOCK: backend\main.py
+
+>>>--- START_FILE_BLOCK: backend\migrate_data.py
+################################################################################
+FILE: backend\migrate_data.py
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+# IDENTITY: backend/migrate_data.py
+# VERSION: 1.1.0
+# ⚙️ GEAR 1.3: Data Migration
+
+import json
+from database import SessionLocal, engine, Base
+import models
+from datetime import datetime, timedelta
+import random
+
+Base.metadata.create_all(bind=engine)
+
+def migrate():
+    db = SessionLocal()
+    
+    try:
+        with open('../config.json', 'r') as f:
+            data = json.load(f)
+            
+        print("📥 config.json loaded. Preparing to migrate...")
+
+        username = data.get("user_name", "Future Doc")
+        user = db.query(models.User).filter(models.User.username == username).first()
+        
+        if not user:
+            user = models.User(
+                username=username,
+                role="Student",
+                sensory_mode="Standard",
+                difficulty=data.get("difficulty", "Asian Parent Expectations (Extreme)"),
+                semester_status=data.get("semester_status", "Year 4 - Redemption Arc"),
+                interests=data.get("interests", [])
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            print(f"✅ User '{username}' created in DB with ID: {user.id}")
+        else:
+            print(f"⚠️ User '{username}' already exists. Skipping creation.")
+
+        # Migrate Units
+        current_units = data.get("current_units", [])
+        for unit_name in current_units:
+            existing_unit = db.query(models.Unit).filter(
+                models.Unit.owner_id == user.id, 
+                models.Unit.name == unit_name
+            ).first()
+            
+            if not existing_unit:
+                new_unit = models.Unit(name=unit_name, is_active=True, owner_id=user.id)
+                db.add(new_unit)
+                
+        # Generate some mock performance data for the charts
+        print("📊 Generating mock performance logs...")
+        subjects = ["Biochemistry II", "General Surgery", "Internal Medicine I"]
+        base_date = datetime.now() - timedelta(days=30)
+        
+        for subject in subjects:
+            for i in range(5):
+                log_date = base_date + timedelta(days=i*6)
+                grade = random.uniform(50.0, 95.0)
+                new_log = models.PerformanceLog(
+                    subject=subject,
+                    grade=grade,
+                    timestamp=log_date.strftime("%Y-%m-%d"),
+                    owner_id=user.id
+                )
+                db.add(new_log)
+
+        db.commit()
+        print("✅ Account funded! Units and mock performance data migrated successfully. 📈")
+
+    except FileNotFoundError:
+        print("❌ Error: config.json not found. Ensure it is one directory above this script (../config.json).")
+    except Exception as e:
+        print(f"❌ Critical Error during migration: {e}")
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    migrate()
+
+ <<<--- END_FILE_BLOCK: backend\migrate_data.py
+
+>>>--- START_FILE_BLOCK: backend\models.py
+################################################################################
+FILE: backend\models.py
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+# IDENTITY: backend/models.py
+# VERSION: 1.1.0
+# ⚙️ GEAR 1.2: Database Models (Entities)
+
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, JSON
+from sqlalchemy.orm import relationship
+from database import Base
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    role = Column(String, default="Student") # "Student" or "Teacher"
+    sensory_mode = Column(String, default="Standard") # "Standard", "Low-Sensory", "High-Stim"
+    difficulty = Column(String, default="Medium (Standard)")
+    ai_persona = Column(String, default="Standard Edu_AI")
+    semester_status = Column(String, default="Year 4 - Redemption Arc")
+    interests = Column(JSON, default=list)
+
+    # Relationships
+    units = relationship("Unit", back_populates="owner")
+    quiz_history = relationship("QuizHistory", back_populates="owner")
+    performance_logs = relationship("PerformanceLog", back_populates="owner")
+
+class Unit(Base):
+    __tablename__ = "units"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    is_active = Column(Boolean, default=True)
+    category = Column(String, default="General")
+    
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="units")
+
+class QuizHistory(Base):
+    __tablename__ = "quiz_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    unit_name = Column(String)
+    score = Column(Integer)
+    total = Column(Integer)
+    pnl = Column(Float)
+    timestamp = Column(String)
+
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="quiz_history")
+
+class PerformanceLog(Base):
+    """Tracks performance over time for the AI predictive chart."""
+    __tablename__ = "performance_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    subject = Column(String)
+    grade = Column(Float)
+    timestamp = Column(String)
+
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="performance_logs")
+
+ <<<--- END_FILE_BLOCK: backend\models.py
+
+>>>--- START_FILE_BLOCK: backend\schemas.py
+################################################################################
+FILE: backend\schemas.py
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+# IDENTITY: backend/schemas.py
+# VERSION: 1.1.0
+# ⚙️ Pydantic Models for Data Validation
+
+from pydantic import BaseModel
+from typing import List, Optional, Dict
+
+class UnitBase(BaseModel):
+    name: str
+    is_active: bool = True
+    category: str = "General"
+
+class UnitResponse(UnitBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class DashboardResponse(BaseModel):
+    username: str
+    role: str
+    sensory_mode: str
+    semester_status: str
+    difficulty: str
+    ai_persona: str
+    active_units: List[str]
+    average_pnl: float
+    total_quizzes: int
+
+class ChaosRequest(BaseModel):
+    unit: str
+    focus_area: Optional[str] = None
+    difficulty: str = "Asian Parent Expectations (Extreme)"
+    student_id: int # Needed to tailor the prompt to their history
+
+class ChaosResponse(BaseModel):
+    case_study: str
+
+class UserPreferencesUpdate(BaseModel):
+    sensory_mode: Optional[str] = None
+    ai_persona: Optional[str] = None
+
+ <<<--- END_FILE_BLOCK: backend\schemas.py
+
+>>>--- START_FILE_BLOCK: backend\__init__.py
+################################################################################
+FILE: backend\__init__.py
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+"""Backend package for Edu_AI."""
+
+ <<<--- END_FILE_BLOCK: backend\__init__.py
+
+>>>--- START_FILE_BLOCK: build.gradle.kts
+################################################################################
+FILE: build.gradle.kts
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+plugins {
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.google.devtools.ksp) apply false
+}
+
+ <<<--- END_FILE_BLOCK: build.gradle.kts
+
+>>>--- START_FILE_BLOCK: logs.txt
+################################################################################
+FILE: logs.txt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+(venv) PS C:\Users\ADMIN\edu_ai\Scale\backend> uvicorn main:app --reload
+INFO:     Will watch for changes in these directories: ['C:\\Users\\ADMIN\\edu_ai\\Scale\\backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [13660] using StatReload
+Process SpawnProcess-1:
+Traceback (most recent call last):
+  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python312\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python312\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "C:\Users\ADMIN\edu_ai\Scale\backend\venv\Lib\site-packages\uvicorn\_subprocess.py", line 78, in subprocess_started
+    target(sockets=sockets)
+  File "C:\Users\ADMIN\edu_ai\Scale\backend\venv\Lib\site-packages\uvicorn\server.py", line 62, in run
+    return asyncio.run(self.serve(sockets=sockets))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 686, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\edu_ai\Scale\backend\venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
+    config.load()
+  File "C:\Users\ADMIN\edu_ai\Scale\backend\venv\Lib\site-packages\uvicorn\config.py", line 458, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\edu_ai\Scale\backend\venv\Lib\site-packages\uvicorn\importer.py", line 24, in import_from_string
+    raise exc from None
+  File "C:\Users\ADMIN\edu_ai\Scale\backend\venv\Lib\site-packages\uvicorn\importer.py", line 21, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Users\ADMIN\edu_ai\Scale\backend\main.py", line 12, in <module>
+    from backend.database import engine, Base, get_db
+ModuleNotFoundError: No module named 'backend'
+
+
+ <<<--- END_FILE_BLOCK: logs.txt
+
+>>>--- START_FILE_BLOCK: requirements.txt
+################################################################################
+FILE: requirements.txt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+fastapi==0.109.2
+uvicorn==0.27.1
+sqlalchemy==2.0.25
+pydantic==2.6.1
+google-generativeai==0.3.2
+python-dotenv==1.0.1
+
+ <<<--- END_FILE_BLOCK: requirements.txt
+
+>>>--- START_FILE_BLOCK: run.txt
+################################################################################
+FILE: run.txt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+# Windows (Command Prompt)
+set GEMINI_API_KEY=AIzaSyDmvjVkFmt0RoTMNER8fYoIKfy7Pkw1sfo
+
+# Run the server!
+uvicorn main:app --reload
+
+
+ <<<--- END_FILE_BLOCK: run.txt
+
+>>>--- START_FILE_BLOCK: settings.gradle.kts
+################################################################################
+FILE: settings.gradle.kts
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+pluginManagement {
+    repositories {
+        google {
+            content {
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "Edu_AI"
+include(":app")
+
+
+ <<<--- END_FILE_BLOCK: settings.gradle.kts
+
+>>>--- START_FILE_BLOCK: app\build.gradle.kts
+################################################################################
+FILE: app\build.gradle.kts
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.devtools.ksp)
+}
+
+android {
+    namespace = "com.example.edu_ai"
+    compileSdk = 35
+
+    val backendBaseUrl = (project.findProperty("backendBaseUrl") as? String)
+        ?: "http://10.0.2.2:8000/"
+
+    defaultConfig {
+        applicationId = "com.example.edu_ai"
+        minSdk = 24
+        targetSdk = 35
+        versionCode = 1
+        versionName = "1.0"
+
+        buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+}
+
+dependencies {
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.navigation.compose)
+
+    // Retrofit
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+
+    // Room
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+
+    // Coroutines
+    implementation(libs.kotlinx.coroutines.android)
+
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+
+ <<<--- END_FILE_BLOCK: app\build.gradle.kts
+
+>>>--- START_FILE_BLOCK: app\src\androidTest\java\com\example\edu_ai\ExampleInstrumentedTest.kt
+################################################################################
+FILE: app\src\androidTest\java\com\example\edu_ai\ExampleInstrumentedTest.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai
+
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.ext.junit.runners.AndroidJUnit4
+
+import org.junit.Test
+import org.junit.runner.RunWith
+
+import org.junit.Assert.*
+
+/**
+ * Instrumented test, which will execute on an Android device.
+ *
+ * See [testing documentation](http://d.android.com/tools/testing).
+ */
+@RunWith(AndroidJUnit4::class)
+class ExampleInstrumentedTest {
+    @Test
+    fun useAppContext() {
+        // Context of the app under test.
+        val appContext = InstrumentationRegistry.getInstrumentation().targetContext
+        assertEquals("com.example.edu_ai", appContext.packageName)
+    }
+}
+
+ <<<--- END_FILE_BLOCK: app\src\androidTest\java\com\example\edu_ai\ExampleInstrumentedTest.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\AndroidManifest.xml
+################################################################################
+FILE: app\src\main\AndroidManifest.xml
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Edu_AI"
+        android:usesCleartextTraffic="true">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Edu_AI">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
+
+ <<<--- END_FILE_BLOCK: app\src\main\AndroidManifest.xml
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\MainActivity.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\MainActivity.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+// #file app/src/main/java/com/example/edu_ai/MainActivity.kt
+// #version 1.0.1
+// #The absolute entry point of the app that boots up the navigation UI.
+
+package com.example.edu_ai
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
+import com.example.edu_ai.ui.navigation.AppNavigation
+import com.example.edu_ai.ui.theme.Edu_AITheme
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            Edu_AITheme {
+                // A surface container using the 'background' color from the theme
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    // Turn on the Navigation system!
+                    AppNavigation()
+                }
+            }
+        }
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\MainActivity.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\EduAIDao.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\local\EduAIDao.kt
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+// IDENTITY: data/local/EduAIDao.kt
+// VERSION: 1.1.0
+// ⚙️ GEAR 1.2: The Local Database (SQLite)
+// This is our base currency. It handles the local ledger of all our data.
+
+package com.example.edu_ai.data.local
+
+import androidx.room.*
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface EduAIDao {
+
+    // User
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUser(user: UserEntity)
+
+    @Query("SELECT * FROM users LIMIT 1")
+    fun getUser(): Flow<UserEntity?>
+
+    // Units
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUnits(units: List<UnitEntity>)
+
+    @Query("SELECT * FROM units")
+    fun getAllUnits(): Flow<List<UnitEntity>>
+
+    @Query("DELETE FROM units")
+    suspend fun deleteAllUnits()
+
+    // Quiz History
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertQuizHistory(quiz: QuizHistoryEntity)
+
+    @Query("SELECT * FROM quiz_history ORDER BY timestamp DESC")
+    fun getQuizHistory(): Flow<List<QuizHistoryEntity>>
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\EduAIDao.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\EduAIDatabase.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\local\EduAIDatabase.kt
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+// IDENTITY: data/local/EduAIDatabase.kt
+// VERSION: 1.1.0
+// ⚙️ GEAR 1.2: The Local Database (SQLite)
+// This is our base currency. It handles the local ledger of all our data.
+
+package com.example.edu_ai.data.local
+
+import androidx.room.Database
+import androidx.room.RoomDatabase
+
+@Database(
+    entities = [UserEntity::class, UnitEntity::class, QuizHistoryEntity::class],
+    version = 1,
+    exportSchema = false
+)
+abstract class EduAIDatabase : RoomDatabase() {
+    abstract fun dao(): EduAIDao
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\EduAIDatabase.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\QuizHistoryEntity.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\local\QuizHistoryEntity.kt
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+// IDENTITY: data/local/QuizHistoryEntity.kt
+// VERSION: 1.1.0
+// ⚙️ GEAR 1.2: The Local Database (SQLite)
+// This is our base currency. It handles the local ledger of all our data.
+
+package com.example.edu_ai.data.local
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "quiz_history")
+data class QuizHistoryEntity(
+    @PrimaryKey(autoGenerate = true) val localId: Long = 0,
+    val unitName: String,
+    val pnlScore: Double,
+    val timestamp: Long
+)
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\QuizHistoryEntity.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\UnitEntity.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\local\UnitEntity.kt
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+// IDENTITY: data/local/UnitEntity.kt
+// VERSION: 1.1.0
+// ⚙️ GEAR 1.2: The Local Database (SQLite)
+// This is our base currency. It handles the local ledger of all our data.
+
+package com.example.edu_ai.data.local
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "units")
+data class UnitEntity(
+    @PrimaryKey(autoGenerate = true) val localId: Long = 0,
+    val unitName: String,
+    val isActive: Boolean
+)
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\UnitEntity.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\UserEntity.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\local\UserEntity.kt
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+// IDENTITY: data/local/UserEntity.kt
+// VERSION: 1.1.0
+// ⚙️ GEAR 1.2: The Local Database (SQLite)
+// This is our base currency. It handles the local ledger of all our data.
+
+package com.example.edu_ai.data.local
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "users")
+data class UserEntity(
+    @PrimaryKey val id: String,
+    val username: String,
+    val role: String,
+    val sensoryMode: String,
+    val semesterStatus: String,
+    val aiPersona: String
+)
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\UserEntity.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\ApiModels.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\remote\ApiModels.kt
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+// IDENTITY: data/remote/ApiModels.kt
+// VERSION: 1.1.0
+// ⚙️ GEAR 1.1: The Network Broker (Retrofit)
+// This handles the communication with our remote server.
+
+package com.example.edu_ai.data.remote
+
+import com.google.gson.annotations.SerializedName
+
+data class DashboardResponse(
+    @SerializedName("username") val username: String,
+    @SerializedName("role") val role: String,
+    @SerializedName("sensory_mode") val sensoryMode: String,
+    @SerializedName("semester_status") val semesterStatus: String,
+    @SerializedName("difficulty") val difficulty: String,
+    @SerializedName("ai_persona") val aiPersona: String,
+    @SerializedName("active_units") val activeUnits: List<String>,
+    @SerializedName("average_pnl") val averagePnl: Double,
+    @SerializedName("total_quizzes") val totalQuizzes: Int
+)
+
+data class ChaosRequest(
+    @SerializedName("unit") val unit: String,
+    @SerializedName("focus_area") val focusArea: String?,
+    @SerializedName("difficulty") val difficulty: String,
+    @SerializedName("student_id") val studentId: String
+)
+
+data class ChaosResponse(
+    @SerializedName("case_study") val caseStudy: String
+)
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\ApiModels.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\EduAIApi.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\remote\EduAIApi.kt
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+// IDENTITY: data/remote/EduAIApi.kt
+// VERSION: 1.1.0
+// ⚙️ GEAR 1.1: The Network Broker (Retrofit)
+// This handles the communication with our remote server.
+
+package com.example.edu_ai.data.remote
+
+import retrofit2.http.Body
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Path
+
+interface EduAIApi {
+
+    @GET("api/user/{user_id}/dashboard")
+    suspend fun getDashboard(@Path("user_id") userId: String): DashboardResponse
+
+    @POST("api/chaos/generate_case")
+    suspend fun generateChaosCase(@Body request: ChaosRequest): ChaosResponse
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\EduAIApi.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\RetrofitClient.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\remote\RetrofitClient.kt
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+// IDENTITY: data/remote/RetrofitClient.kt
+// VERSION: 1.1.0
+// ⚙️ GEAR 1.1: The Network Broker (Retrofit)
+// This handles the communication with our remote server.
+
+package com.example.edu_ai.data.remote
+
+import com.example.edu_ai.BuildConfig
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+
+object RetrofitClient {
+    private val BASE_URL = BuildConfig.BACKEND_BASE_URL
+
+    val instance: EduAIApi by lazy {
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(EduAIApi::class.java)
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\RetrofitClient.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\repository\EduAIRepository.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\repository\EduAIRepository.kt
+VERSION: 1.1.0 | SYSTEM: N/A
+################################################################################
+
+// IDENTITY: repository/EduAIRepository.kt
+// VERSION: 1.1.0
+// ⚙️ GEAR 1.3: The Repository (Data Orchestrator)
+// This is the single source of truth. It decides whether to use the Network Broker or the Local Ledger.
+
+package com.example.edu_ai.repository
+
+import com.example.edu_ai.data.local.EduAIDao
+import com.example.edu_ai.data.local.UserEntity
+import com.example.edu_ai.data.local.UnitEntity
+import com.example.edu_ai.data.remote.EduAIApi
+import com.example.edu_ai.data.remote.DashboardResponse
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.firstOrNull
+
+class EduAIRepository(
+    private val api: EduAIApi,
+    private val dao: EduAIDao
+) {
+
+    /**
+     * Fetches dashboard data from the API, updates the local database,
+     * and returns a Flow that emits the user data.
+     * Falls back to local database if network fails.
+     */
+    fun getDashboardData(userId: String): Flow<UserEntity?> = flow {
+        try {
+            // 1. Try to fetch from remote
+            val response = api.getDashboard(userId)
+            
+            // 2. Map and Save to Local (Offline-First)
+            val userEntity = UserEntity(
+                id = userId,
+                username = response.username,
+                role = response.role,
+                sensoryMode = response.sensoryMode,
+                semesterStatus = response.semesterStatus,
+                aiPersona = response.aiPersona
+            )
+            dao.insertUser(userEntity)
+            
+            // Handle units
+            dao.deleteAllUnits()
+            val unitEntities = response.activeUnits.map { unitName ->
+                UnitEntity(unitName = unitName, isActive = true)
+            }
+            dao.insertUnits(unitEntities)
+            
+            emit(userEntity)
+        } catch (e: Exception) {
+            // 3. Fallback: Fetch from local ledger if network fails
+            val cachedUser = dao.getUser().firstOrNull()
+            emit(cachedUser)
+        }
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\repository\EduAIRepository.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\navigation\AppNavigation.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\navigation\AppNavigation.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+// #file app/src/main/java/com/example/edu_ai/ui/navigation/AppNavigation.kt
+// #version 1.0.2
+// #The traffic cop routing users to either the Admin or Worker dashboard.
+
+package com.example.edu_ai.ui.navigation
+
+import androidx.compose.runtime.Composable
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.edu_ai.ui.screens.LoginScreen
+import com.example.edu_ai.ui.screens.student.StudentDashboard
+import com.example.edu_ai.ui.screens.teacher.TeacherDashboard
+
+@Composable
+fun AppNavigation() {
+    // This is our GPS for the app
+    val navController = rememberNavController()
+
+    NavHost(navController = navController, startDestination = "login") {
+        
+        // 🛑 Route 1: The Front Door
+        composable("login") {
+            LoginScreen(
+                onLoginSuccess = { role ->
+                    if (role == "Teacher") {
+                        // Send Admin to the penthouse
+                        navController.navigate("teacher_dashboard") {
+                            popUpTo("login") { inclusive = true } // Don't let them hit back to login
+                        }
+                    } else {
+                        // Send Student to the trenches
+                        navController.navigate("student_dashboard") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                }
+            )
+        }
+
+        // 📈 Route 2: The Worker (Student) View
+        composable("student_dashboard") {
+            StudentDashboard(
+                onLogout = {
+                    navController.navigate("login") {
+                        popUpTo("student_dashboard") { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // 👨‍🏫 Route 3: The Admin (Teacher) View
+        composable("teacher_dashboard") {
+            TeacherDashboard(
+                onLogout = {
+                    navController.navigate("login") {
+                        popUpTo("teacher_dashboard") { inclusive = true }
+                    }
+                }
+            )
+        }
+    }
+}
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\navigation\AppNavigation.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\LoginScreen.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\screens\LoginScreen.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.screens
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LoginScreen(onLoginSuccess: (String) -> Unit) {
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var selectedRole by remember { mutableStateOf("Student") }
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "EduAI Terminal 📈",
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(text = "Authenticate to access the market", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Username Field
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it },
+            label = { Text("Trader ID (Username)") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Password Field
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Passkey") },
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Role Selector (Dropdown)
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            OutlinedTextField(
+                value = selectedRole,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Account Type") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier.menuAnchor().fillMaxWidth()
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("👩‍🎓 Student Portal (Worker)") },
+                    onClick = { selectedRole = "Student"; expanded = false }
+                )
+                DropdownMenuItem(
+                    text = { Text("👨‍🏫 Teacher Portal (Admin)") },
+                    onClick = { selectedRole = "Teacher"; expanded = false }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Login Button
+        Button(
+            onClick = { 
+                onLoginSuccess(selectedRole) 
+            },
+            modifier = Modifier.fillMaxWidth().height(50.dp)
+        ) {
+            Text("EXECUTE LOGIN", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\LoginScreen.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\StudentDashboard.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\screens\student\StudentDashboard.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.screens.student
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StudentDashboard(onLogout: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("👩‍🎓 Student Terminal") },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Liquidate Account")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Text("Welcome back, Future Doc!", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("Status: Year 4 - Redemption Arc 🔥", color = MaterialTheme.colorScheme.primary)
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Current PnL (Win Rate)", fontWeight = FontWeight.Bold)
+                        Text("📈 78.4% Accuracy in Internal Medicine", fontSize = 18.sp)
+                        Text("⚠️ Warning: Stop-loss getting tight in Biochemistry", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+            item {
+                Button(
+                    onClick = { /* TODO: Navigate to Chaos Room! */ },
+                    modifier = Modifier.fillMaxWidth().height(60.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                ) {
+                    Text("LAUNCH AI CHAOS ENGINE 🧠", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            item {
+                Text("Active Contracts (Units)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+
+            // Mock list of active units
+            val units = listOf("Biochemistry II", "General Surgery", "Community Health", "Internal Medicine I")
+            items(units.size) { index ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "📘 ${units[index]}",
+                        modifier = Modifier.padding(16.dp),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\StudentDashboard.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\teacher\TeacherDashboard.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\screens\teacher\TeacherDashboard.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.screens.teacher
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TeacherDashboard(onLogout: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("👨‍🏫 Admin / Teacher Portal") },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Close Terminal")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Text("Class Overview", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("Monitoring 5 Active Portfolios", color = MaterialTheme.colorScheme.secondary)
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("🚨 Risk Management Alert", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                        Text("3 students are currently hitting stop-loss in Anatomy. AI Intervention deployed.")
+                    }
+                }
+            }
+
+            item {
+                Text("Student Ledger", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+
+            // Mock list of students straight from your Portals.py class list!
+            val students = listOf(
+                Pair("Neema Ongaga", "Bullish 📈 (89%)"),
+                Pair("Grace Naliaka", "Consolidating ➖ (72%)"),
+                Pair("Rayvins Otieno", "Bullish 📈 (91%)"),
+                Pair("Hillary Lweya", "Bearish 📉 (54%) - Margin Call Risk"),
+                Pair("Tatiana A.", "Bullish 📈 (85%)")
+            )
+
+            items(students.size) { index ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "👤 ${students[index].first}", fontWeight = FontWeight.Medium)
+                        Text(text = students[index].second, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\teacher\TeacherDashboard.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\Color.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\theme\Color.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val Purple80 = Color(0xFFD0BCFF)
+val PurpleGrey80 = Color(0xFFCCC2DC)
+val Pink80 = Color(0xFFEFB8C8)
+
+val Purple40 = Color(0xFF6650a4)
+val PurpleGrey40 = Color(0xFF625b71)
+val Pink40 = Color(0xFF7D5260)
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\Color.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\Theme.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\theme\Theme.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.theme
+
+import android.app.Activity
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
+
+private val DarkColorScheme = darkColorScheme(
+    primary = Purple80,
+    secondary = PurpleGrey80,
+    tertiary = Pink80
+)
+
+private val LightColorScheme = lightColorScheme(
+    primary = Purple40,
+    secondary = PurpleGrey40,
+    tertiary = Pink40
+
+    /* Other default colors to override
+    background = Color(0xFFFFFBFE),
+    surface = Color(0xFFFFFBFE),
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
+    onBackground = Color(0xFF1C1B1F),
+    onSurface = Color(0xFF1C1B1F),
+    */
+)
+
+@Composable
+fun Edu_AITheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    // Dynamic color is available on Android 12+
+    dynamicColor: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val context = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
+    }
+
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = Typography,
+        content = content
+    )
+}
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\Theme.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\Type.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\theme\Type.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.theme
+
+import androidx.compose.material3.Typography
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+
+// Set of Material typography styles to start with
+val Typography = Typography(
+    bodyLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.5.sp
+    )
+    /* Other default text styles to override
+    titleLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 22.sp,
+        lineHeight = 28.sp,
+        letterSpacing = 0.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.5.sp
+    )
+    */
+)
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\Type.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\screens\LoginScreen.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\theme\screens\LoginScreen.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+// #file app/src/main/java/com/eduai/ui/screens/LoginScreen.kt
+// #version 1.0.1
+// #The authentication gateway where users choose their role before executing the trade.
+
+package com.eduai.ui.screens
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LoginScreen(onLoginSuccess: (String) -> Unit) {
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var selectedRole by remember { mutableStateOf("Student") }
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "EduAI Terminal 📈",
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(text = "Authenticate to access the market", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Username Field
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it },
+            label = { Text("Trader ID (Username)") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Password Field
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Passkey") },
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Role Selector (Dropdown)
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            OutlinedTextField(
+                value = selectedRole,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Account Type") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier.menuAnchor().fillMaxWidth()
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("👩‍🎓 Student Portal (Worker)") },
+                    onClick = { selectedRole = "Student"; expanded = false }
+                )
+                DropdownMenuItem(
+                    text = { Text("👨‍🏫 Teacher Portal (Admin)") },
+                    onClick = { selectedRole = "Teacher"; expanded = false }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Login Button
+        Button(
+            onClick = { 
+                // TODO: Wire this to Retrofit ViewModel later to actually verify password!
+                // For now, we bypass the firewall directly to the selected portal.
+                onLoginSuccess(selectedRole) 
+            },
+            modifier = Modifier.fillMaxWidth().height(50.dp)
+        ) {
+            Text("EXECUTE LOGIN", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\screens\LoginScreen.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\screens\StudentDashboard.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\theme\screens\StudentDashboard.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+// #file app/src/main/java/com/eduai/ui/screens/student/StudentDashboard.kt
+// #version 1.0.1
+// #The main hub for students to see their PnL and launch AI medical cases.
+
+package com.eduai.ui.screens.student
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StudentDashboard(onLogout: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("👩‍🎓 Student Terminal") },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Liquidate Account")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Text("Welcome back, Future Doc!", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("Status: Year 4 - Redemption Arc 🔥", color = MaterialTheme.colorScheme.primary)
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Current PnL (Win Rate)", fontWeight = FontWeight.Bold)
+                        Text("📈 78.4% Accuracy in Internal Medicine", fontSize = 18.sp)
+                        Text("⚠️ Warning: Stop-loss getting tight in Biochemistry", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+            item {
+                Button(
+                    onClick = { /* TODO: Navigate to Chaos Room! */ },
+                    modifier = Modifier.fillMaxWidth().height(60.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                ) {
+                    Text("LAUNCH AI CHAOS ENGINE 🧠", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            item {
+                Text("Active Contracts (Units)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+
+            // Mock list of active units
+            val units = listOf("Biochemistry II", "General Surgery", "Community Health", "Internal Medicine I")
+            items(units.size) { index ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "📘 ${units[index]}",
+                        modifier = Modifier.padding(16.dp),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+}
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\screens\StudentDashboard.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\screens\TeacherDashboard.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\theme\screens\TeacherDashboard.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+// #file app/src/main/java/com/eduai/ui/screens/teacher/TeacherDashboard.kt
+// #version 1.0.1
+// #The admin panel where teachers manage student risk and track class performance.
+
+package com.eduai.ui.screens.teacher
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TeacherDashboard(onLogout: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("👨‍🏫 Admin / Teacher Portal") },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Close Terminal")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Text("Class Overview", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("Monitoring 5 Active Portfolios", color = MaterialTheme.colorScheme.secondary)
+            }
+
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("🚨 Risk Management Alert", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                        Text("3 students are currently hitting stop-loss in Anatomy. AI Intervention deployed.")
+                    }
+                }
+            }
+
+            item {
+                Text("Student Ledger", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+
+            // Mock list of students straight from your Portals.py class list!
+            val students = listOf(
+                Pair("Neema Ongaga", "Bullish 📈 (89%)"),
+                Pair("Grace Naliaka", "Consolidating ➖ (72%)"),
+                Pair("Rayvins Otieno", "Bullish 📈 (91%)"),
+                Pair("Hillary Lweya", "Bearish 📉 (54%) - Margin Call Risk"),
+                Pair("Tatiana A.", "Bullish 📈 (85%)")
+            )
+
+            items(students.size) { index ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "👤 ${students[index].first}", fontWeight = FontWeight.Medium)
+                        Text(text = students[index].second, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\screens\TeacherDashboard.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\res\drawable\ic_launcher_background.xml
+################################################################################
+FILE: app\src\main\res\drawable\ic_launcher_background.xml
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#3DDC84"
+        android:pathData="M0,0h108v108h-108z" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M9,0L9,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,0L19,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M29,0L29,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M39,0L39,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M49,0L49,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M59,0L59,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M69,0L69,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M79,0L79,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M89,0L89,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M99,0L99,108"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,9L108,9"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,19L108,19"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,29L108,29"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,39L108,39"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,49L108,49"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,59L108,59"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,69L108,69"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,79L108,79"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,89L108,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,99L108,99"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,29L89,29"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,39L89,39"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,49L89,49"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,59L89,59"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,69L89,69"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M19,79L89,79"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M29,19L29,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M39,19L39,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M49,19L49,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M59,19L59,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M69,19L69,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M79,19L79,89"
+        android:strokeWidth="0.8"
+        android:strokeColor="#33FFFFFF" />
+</vector>
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\res\drawable\ic_launcher_background.xml
+
+>>>--- START_FILE_BLOCK: app\src\main\res\drawable\ic_launcher_foreground.xml
+################################################################################
+FILE: app\src\main\res\drawable\ic_launcher_foreground.xml
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="85.84757"
+                android:endY="92.4963"
+                android:startX="42.9492"
+                android:startY="49.59793"
+                android:type="linear">
+                <item
+                    android:color="#44000000"
+                    android:offset="0.0" />
+                <item
+                    android:color="#00000000"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="nonZero"
+        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
+        android:strokeWidth="1"
+        android:strokeColor="#00000000" />
+</vector>
+
+ <<<--- END_FILE_BLOCK: app\src\main\res\drawable\ic_launcher_foreground.xml
+
+>>>--- START_FILE_BLOCK: app\src\main\res\mipmap-anydpi-v26\ic_launcher.xml
+################################################################################
+FILE: app\src\main\res\mipmap-anydpi-v26\ic_launcher.xml
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+
+ <<<--- END_FILE_BLOCK: app\src\main\res\mipmap-anydpi-v26\ic_launcher.xml
+
+>>>--- START_FILE_BLOCK: app\src\main\res\mipmap-anydpi-v26\ic_launcher_round.xml
+################################################################################
+FILE: app\src\main\res\mipmap-anydpi-v26\ic_launcher_round.xml
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+
+ <<<--- END_FILE_BLOCK: app\src\main\res\mipmap-anydpi-v26\ic_launcher_round.xml
+
+>>>--- START_FILE_BLOCK: app\src\main\res\values\colors.xml
+################################################################################
+FILE: app\src\main\res\values\colors.xml
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>
+
+ <<<--- END_FILE_BLOCK: app\src\main\res\values\colors.xml
+
+>>>--- START_FILE_BLOCK: app\src\main\res\values\strings.xml
+################################################################################
+FILE: app\src\main\res\values\strings.xml
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+<resources>
+    <string name="app_name">Edu_AI</string>
+</resources>
+
+ <<<--- END_FILE_BLOCK: app\src\main\res\values\strings.xml
+
+>>>--- START_FILE_BLOCK: app\src\main\res\values\themes.xml
+################################################################################
+FILE: app\src\main\res\values\themes.xml
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.Edu_AI" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
+
+ <<<--- END_FILE_BLOCK: app\src\main\res\values\themes.xml
+
+>>>--- START_FILE_BLOCK: app\src\main\res\xml\backup_rules.xml
+################################################################################
+FILE: app\src\main\res\xml\backup_rules.xml
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+<?xml version="1.0" encoding="utf-8"?><!--
+   Sample backup rules file; uncomment and customize as necessary.
+   See https://developer.android.com/guide/topics/data/autobackup
+   for details.
+   Note: This file is ignored for devices older than API 31
+   See https://developer.android.com/about/versions/12/backup-restore
+-->
+<full-backup-content>
+    <!--
+   <include domain="sharedpref" path="."/>
+   <exclude domain="sharedpref" path="device.xml"/>
+-->
+</full-backup-content>
+
+ <<<--- END_FILE_BLOCK: app\src\main\res\xml\backup_rules.xml
+
+>>>--- START_FILE_BLOCK: app\src\main\res\xml\data_extraction_rules.xml
+################################################################################
+FILE: app\src\main\res\xml\data_extraction_rules.xml
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+<?xml version="1.0" encoding="utf-8"?><!--
+   Sample data extraction rules file; uncomment and customize as necessary.
+   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
+   for details.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- TODO: Use <include> and <exclude> to control what is backed up.
+        <include .../>
+        <exclude .../>
+        -->
+    </cloud-backup>
+    <!--
+    <device-transfer>
+        <include .../>
+        <exclude .../>
+    </device-transfer>
+    -->
+</data-extraction-rules>
+
+ <<<--- END_FILE_BLOCK: app\src\main\res\xml\data_extraction_rules.xml
+
+>>>--- START_FILE_BLOCK: app\src\test\java\com\example\edu_ai\ExampleUnitTest.kt
+################################################################################
+FILE: app\src\test\java\com\example\edu_ai\ExampleUnitTest.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai
+
+import org.junit.Test
+
+import org.junit.Assert.*
+
+/**
+ * Example local unit test, which will execute on the development machine (host).
+ *
+ * See [testing documentation](http://d.android.com/tools/testing).
+ */
+class ExampleUnitTest {
+    @Test
+    fun addition_isCorrect() {
+        assertEquals(4, 2 + 2)
+    }
+}
+
+ <<<--- END_FILE_BLOCK: app\src\test\java\com\example\edu_ai\ExampleUnitTest.kt

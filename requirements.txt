@@ -1,0 +1,6 @@
+fastapi==0.109.2
+uvicorn==0.27.1
+sqlalchemy==2.0.25
+pydantic==2.6.1
+google-generativeai==0.3.2
+python-dotenv==1.0.1
