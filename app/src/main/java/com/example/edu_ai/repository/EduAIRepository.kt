@@ -1,15 +1,10 @@
 // IDENTITY: repository/EduAIRepository.kt
-// VERSION: 1.1.0
-// ⚙️ GEAR 1.3: The Repository (Data Orchestrator)
-// This is the single source of truth. It decides whether to use the Network Broker or the Local Ledger.
-
 package com.example.edu_ai.repository
 
 import com.example.edu_ai.data.local.EduAIDao
 import com.example.edu_ai.data.local.UserEntity
 import com.example.edu_ai.data.local.UnitEntity
 import com.example.edu_ai.data.remote.EduAIApi
-import com.example.edu_ai.data.remote.DashboardResponse
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.firstOrNull
@@ -19,17 +14,11 @@ class EduAIRepository(
     private val dao: EduAIDao
 ) {
 
-    /**
-     * Fetches dashboard data from the API, updates the local database,
-     * and returns a Flow that emits the user data.
-     * Falls back to local database if network fails.
-     */
     fun getDashboardData(userId: String): Flow<UserEntity?> = flow {
         try {
             // 1. Try to fetch from remote
             val response = api.getDashboard(userId)
             
-            // 2. Map and Save to Local (Offline-First)
             val userEntity = UserEntity(
                 id = userId,
                 username = response.username,
@@ -40,7 +29,6 @@ class EduAIRepository(
             )
             dao.insertUser(userEntity)
             
-            // Handle units
             dao.deleteAllUnits()
             val unitEntities = response.activeUnits.map { unitName ->
                 UnitEntity(unitName = unitName, isActive = true)
@@ -49,9 +37,32 @@ class EduAIRepository(
             
             emit(userEntity)
         } catch (e: Exception) {
-            // 3. Fallback: Fetch from local ledger if network fails
+            // 2. Fallback: Check Local DB
             val cachedUser = dao.getUser().firstOrNull()
-            emit(cachedUser)
+            if (cachedUser != null) {
+                emit(cachedUser)
+            } else {
+                // 3. Dev Fallback: If everything fails and DB is empty, provide a mock user
+                val devUser = UserEntity(
+                    id = userId,
+                    username = "Dev Trader",
+                    role = "Student",
+                    sensoryMode = "Visual",
+                    semesterStatus = "Year 4 - Redemption Arc 🔥",
+                    aiPersona = "Socratic Mentor"
+                )
+                dao.insertUser(devUser)
+                
+                // Add some default units so the Quiz tab isn't empty
+                val devUnits = listOf(
+                    UnitEntity(unitName = "Biochemistry II", isActive = true),
+                    UnitEntity(unitName = "General Surgery", isActive = true),
+                    UnitEntity(unitName = "Internal Medicine", isActive = true)
+                )
+                dao.insertUnits(devUnits)
+                
+                emit(devUser)
+            }
         }
     }
 }

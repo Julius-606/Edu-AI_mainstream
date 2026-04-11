@@ -1,50 +1,76 @@
 package com.example.edu_ai.data.remote.ai
 
+import com.example.edu_ai.data.local.QuizHistoryEntity
 import com.example.edu_ai.data.local.UserEntity
+import com.example.edu_ai.data.remote.RetrofitClient
+import com.example.edu_ai.data.remote.ChatRequest
+import com.example.edu_ai.data.remote.QuizRequest
+import com.example.edu_ai.data.remote.QuizRecordRequest
+import com.example.edu_ai.data.remote.ChatMessage as ApiChatMessage
 
 /**
- * The Brain of the operation. 
- * This interface allows us to hot-swap AI models (e.g., from Gemini Flash to Gemini Pro)
- * without breaking the UI.
+ * 🚀 The New Network-First AI Service
+ * This service now talks to your Python Backend instead of Gemini directly.
  */
-interface AiService {
-    suspend fun getChatResponse(
+class GeminiAiService : AiService {
+
+    override suspend fun getChatResponse(
         prompt: String,
         userContext: UserEntity,
-        history: List<ChatMessage> = emptyList()
-    ): String
-}
-
-data class ChatMessage(
-    val role: String, // "user" or "model"
-    val content: String
-)
-
-/**
- * AI Switch System: This factory decides which "Engine" to ignite.
- * For now, we'll use a simple flag or BuildConfig to switch.
- */
-class AiServiceFactory {
-    fun createService(isProMode: Boolean): AiService {
-        return if (isProMode) {
-            // This would be the "Elder Brother" model (e.g., a dedicated backend or Vertex AI)
-            ProAiService() 
-        } else {
-            // This is the "Dev/Pitch" model (e.g., Gemini API via SDK)
-            GeminiAiService()
+        history: List<ChatMessage>
+    ): String {
+        return try {
+            val apiHistory = history.map { ApiChatMessage(role = it.role, content = it.content) }
+            val response = RetrofitClient.instance.aiChat(
+                ChatRequest(
+                    prompt = prompt,
+                    user_id = userContext.id.filter { it.isDigit() }.toIntOrNull() ?: 1,
+                    history = apiHistory
+                )
+            )
+            response.response
+        } catch (e: Exception) {
+            "Consultation failed: ${e.localizedMessage}. Ensure the Python Backend is running."
         }
     }
-}
 
-// Placeholder implementations for now
-class GeminiAiService : AiService {
-    override suspend fun getChatResponse(prompt: String, userContext: UserEntity, history: List<ChatMessage>): String {
-        return "Gemini (Dev Mode): I see you're in ${userContext.semesterStatus}. Let's talk about $prompt."
+    override suspend fun generateQuiz(
+        unitName: String,
+        userContext: UserEntity
+    ): QuizResponse? {
+        return try {
+            val response = RetrofitClient.instance.generateAiQuiz(
+                QuizRequest(
+                    unit_name = unitName,
+                    user_id = userContext.id.filter { it.isDigit() }.toIntOrNull() ?: 1
+                )
+            )
+            // Map API response to UI model
+            QuizResponse(
+                title = response.quiz_title,
+                questions = response.questions.map { q ->
+                    QuizQuestion(q.question_text, q.options, q.correct_option_index, q.explanation)
+                }
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    override suspend fun getRecommendations(
+        userContext: UserEntity,
+        quizHistory: List<QuizHistoryEntity>
+    ): String {
+        // We'll let the chat endpoint handle recommendations for now to keep it simple
+        return "Keep focusing on your active units! Your personalized strategy is being updated."
     }
 }
 
-class ProAiService : AiService {
-    override suspend fun getChatResponse(prompt: String, userContext: UserEntity, history: List<ChatMessage>): String {
-        return "Pro Engine (Scale Mode): Deep analysis for ${userContext.username} initiated..."
-    }
+// Interface stays the same to avoid breaking UI code
+interface AiService {
+    suspend fun getChatResponse(prompt: String, userContext: UserEntity, history: List<ChatMessage> = emptyList()): String
+    suspend fun generateQuiz(unitName: String, userContext: UserEntity): QuizResponse?
+    suspend fun getRecommendations(userContext: UserEntity, quizHistory: List<QuizHistoryEntity>): String
 }
+
+data class ChatMessage(val role: String, val content: String)

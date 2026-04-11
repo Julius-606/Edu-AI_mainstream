@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(onLoginSuccess: (String) -> Unit) {
+fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var selectedRole by remember { mutableStateOf("Student") }
@@ -89,7 +89,9 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         // Login Button
         Button(
             onClick = { 
-                onLoginSuccess(selectedRole) 
+                if (username.isNotBlank()) {
+                    onLoginSuccess(selectedRole, username)
+                }
             },
             modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {

@@ -1,8 +1,4 @@
 // IDENTITY: data/local/EduAIDao.kt
-// VERSION: 1.1.0
-// ⚙️ GEAR 1.2: The Local Database (SQLite)
-// This is our base currency. It handles the local ledger of all our data.
-
 package com.example.edu_ai.data.local
 
 import androidx.room.*
@@ -17,6 +13,9 @@ interface EduAIDao {
 
     @Query("SELECT * FROM users LIMIT 1")
     fun getUser(): Flow<UserEntity?>
+    
+    @Query("SELECT * FROM users WHERE id = :userId")
+    suspend fun getUserById(userId: String): UserEntity?
 
     // Units
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -34,4 +33,11 @@ interface EduAIDao {
 
     @Query("SELECT * FROM quiz_history ORDER BY timestamp DESC")
     fun getQuizHistory(): Flow<List<QuizHistoryEntity>>
+
+    // Chat History
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertChatMessage(message: ChatMessageEntity)
+
+    @Query("SELECT * FROM chat_messages WHERE userId = :userId ORDER BY timestamp ASC")
+    fun getChatMessages(userId: String): Flow<List<ChatMessageEntity>>
 }

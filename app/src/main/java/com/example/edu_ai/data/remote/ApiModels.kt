@@ -1,8 +1,4 @@
 // IDENTITY: data/remote/ApiModels.kt
-// VERSION: 1.1.0
-// ⚙️ GEAR 1.1: The Network Broker (Retrofit)
-// This handles the communication with our remote server.
-
 package com.example.edu_ai.data.remote
 
 import com.google.gson.annotations.SerializedName
@@ -19,13 +15,44 @@ data class DashboardResponse(
     @SerializedName("total_quizzes") val totalQuizzes: Int
 )
 
-data class ChaosRequest(
-    @SerializedName("unit") val unit: String,
-    @SerializedName("focus_area") val focusArea: String?,
-    @SerializedName("difficulty") val difficulty: String,
-    @SerializedName("student_id") val studentId: String
+// --- AI Models ---
+
+data class ChatMessage(
+    @SerializedName("role") val role: String,
+    @SerializedName("content") val content: String
 )
 
-data class ChaosResponse(
-    @SerializedName("case_study") val caseStudy: String
+data class ChatRequest(
+    @SerializedName("prompt") val prompt: String,
+    @SerializedName("user_id") val user_id: Int,
+    @SerializedName("history") val history: List<ChatMessage> = emptyList()
+)
+
+data class ChatResponse(
+    @SerializedName("response") val response: String
+)
+
+data class QuizRequest(
+    @SerializedName("unit_name") val unit_name: String,
+    @SerializedName("user_id") val user_id: Int
+)
+
+data class ApiQuizQuestion(
+    @SerializedName("question_text") val question_text: String,
+    @SerializedName("options") val options: List<String>,
+    @SerializedName("correct_option_index") val correct_option_index: Int,
+    @SerializedName("explanation") val explanation: String
+)
+
+data class ApiQuizResponse(
+    @SerializedName("quiz_title") val quiz_title: String,
+    @SerializedName("questions") val questions: List<ApiQuizQuestion>
+)
+
+data class QuizRecordRequest(
+    @SerializedName("unit_name") val unit_name: String,
+    @SerializedName("score") val score: Int,
+    @SerializedName("total") val total: Int,
+    @SerializedName("user_id") val user_id: Int,
+    @SerializedName("timestamp") val timestamp: Long
 )

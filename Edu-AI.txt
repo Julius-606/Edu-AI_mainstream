@@ -1,7 +1,7 @@
 ================================================================================
 SYSTEM INSTRUCTIONS FOR PROJECT ORBIT (THE JARVIS PROTOCOL)
 ================================================================================
-DATE: 2026-04-10 11:24:42
+DATE: 2026-04-11 18:35:55
 STATUS: VERSION 3.1 (STABILITY UPGRADE)
 
 INSTRUCTIONS FOR THE AI ASSISTANT:
@@ -20,11 +20,12 @@ INSTRUCTIONS FOR THE AI ASSISTANT:
 ================================================================================
 FILE MANIFEST (TABLE OF CONTENTS)
 ================================================================================
+- backend\ai_engine.py [v1.0.0]
 - backend\database.py [v1.1.0]
-- backend\main.py [v1.1.0]
+- backend\main.py [v1.2.2]
 - backend\migrate_data.py [v1.1.0]
 - backend\models.py [v1.1.0]
-- backend\schemas.py [v1.1.0]
+- backend\schemas.py [v1.1.1]
 - backend\__init__.py [v1.0.0]
 - build.gradle.kts [v1.0.0]
 - logs.txt [v1.0.0]
@@ -34,19 +35,32 @@ FILE MANIFEST (TABLE OF CONTENTS)
 - app\build.gradle.kts [v1.0.0]
 - app\src\androidTest\java\com\example\edu_ai\ExampleInstrumentedTest.kt [v1.0.0]
 - app\src\main\AndroidManifest.xml [v1.0.0]
+- app\src\main\java\com\example\edu_ai\EduAIApplication.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\MainActivity.kt [v1.0.0]
-- app\src\main\java\com\example\edu_ai\data\local\EduAIDao.kt [v1.1.0]
-- app\src\main\java\com\example\edu_ai\data\local\EduAIDatabase.kt [v1.1.0]
+- app\src\main\java\com\example\edu_ai\data\local\ChatMessageEntity.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\data\local\EduAIDao.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\data\local\EduAIDatabase.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\data\local\QuizHistoryEntity.kt [v1.1.0]
 - app\src\main\java\com\example\edu_ai\data\local\UnitEntity.kt [v1.1.0]
 - app\src\main\java\com\example\edu_ai\data\local\UserEntity.kt [v1.1.0]
-- app\src\main\java\com\example\edu_ai\data\remote\ApiModels.kt [v1.1.0]
-- app\src\main\java\com\example\edu_ai\data\remote\EduAIApi.kt [v1.1.0]
-- app\src\main\java\com\example\edu_ai\data\remote\RetrofitClient.kt [v1.1.0]
-- app\src\main\java\com\example\edu_ai\repository\EduAIRepository.kt [v1.1.0]
+- app\src\main\java\com\example\edu_ai\data\remote\ApiModels.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\data\remote\EduAIApi.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\data\remote\RetrofitClient.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\data\remote\ai\AiService.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\data\remote\ai\AiServiceFactory.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\data\remote\ai\GeminiKeyManager.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\data\remote\ai\QuizModels.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\repository\EduAIRepository.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\ui\navigation\AppNavigation.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\ui\screens\LoginScreen.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\screens\student\ChatInterface.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\screens\student\ChatViewModel.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\screens\student\ModuleScreen.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\screens\student\ProgressViewModel.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\screens\student\QuizInterface.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\screens\student\QuizViewModel.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\ui\screens\student\StudentDashboard.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\ui\screens\student\StudentViewModel.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\ui\screens\teacher\TeacherDashboard.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\ui\theme\Color.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\ui\theme\Theme.kt [v1.0.0]
@@ -68,6 +82,164 @@ FILE MANIFEST (TABLE OF CONTENTS)
 ================================================================================
 FULL PROJECT CONTENT BEGINS BELOW
 ================================================================================
+
+>>>--- START_FILE_BLOCK: backend\ai_engine.py
+################################################################################
+FILE: backend\ai_engine.py
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+import google.generativeai as genai
+import time
+import logging
+import re
+import json
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Setup Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# --- 🔐 SECURE KEYCHAIN ---
+GEMINI_API_KEYS = [
+    os.getenv("GEMINI_API_KEY_1"),
+    os.getenv("GEMINI_API_KEY_2"),
+    os.getenv("GEMINI_API_KEY_3"),
+    os.getenv("GEMINI_API_KEY_4")
+]
+GEMINI_API_KEYS = [key for key in GEMINI_API_KEYS if key]
+
+class AiEngine:
+    def __init__(self):
+        self.key_index = 0
+        # 🎯 FIXATED: Start with the proven winner.
+        # Fallbacks are kept at the end for extreme safety.
+        self.model_variants = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"]
+
+        if GEMINI_API_KEYS:
+            self._configure_genai()
+            self._discover_models()
+        else:
+            logger.error("❌ No Gemini API keys found in environment variables.")
+
+    def _configure_genai(self):
+        key = GEMINI_API_KEYS[self.key_index % len(GEMINI_API_KEYS)]
+        genai.configure(api_key=key)
+        logger.info(f"🔑 AI Engine configured with key index {self.key_index % len(GEMINI_API_KEYS)}")
+
+    def _discover_models(self):
+        """🚀 Dynamically discovers available models without overwriting our fixated preference."""
+        try:
+            available = []
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    name = m.name.split('/')[-1]
+                    available.append(name)
+
+            gemini_only = [m for m in available if 'gemini' in m.lower()]
+
+            if gemini_only:
+                # Keep our preferred order, but add any new ones found as extra fallbacks
+                current_set = set(self.model_variants)
+                new_discoveries = [m for m in gemini_only if m not in current_set]
+                self.model_variants += new_discoveries
+                logger.info(f"📡 Dynamic Discovery added: {new_discoveries}")
+                logger.info(f"📊 Final Model Priority: {self.model_variants}")
+            else:
+                logger.warning("⚠️ Discovery found no Gemini models. Using defaults.")
+        except Exception as e:
+            logger.warning(f"⚠️ Model discovery failed: {e}. Keeping defaults.")
+
+    def _rotate_key(self):
+        if not GEMINI_API_KEYS: return
+        self.key_index = (self.key_index + 1) % len(GEMINI_API_KEYS)
+        self._configure_genai()
+
+    def ask(self, prompt, system_instruction=None):
+        if not GEMINI_API_KEYS: return None
+
+        # Logic: Try each model one by one. For each model, try ALL keys before giving up.
+        for variant in self.model_variants:
+            for _ in range(len(GEMINI_API_KEYS)):
+                try:
+                    model = genai.GenerativeModel(
+                        model_name=variant,
+                        system_instruction=system_instruction
+                    )
+                    response = model.generate_content(prompt)
+                    if response and response.text:
+                        return response.text
+                except Exception as e:
+                    err_msg = str(e).lower()
+                    logger.warning(f"⚠️ {variant} failed with key index {self.key_index % len(GEMINI_API_KEYS)}: {err_msg}")
+
+                    # If key is exhausted, blocked, or invalid -> Rotate to next key and RETRY same model
+                    if any(x in err_msg for x in ["429", "quota", "limit", "401", "403", "expired", "permission", "invalid"]):
+                        self._rotate_key()
+                        time.sleep(0.5)
+                        continue
+                    else:
+                        # If the error is model-specific (like 404), break to try next model variant
+                        break
+        return None
+
+    def generate_quiz(self, unit_name, student_level):
+        if not GEMINI_API_KEYS: return None
+
+        prompt = f"""
+        Generate a 5-question multiple choice quiz for the unit: '{unit_name}'.
+        Level: {student_level}.
+        Return ONLY valid JSON.
+        Format:
+        {{
+          "quiz_title": "Title",
+          "questions": [
+            {{
+              "question_text": "...",
+              "options": ["A", "B", "C", "D"],
+              "correct_option_index": 0,
+              "explanation": "..."
+            }}
+          ]
+        }}
+        """
+
+        for variant in self.model_variants:
+            for _ in range(len(GEMINI_API_KEYS)):
+                try:
+                    model = genai.GenerativeModel(model_name=variant)
+                    config = None
+                    if any(v in variant for v in ["1.5", "2.0", "exp"]):
+                        config = genai.types.GenerationConfig(response_mime_type="application/json")
+
+                    response = model.generate_content(prompt, generation_config=config)
+
+                    if response and response.text:
+                        raw_text = response.text.strip()
+                        if raw_text.startswith("```json"):
+                            raw_text = raw_text.replace("```json", "", 1).rsplit("```", 1)[0].strip()
+                        elif raw_text.startswith("```"):
+                            raw_text = raw_text.replace("```", "", 1).rsplit("```", 1)[0].strip()
+
+                        return json.loads(raw_text)
+                except Exception as e:
+                    err_msg = str(e).lower()
+                    logger.warning(f"⚠️ Quiz Gen Failed ({variant}) with key index {self.key_index % len(GEMINI_API_KEYS)}: {err_msg}")
+
+                    # Rotate key and retry same model
+                    self._rotate_key()
+                    time.sleep(0.5)
+                    continue
+        return None
+
+ai_engine = AiEngine()
+
+
+ <<<--- END_FILE_BLOCK: backend\ai_engine.py
 
 >>>--- START_FILE_BLOCK: backend\database.py
 ################################################################################
@@ -110,33 +282,34 @@ def get_db():
 >>>--- START_FILE_BLOCK: backend\main.py
 ################################################################################
 FILE: backend\main.py
-VERSION: 1.1.0 | SYSTEM: N/A
+VERSION: 1.2.2 | SYSTEM: N/A
 ################################################################################
 
 # IDENTITY: backend/main.py
-# VERSION: 1.1.0
+# VERSION: 1.2.2
 # ⚙️ GEAR 2: The API Routes (Executing the Trades)
 
 import os
-
-import google.generativeai as genai
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+import logging
 
 try:
-    from .database import Base, engine, get_db
-    from . import models as models
-    from . import schemas as schemas
-except ImportError:
     from database import Base, engine, get_db
     import models as models
     import schemas as schemas
+    from ai_engine import ai_engine
+except ImportError:
+    from .database import Base, engine, get_db
+    from . import models as models
+    from . import schemas as schemas
+    from .ai_engine import ai_engine
 
 # Create database tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Edu_AI Prop Firm Backend", version="1.1.0")
+app = FastAPI(title="Edu_AI Prop Firm Backend", version="1.2.2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -146,26 +319,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_FALLBACK_KEY_HERE")
-genai.configure(api_key=GEMINI_KEY)
-ai_model = genai.GenerativeModel("gemini-1.5-flash")
-
 @app.get("/")
 def read_root():
-    return {"status": "Bullish 📈", "message": "Edu_AI Backend v1.1.0 is Online."}
+    return {"status": "Bullish 📈", "message": "Edu_AI Backend v1.2.2 is Online."}
 
 @app.get("/api/user/{user_id}/dashboard", response_model=schemas.DashboardResponse)
 def get_dashboard(user_id: int, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+        # Auto-create user for testing if not exists
+        user = models.User(
+            id=user_id,
+            username=f"Trader_{user_id}",
+            role="Student",
+            sensory_mode="Standard",
+            ai_persona="Socratic Mentor",
+            semester_status="Year 4 - Redemption Arc"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
     active_units = db.query(models.Unit).filter(
         models.Unit.owner_id == user_id, 
         models.Unit.is_active == True
     ).all()
-    unit_names = [u.name for u in active_units]
 
+    if not active_units:
+        # Add default units
+        defaults = ["Biochemistry II", "General Surgery", "Internal Medicine"]
+        for name in defaults:
+            db.add(models.Unit(name=name, owner_id=user_id))
+        db.commit()
+        active_units = db.query(models.Unit).filter(models.Unit.owner_id == user_id).all()
+
+    unit_names = [u.name for u in active_units]
     quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user_id).all()
     total_quizzes = len(quizzes)
     average_pnl = sum([q.pnl for q in quizzes]) / total_quizzes if total_quizzes > 0 else 0.0
@@ -182,69 +370,65 @@ def get_dashboard(user_id: int, db: Session = Depends(get_db)):
         total_quizzes=total_quizzes
     )
 
-@app.put("/api/user/{user_id}/preferences")
-def update_preferences(user_id: int, prefs: schemas.UserPreferencesUpdate, db: Session = Depends(get_db)):
-    """Updates user UI/UX preferences."""
-    user = db.query(models.User).filter(models.User.id == user_id).first()
+# --- AI ENDPOINTS ---
+
+@app.post("/api/ai/chat", response_model=schemas.ChatResponse)
+def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == request.user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+        raise HTTPException(status_code=404, detail="User not found")
+
+    system_instruction = f"You are {user.ai_persona} (an AI Study Companion). " \
+                         f"The student is at level: {user.semester_status}. " \
+                         f"Be encouraging, concise, and educational. Recommend a YouTube link ONLY if it directly helps explain a complex concept."
     
-    if prefs.sensory_mode:
-        user.sensory_mode = prefs.sensory_mode
-    if prefs.ai_persona:
-        user.ai_persona = prefs.ai_persona
-        
+    # Pre-pend history if available
+    history_text = ""
+    for msg in request.history:
+        history_text += f"{msg.role}: {msg.content}\n"
+
+    full_prompt = f"{history_text}User: {request.prompt}"
+
+    response_text = ai_engine.ask(prompt=full_prompt, system_instruction=system_instruction)
+    if not response_text:
+        raise HTTPException(status_code=500, detail="Both AI engines are currently unavailable.")
+    
+    return schemas.ChatResponse(response=response_text)
+
+@app.post("/api/ai/quiz", response_model=schemas.QuizResponse)
+def generate_quiz(request: schemas.QuizRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == request.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    quiz_data = ai_engine.generate_quiz(
+        unit_name=request.unit_name,
+        student_level=user.semester_status
+    )
+    
+    if not quiz_data:
+        raise HTTPException(status_code=500, detail="Failed to ignite the Quiz Engine.")
+    
+    return quiz_data
+
+@app.post("/api/quiz/record")
+def record_quiz(history: schemas.QuizRecordRequest, db: Session = Depends(get_db)):
+    new_record = models.QuizHistory(
+        unit_name=history.unit_name,
+        score=history.score,
+        total=history.total,
+        pnl=(history.score / history.total) * 100 if history.total > 0 else 0,
+        owner_id=history.user_id,
+        timestamp=str(history.timestamp)
+    )
+    db.add(new_record)
     db.commit()
-    return {"status": "Success", "message": "Preferences updated."}
-
-@app.post("/api/chaos/generate_case", response_model=schemas.ChaosResponse)
-def generate_medical_case(request: schemas.ChaosRequest, db: Session = Depends(get_db)):
-    """Generates case, tailoring to user history if necessary."""
-    
-    # 1. Fetch user memory to personalize the prompt
-    user = db.query(models.User).filter(models.User.id == request.student_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Student not found.")
-        
-    # Check history for weak spots in this unit
-    weak_spots = ""
-    history = db.query(models.QuizHistory).filter(
-        models.QuizHistory.owner_id == request.student_id,
-        models.QuizHistory.unit_name == request.unit,
-        models.QuizHistory.pnl < 50.0 # If they scored less than 50%
-    ).all()
-    
-    if history:
-         weak_spots = "NOTE: Student previously struggled with this unit. Ensure the case reinforces core pathophysiological concepts."
-
-    focus = f" specifically focusing on {request.focus_area}" if request.focus_area else ""
-    
-    prompt = f"""
-    ACT AS: {user.ai_persona}.
-    TASK: Present a "Medical Mystery" case study for a student.
-    TOPIC: {request.unit}{focus}.
-    DIFFICULTY: {request.difficulty}.
-    {weak_spots}
-    
-    Format the output beautifully using Markdown. Include Patient Demographics, Vitals, Labs, 
-    and a clinical presentation. End by asking the student for their differential diagnosis.
-    Adapt the language to be accessible but rigorous.
-    """
-    
-    try:
-        response = ai_model.generate_content(prompt)
-        return schemas.ChaosResponse(case_study=response.text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI connection failed: {str(e)}")
-
+    return {"status": "Success", "message": "Trade recorded."}
 
 if __name__ == "__main__":
     import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "8000"))
-
-    uvicorn.run(app, host=host, port=port)
 
  <<<--- END_FILE_BLOCK: backend\main.py
 
@@ -410,15 +594,15 @@ class PerformanceLog(Base):
 >>>--- START_FILE_BLOCK: backend\schemas.py
 ################################################################################
 FILE: backend\schemas.py
-VERSION: 1.1.0 | SYSTEM: N/A
+VERSION: 1.1.1 | SYSTEM: N/A
 ################################################################################
 
 # IDENTITY: backend/schemas.py
-# VERSION: 1.1.0
+# VERSION: 1.1.1
 # ⚙️ Pydantic Models for Data Validation
 
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Any
 
 class UnitBase(BaseModel):
     name: str
@@ -445,7 +629,7 @@ class ChaosRequest(BaseModel):
     unit: str
     focus_area: Optional[str] = None
     difficulty: str = "Asian Parent Expectations (Extreme)"
-    student_id: int # Needed to tailor the prompt to their history
+    student_id: int
 
 class ChaosResponse(BaseModel):
     case_study: str
@@ -453,6 +637,41 @@ class ChaosResponse(BaseModel):
 class UserPreferencesUpdate(BaseModel):
     sensory_mode: Optional[str] = None
     ai_persona: Optional[str] = None
+
+# --- AI Models ---
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    prompt: str
+    user_id: int
+    history: List[ChatMessage] = []
+
+class ChatResponse(BaseModel):
+    response: str
+
+class QuizRequest(BaseModel):
+    unit_name: str
+    user_id: int
+
+class QuizQuestion(BaseModel):
+    question_text: str
+    options: List[str]
+    correct_option_index: int
+    explanation: str
+
+class QuizResponse(BaseModel):
+    quiz_title: str
+    questions: List[QuizQuestion]
+
+class QuizRecordRequest(BaseModel):
+    unit_name: str
+    score: int
+    total: int
+    user_id: int
+    timestamp: Any
+
 
  <<<--- END_FILE_BLOCK: backend\schemas.py
 
@@ -548,8 +767,9 @@ fastapi==0.109.2
 uvicorn==0.27.1
 sqlalchemy==2.0.25
 pydantic==2.6.1
-google-generativeai==0.3.2
+google-generativeai>=0.7.2
 python-dotenv==1.0.1
+
 
  <<<--- END_FILE_BLOCK: requirements.txt
 
@@ -661,6 +881,7 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
@@ -668,6 +889,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.google.generativeai)
 
     // Retrofit
     implementation(libs.retrofit)
@@ -739,6 +962,7 @@ VERSION: 1.0.0 | SYSTEM: N/A
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
+        android:name=".EduAIApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -764,6 +988,43 @@ VERSION: 1.0.0 | SYSTEM: N/A
 </manifest>
 
  <<<--- END_FILE_BLOCK: app\src\main\AndroidManifest.xml
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\EduAIApplication.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\EduAIApplication.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai
+
+import android.app.Application
+import androidx.room.Room
+import com.example.edu_ai.data.local.EduAIDatabase
+import com.example.edu_ai.data.remote.RetrofitClient
+import com.example.edu_ai.repository.EduAIRepository
+
+class EduAIApplication : Application() {
+
+    lateinit var database: EduAIDatabase
+    lateinit var repository: EduAIRepository
+
+    override fun onCreate() {
+        super.onCreate()
+        database = Room.databaseBuilder(
+            applicationContext,
+            EduAIDatabase::class.java,
+            "edu_ai_db"
+        ).build()
+
+        repository = EduAIRepository(
+            api = RetrofitClient.instance,
+            dao = database.dao()
+        )
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\EduAIApplication.kt
 
 >>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\MainActivity.kt
 ################################################################################
@@ -808,17 +1069,36 @@ class MainActivity : ComponentActivity() {
 
  <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\MainActivity.kt
 
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\ChatMessageEntity.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\local\ChatMessageEntity.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.data.local
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "chat_messages")
+data class ChatMessageEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val userId: String,
+    val role: String, // "user" or "model"
+    val content: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\ChatMessageEntity.kt
+
 >>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\EduAIDao.kt
 ################################################################################
 FILE: app\src\main\java\com\example\edu_ai\data\local\EduAIDao.kt
-VERSION: 1.1.0 | SYSTEM: N/A
+VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
 // IDENTITY: data/local/EduAIDao.kt
-// VERSION: 1.1.0
-// ⚙️ GEAR 1.2: The Local Database (SQLite)
-// This is our base currency. It handles the local ledger of all our data.
-
 package com.example.edu_ai.data.local
 
 import androidx.room.*
@@ -833,6 +1113,9 @@ interface EduAIDao {
 
     @Query("SELECT * FROM users LIMIT 1")
     fun getUser(): Flow<UserEntity?>
+    
+    @Query("SELECT * FROM users WHERE id = :userId")
+    suspend fun getUserById(userId: String): UserEntity?
 
     // Units
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -850,6 +1133,13 @@ interface EduAIDao {
 
     @Query("SELECT * FROM quiz_history ORDER BY timestamp DESC")
     fun getQuizHistory(): Flow<List<QuizHistoryEntity>>
+
+    // Chat History
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertChatMessage(message: ChatMessageEntity)
+
+    @Query("SELECT * FROM chat_messages WHERE userId = :userId ORDER BY timestamp ASC")
+    fun getChatMessages(userId: String): Flow<List<ChatMessageEntity>>
 }
 
 
@@ -858,22 +1148,23 @@ interface EduAIDao {
 >>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\EduAIDatabase.kt
 ################################################################################
 FILE: app\src\main\java\com\example\edu_ai\data\local\EduAIDatabase.kt
-VERSION: 1.1.0 | SYSTEM: N/A
+VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
 // IDENTITY: data/local/EduAIDatabase.kt
-// VERSION: 1.1.0
-// ⚙️ GEAR 1.2: The Local Database (SQLite)
-// This is our base currency. It handles the local ledger of all our data.
-
 package com.example.edu_ai.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [UserEntity::class, UnitEntity::class, QuizHistoryEntity::class],
-    version = 1,
+    entities = [
+        UserEntity::class, 
+        UnitEntity::class, 
+        QuizHistoryEntity::class,
+        ChatMessageEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class EduAIDatabase : RoomDatabase() {
@@ -968,14 +1259,10 @@ data class UserEntity(
 >>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\ApiModels.kt
 ################################################################################
 FILE: app\src\main\java\com\example\edu_ai\data\remote\ApiModels.kt
-VERSION: 1.1.0 | SYSTEM: N/A
+VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
 // IDENTITY: data/remote/ApiModels.kt
-// VERSION: 1.1.0
-// ⚙️ GEAR 1.1: The Network Broker (Retrofit)
-// This handles the communication with our remote server.
-
 package com.example.edu_ai.data.remote
 
 import com.google.gson.annotations.SerializedName
@@ -992,15 +1279,46 @@ data class DashboardResponse(
     @SerializedName("total_quizzes") val totalQuizzes: Int
 )
 
-data class ChaosRequest(
-    @SerializedName("unit") val unit: String,
-    @SerializedName("focus_area") val focusArea: String?,
-    @SerializedName("difficulty") val difficulty: String,
-    @SerializedName("student_id") val studentId: String
+// --- AI Models ---
+
+data class ChatMessage(
+    @SerializedName("role") val role: String,
+    @SerializedName("content") val content: String
 )
 
-data class ChaosResponse(
-    @SerializedName("case_study") val caseStudy: String
+data class ChatRequest(
+    @SerializedName("prompt") val prompt: String,
+    @SerializedName("user_id") val user_id: Int,
+    @SerializedName("history") val history: List<ChatMessage> = emptyList()
+)
+
+data class ChatResponse(
+    @SerializedName("response") val response: String
+)
+
+data class QuizRequest(
+    @SerializedName("unit_name") val unit_name: String,
+    @SerializedName("user_id") val user_id: Int
+)
+
+data class ApiQuizQuestion(
+    @SerializedName("question_text") val question_text: String,
+    @SerializedName("options") val options: List<String>,
+    @SerializedName("correct_option_index") val correct_option_index: Int,
+    @SerializedName("explanation") val explanation: String
+)
+
+data class ApiQuizResponse(
+    @SerializedName("quiz_title") val quiz_title: String,
+    @SerializedName("questions") val questions: List<ApiQuizQuestion>
+)
+
+data class QuizRecordRequest(
+    @SerializedName("unit_name") val unit_name: String,
+    @SerializedName("score") val score: Int,
+    @SerializedName("total") val total: Int,
+    @SerializedName("user_id") val user_id: Int,
+    @SerializedName("timestamp") val timestamp: Long
 )
 
 
@@ -1009,14 +1327,10 @@ data class ChaosResponse(
 >>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\EduAIApi.kt
 ################################################################################
 FILE: app\src\main\java\com\example\edu_ai\data\remote\EduAIApi.kt
-VERSION: 1.1.0 | SYSTEM: N/A
+VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
 // IDENTITY: data/remote/EduAIApi.kt
-// VERSION: 1.1.0
-// ⚙️ GEAR 1.1: The Network Broker (Retrofit)
-// This handles the communication with our remote server.
-
 package com.example.edu_ai.data.remote
 
 import retrofit2.http.Body
@@ -1029,8 +1343,16 @@ interface EduAIApi {
     @GET("api/user/{user_id}/dashboard")
     suspend fun getDashboard(@Path("user_id") userId: String): DashboardResponse
 
-    @POST("api/chaos/generate_case")
-    suspend fun generateChaosCase(@Body request: ChaosRequest): ChaosResponse
+    // --- AI Endpoints ---
+
+    @POST("api/ai/chat")
+    suspend fun aiChat(@Body request: ChatRequest): ChatResponse
+
+    @POST("api/ai/quiz")
+    suspend fun generateAiQuiz(@Body request: QuizRequest): ApiQuizResponse
+
+    @POST("api/quiz/record")
+    suspend fun recordQuiz(@Body request: QuizRecordRequest): Map<String, String>
 }
 
 
@@ -1039,26 +1361,32 @@ interface EduAIApi {
 >>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\RetrofitClient.kt
 ################################################################################
 FILE: app\src\main\java\com\example\edu_ai\data\remote\RetrofitClient.kt
-VERSION: 1.1.0 | SYSTEM: N/A
+VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
 // IDENTITY: data/remote/RetrofitClient.kt
-// VERSION: 1.1.0
-// ⚙️ GEAR 1.1: The Network Broker (Retrofit)
-// This handles the communication with our remote server.
-
 package com.example.edu_ai.data.remote
 
 import com.example.edu_ai.BuildConfig
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private val BASE_URL = BuildConfig.BACKEND_BASE_URL
+    // The BASE_URL is now dynamically injected from build.gradle.kts / gradle.properties
+    private const val BASE_URL = BuildConfig.BACKEND_BASE_URL
+
+    private val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(120, TimeUnit.SECONDS) // Increased for multi-key processing
+        .readTimeout(120, TimeUnit.SECONDS)    // Increased for multi-key processing
+        .writeTimeout(120, TimeUnit.SECONDS)
+        .build()
 
     val instance: EduAIApi by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(EduAIApi::class.java)
@@ -1068,24 +1396,215 @@ object RetrofitClient {
 
  <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\RetrofitClient.kt
 
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\ai\AiService.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\remote\ai\AiService.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.data.remote.ai
+
+import com.example.edu_ai.data.local.QuizHistoryEntity
+import com.example.edu_ai.data.local.UserEntity
+import com.example.edu_ai.data.remote.RetrofitClient
+import com.example.edu_ai.data.remote.ChatRequest
+import com.example.edu_ai.data.remote.QuizRequest
+import com.example.edu_ai.data.remote.QuizRecordRequest
+import com.example.edu_ai.data.remote.ChatMessage as ApiChatMessage
+
+/**
+ * 🚀 The New Network-First AI Service
+ * This service now talks to your Python Backend instead of Gemini directly.
+ */
+class GeminiAiService : AiService {
+
+    override suspend fun getChatResponse(
+        prompt: String,
+        userContext: UserEntity,
+        history: List<ChatMessage>
+    ): String {
+        return try {
+            val apiHistory = history.map { ApiChatMessage(role = it.role, content = it.content) }
+            val response = RetrofitClient.instance.aiChat(
+                ChatRequest(
+                    prompt = prompt,
+                    user_id = userContext.id.filter { it.isDigit() }.toIntOrNull() ?: 1,
+                    history = apiHistory
+                )
+            )
+            response.response
+        } catch (e: Exception) {
+            "Consultation failed: ${e.localizedMessage}. Ensure the Python Backend is running."
+        }
+    }
+
+    override suspend fun generateQuiz(
+        unitName: String,
+        userContext: UserEntity
+    ): QuizResponse? {
+        return try {
+            val response = RetrofitClient.instance.generateAiQuiz(
+                QuizRequest(
+                    unit_name = unitName,
+                    user_id = userContext.id.filter { it.isDigit() }.toIntOrNull() ?: 1
+                )
+            )
+            // Map API response to UI model
+            QuizResponse(
+                title = response.quiz_title,
+                questions = response.questions.map { q ->
+                    QuizQuestion(q.question_text, q.options, q.correct_option_index, q.explanation)
+                }
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    override suspend fun getRecommendations(
+        userContext: UserEntity,
+        quizHistory: List<QuizHistoryEntity>
+    ): String {
+        // We'll let the chat endpoint handle recommendations for now to keep it simple
+        return "Keep focusing on your active units! Your personalized strategy is being updated."
+    }
+}
+
+// Interface stays the same to avoid breaking UI code
+interface AiService {
+    suspend fun getChatResponse(prompt: String, userContext: UserEntity, history: List<ChatMessage> = emptyList()): String
+    suspend fun generateQuiz(unitName: String, userContext: UserEntity): QuizResponse?
+    suspend fun getRecommendations(userContext: UserEntity, quizHistory: List<QuizHistoryEntity>): String
+}
+
+data class ChatMessage(val role: String, val content: String)
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\ai\AiService.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\ai\AiServiceFactory.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\remote\ai\AiServiceFactory.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.data.remote.ai
+
+/**
+ * Factory to create instances of [AiService].
+ */
+class AiServiceFactory {
+    /**
+     * Creates an [AiService] instance.
+     * @param isProMode Boolean flag to determine which AI service to provide.
+     * Currently, it always returns [GeminiAiService] as it's the primary network-first service.
+     */
+    fun createService(isProMode: Boolean): AiService {
+        return GeminiAiService()
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\ai\AiServiceFactory.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\ai\GeminiKeyManager.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\remote\ai\GeminiKeyManager.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.data.remote.ai
+
+import android.util.Log
+
+/**
+ * 🔑 The Key Rotary System
+ * Inspired by your Python implementation!
+ */
+object GeminiKeyManager {
+    
+    private val apiKeys = listOf(
+        "AIzaSyDmvjVkFmt0RoTMNER8fYoIKfy7Pkw1sfo",
+        "AIzaSyDgvt1qfR_IG-UN__WcOPj1hv5s1IVUWHY",
+        "AIzaSyAexK9L9QdaJriD0NN7bfeSewiqfyMaR7g",
+        "AIzaSyAhUSxiUpljDD91wLNC1__18PywTvd0kCM"
+    )
+
+    private var currentKeyIndex = 0
+
+    /**
+     * Returns the current API key in the rotation.
+     */
+    fun getCurrentKey(): String {
+        if (apiKeys.isEmpty()) return ""
+        return apiKeys[currentKeyIndex % apiKeys.size]
+    }
+
+    /**
+     * Swaps to the next key. Returns the new key.
+     */
+    fun rotateKey(): String {
+        if (apiKeys.size <= 1) return getCurrentKey()
+        currentKeyIndex = (currentKeyIndex + 1) % apiKeys.size
+        Log.d("GeminiKeyManager", "🔄 Swapped to Key Index: $currentKeyIndex")
+        return getCurrentKey()
+    }
+
+    fun getKeyCount(): Int = apiKeys.size
+
+    /**
+     * For debugging, returns the last 4 digits of the current key.
+     */
+    fun getKeySnippet(): String {
+        val key = getCurrentKey()
+        return if (key.length > 4) "...${key.takeLast(4)}" else "INVALID"
+    }
+    
+    // Legacy support for older code
+    fun getNextKey(): String = rotateKey()
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\ai\GeminiKeyManager.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\ai\QuizModels.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\data\remote\ai\QuizModels.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.data.remote.ai
+
+import com.google.gson.annotations.SerializedName
+
+data class QuizResponse(
+    @SerializedName("quiz_title") val title: String,
+    @SerializedName("questions") val questions: List<QuizQuestion>
+)
+
+data class QuizQuestion(
+    @SerializedName("question_text") val text: String,
+    @SerializedName("options") val options: List<String>,
+    @SerializedName("correct_option_index") val correctIndex: Int,
+    @SerializedName("explanation") val explanation: String
+)
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\ai\QuizModels.kt
+
 >>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\repository\EduAIRepository.kt
 ################################################################################
 FILE: app\src\main\java\com\example\edu_ai\repository\EduAIRepository.kt
-VERSION: 1.1.0 | SYSTEM: N/A
+VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
 // IDENTITY: repository/EduAIRepository.kt
-// VERSION: 1.1.0
-// ⚙️ GEAR 1.3: The Repository (Data Orchestrator)
-// This is the single source of truth. It decides whether to use the Network Broker or the Local Ledger.
-
 package com.example.edu_ai.repository
 
 import com.example.edu_ai.data.local.EduAIDao
 import com.example.edu_ai.data.local.UserEntity
 import com.example.edu_ai.data.local.UnitEntity
 import com.example.edu_ai.data.remote.EduAIApi
-import com.example.edu_ai.data.remote.DashboardResponse
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.firstOrNull
@@ -1095,17 +1614,11 @@ class EduAIRepository(
     private val dao: EduAIDao
 ) {
 
-    /**
-     * Fetches dashboard data from the API, updates the local database,
-     * and returns a Flow that emits the user data.
-     * Falls back to local database if network fails.
-     */
     fun getDashboardData(userId: String): Flow<UserEntity?> = flow {
         try {
             // 1. Try to fetch from remote
             val response = api.getDashboard(userId)
             
-            // 2. Map and Save to Local (Offline-First)
             val userEntity = UserEntity(
                 id = userId,
                 username = response.username,
@@ -1116,7 +1629,6 @@ class EduAIRepository(
             )
             dao.insertUser(userEntity)
             
-            // Handle units
             dao.deleteAllUnits()
             val unitEntities = response.activeUnits.map { unitName ->
                 UnitEntity(unitName = unitName, isActive = true)
@@ -1125,9 +1637,32 @@ class EduAIRepository(
             
             emit(userEntity)
         } catch (e: Exception) {
-            // 3. Fallback: Fetch from local ledger if network fails
+            // 2. Fallback: Check Local DB
             val cachedUser = dao.getUser().firstOrNull()
-            emit(cachedUser)
+            if (cachedUser != null) {
+                emit(cachedUser)
+            } else {
+                // 3. Dev Fallback: If everything fails and DB is empty, provide a mock user
+                val devUser = UserEntity(
+                    id = userId,
+                    username = "Dev Trader",
+                    role = "Student",
+                    sensoryMode = "Visual",
+                    semesterStatus = "Year 4 - Redemption Arc 🔥",
+                    aiPersona = "Socratic Mentor"
+                )
+                dao.insertUser(devUser)
+                
+                // Add some default units so the Quiz tab isn't empty
+                val devUnits = listOf(
+                    UnitEntity(unitName = "Biochemistry II", isActive = true),
+                    UnitEntity(unitName = "General Surgery", isActive = true),
+                    UnitEntity(unitName = "Internal Medicine", isActive = true)
+                )
+                dao.insertUnits(devUnits)
+                
+                emit(devUser)
+            }
         }
     }
 }
@@ -1141,39 +1676,34 @@ FILE: app\src\main\java\com\example\edu_ai\ui\navigation\AppNavigation.kt
 VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
-// #file app/src/main/java/com/example/edu_ai/ui/navigation/AppNavigation.kt
-// #version 1.0.2
-// #The traffic cop routing users to either the Admin or Worker dashboard.
-
 package com.example.edu_ai.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.edu_ai.ui.screens.LoginScreen
+import com.example.edu_ai.ui.screens.student.ModuleScreen
 import com.example.edu_ai.ui.screens.student.StudentDashboard
 import com.example.edu_ai.ui.screens.teacher.TeacherDashboard
 
 @Composable
 fun AppNavigation() {
-    // This is our GPS for the app
     val navController = rememberNavController()
 
     NavHost(navController = navController, startDestination = "login") {
         
-        // 🛑 Route 1: The Front Door
         composable("login") {
             LoginScreen(
-                onLoginSuccess = { role ->
+                onLoginSuccess = { role, userId ->
                     if (role == "Teacher") {
-                        // Send Admin to the penthouse
                         navController.navigate("teacher_dashboard") {
-                            popUpTo("login") { inclusive = true } // Don't let them hit back to login
+                            popUpTo("login") { inclusive = true }
                         }
                     } else {
-                        // Send Student to the trenches
-                        navController.navigate("student_dashboard") {
+                        navController.navigate("student_dashboard/$userId") {
                             popUpTo("login") { inclusive = true }
                         }
                     }
@@ -1181,18 +1711,37 @@ fun AppNavigation() {
             )
         }
 
-        // 📈 Route 2: The Worker (Student) View
-        composable("student_dashboard") {
+        composable(
+            route = "student_dashboard/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: "STUDENT_001"
             StudentDashboard(
+                userId = userId,
                 onLogout = {
                     navController.navigate("login") {
-                        popUpTo("student_dashboard") { inclusive = true }
+                        popUpTo("student_dashboard/$userId") { inclusive = true }
                     }
+                },
+                onLaunchModule = {
+                    navController.navigate("module_screen/$userId")
                 }
             )
         }
 
-        // 👨‍🏫 Route 3: The Admin (Teacher) View
+        composable(
+            route = "module_screen/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: "STUDENT_001"
+            ModuleScreen(
+                userId = userId,
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
         composable("teacher_dashboard") {
             TeacherDashboard(
                 onLogout = {
@@ -1204,6 +1753,7 @@ fun AppNavigation() {
         }
     }
 }
+
 
  <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\navigation\AppNavigation.kt
 
@@ -1227,7 +1777,7 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(onLoginSuccess: (String) -> Unit) {
+fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var selectedRole by remember { mutableStateOf("Student") }
@@ -1304,7 +1854,9 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         // Login Button
         Button(
             onClick = { 
-                onLoginSuccess(selectedRole) 
+                if (username.isNotBlank()) {
+                    onLoginSuccess(selectedRole, username)
+                }
             },
             modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
@@ -1316,6 +1868,1020 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
 
  <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\LoginScreen.kt
 
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\ChatInterface.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\screens\student\ChatInterface.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.screens.student
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.PlayCircleFilled
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.edu_ai.data.remote.ai.ChatMessage
+import kotlinx.coroutines.delay
+import java.util.regex.Pattern
+
+@Composable
+fun ChatInterface(
+    viewModel: ChatViewModel,
+    modifier: Modifier = Modifier
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    var inputText by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
+    Column(modifier = modifier.fillMaxSize()) {
+        // 1. Message List
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            reverseLayout = false,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(vertical = 16.dp)
+        ) {
+            items(uiState.messages) { message ->
+                ChatBubble(message)
+            }
+            if (uiState.isTyping) {
+                item {
+                    TypingIndicator()
+                }
+            }
+        }
+
+        // 2. Error Display
+        uiState.error?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(8.dp),
+                fontSize = 12.sp
+            )
+        }
+
+        // 3. Input Area
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = { inputText = it },
+                placeholder = { Text("Ask about your syllabus...") },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(24.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(
+                onClick = {
+                    if (inputText.isNotBlank()) {
+                        viewModel.sendMessage(inputText)
+                        inputText = ""
+                    }
+                },
+                enabled = !uiState.isTyping
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Send",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TypingIndicator() {
+    var seconds by remember { mutableIntStateOf(0) }
+    
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            seconds++
+        }
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(start = 8.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Timer,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.secondary
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = "Gemini is thinking... (${seconds}s)",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary
+        )
+    }
+}
+
+@Composable
+fun ChatBubble(message: ChatMessage) {
+    val isUser = message.role == "user"
+    val alignment = if (isUser) Alignment.End else Alignment.Start
+    val containerColor = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val contentColor = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+
+    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = alignment) {
+        Surface(
+            color = containerColor,
+            contentColor = contentColor,
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = if (isUser) 16.dp else 0.dp,
+                bottomEnd = if (isUser) 0.dp else 16.dp
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(text = message.content)
+                
+                // Detect YouTube Links
+                val youtubeUrl = extractYoutubeUrl(message.content)
+                if (youtubeUrl != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    VideoRecommendationCard(url = youtubeUrl)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VideoRecommendationCard(url: String) {
+    val context = LocalContext.current
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        modifier = Modifier.padding(top = 4.dp),
+        onClick = {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            context.startActivity(intent)
+        }
+    ) {
+        Row(
+            modifier = Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.PlayCircleFilled, contentDescription = null, tint = Color.Red)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Watch Recommended Lesson", style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+fun extractYoutubeUrl(content: String): String? {
+    val ytPattern = "(https?://(?:www\\.)?youtube\\.com/watch\\?v=[\\w-]+|https?://youtu\\.be/[\\w-]+)"
+    val pattern = Pattern.compile(ytPattern)
+    val matcher = pattern.matcher(content)
+    return if (matcher.find()) matcher.group(0) else null
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\ChatInterface.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\ChatViewModel.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\screens\student\ChatViewModel.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.screens.student
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.edu_ai.EduAIApplication
+import com.example.edu_ai.data.local.ChatMessageEntity
+import com.example.edu_ai.data.local.EduAIDao
+import com.example.edu_ai.data.local.UserEntity
+import com.example.edu_ai.data.remote.ai.AiService
+import com.example.edu_ai.data.remote.ai.AiServiceFactory
+import com.example.edu_ai.data.remote.ai.ChatMessage
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+
+data class ChatUiState(
+    val messages: List<ChatMessage> = emptyList(),
+    val isTyping: Boolean = false,
+    val error: String? = null
+)
+
+class ChatViewModel(
+    private val aiService: AiService,
+    private val dao: EduAIDao,
+    private val user: UserEntity
+) : ViewModel() {
+
+    private val _isTyping = MutableStateFlow(false)
+    private val _error = MutableStateFlow<String?>(null)
+
+    val uiState: StateFlow<ChatUiState> = combine(
+        dao.getChatMessages(user.id),
+        _isTyping,
+        _error
+    ) { localMessages, typing, err ->
+        ChatUiState(
+            messages = localMessages.map { ChatMessage(it.role, it.content) },
+            isTyping = typing,
+            error = err
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = ChatUiState()
+    )
+
+    fun sendMessage(text: String) {
+        if (text.isBlank()) return
+
+        viewModelScope.launch {
+            // 1. Save user message to Local DB
+            dao.insertChatMessage(
+                ChatMessageEntity(
+                    userId = user.id,
+                    role = "user",
+                    content = text
+                )
+            )
+            
+            _isTyping.value = true
+            _error.value = null
+
+            try {
+                // 2. Get history for API context
+                val history = uiState.value.messages
+
+                // 3. Ask AI
+                val response = aiService.getChatResponse(
+                    prompt = text,
+                    userContext = user,
+                    history = history
+                )
+                
+                // 4. Save AI response to Local DB
+                dao.insertChatMessage(
+                    ChatMessageEntity(
+                        userId = user.id,
+                        role = "model",
+                        content = response
+                    )
+                )
+            } catch (e: Exception) {
+                _error.value = "Connection lost. The AI is offline."
+            } finally {
+                _isTyping.value = false
+            }
+        }
+    }
+
+    companion object {
+        fun provideFactory(user: UserEntity): ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val application = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as EduAIApplication)
+                val aiService = AiServiceFactory().createService(isProMode = false)
+                ChatViewModel(aiService, application.database.dao(), user)
+            }
+        }
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\ChatViewModel.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\ModuleScreen.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\screens\student\ModuleScreen.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.screens.student
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.edu_ai.data.local.UserEntity
+import java.text.SimpleDateFormat
+import java.util.*
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ModuleScreen(
+    userId: String,
+    onBack: () -> Unit,
+    studentViewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
+) {
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val uiState by studentViewModel.uiState.collectAsState()
+
+    LaunchedEffect(userId) {
+        studentViewModel.refreshDashboard(userId)
+    }
+    
+    val tabs = listOf("Chat", "History", "Quiz", "Progress", "Zenith")
+    val icons = listOf(
+        Icons.AutoMirrored.Filled.Chat,
+        Icons.AutoMirrored.Filled.List,
+        Icons.Default.Edit,
+        Icons.Default.Star,
+        Icons.Default.AccountCircle
+    )
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(tabs[selectedTab]) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        },
+        bottomBar = {
+            NavigationBar {
+                tabs.forEachIndexed { index, title ->
+                    NavigationBarItem(
+                        icon = { Icon(icons[index], contentDescription = title) },
+                        label = { Text(title) },
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index }
+                    )
+                }
+            }
+        }
+    ) { padding ->
+        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+            if (uiState.isLoading && uiState.user == null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                when (selectedTab) {
+                    0 -> ChatTabWrapper(uiState.user)
+                    1 -> ChatHistoryTab()
+                    2 -> {
+                        if (uiState.user != null) {
+                            val quizViewModel: QuizViewModel = viewModel(
+                                factory = QuizViewModel.provideFactory(uiState.user!!)
+                            )
+                            QuizTabWrapper(
+                                user = uiState.user,
+                                units = uiState.units,
+                                viewModel = quizViewModel
+                            )
+                        }
+                    }
+                    3 -> {
+                        if (uiState.user != null) {
+                            val progressViewModel: ProgressViewModel = viewModel(
+                                factory = ProgressViewModel.provideFactory(uiState.user!!)
+                            )
+                            ProgressTab(viewModel = progressViewModel)
+                        }
+                    }
+                    4 -> ZenithTab()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatTabWrapper(user: UserEntity?) {
+    var isChatStarted by remember { mutableStateOf(false) }
+
+    if (!isChatStarted) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("AI Study Companion", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Ask anything about your current module...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Button(
+                onClick = { isChatStarted = true },
+                modifier = Modifier.fillMaxWidth().height(56.dp)
+            ) {
+                Text("START 🚀", fontWeight = FontWeight.Bold)
+            }
+        }
+    } else {
+        if (user != null) {
+            val chatViewModel: ChatViewModel = viewModel(
+                factory = ChatViewModel.provideFactory(user)
+            )
+            ChatInterface(viewModel = chatViewModel)
+        }
+    }
+}
+
+@Composable
+fun ChatHistoryTab() {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text("Previous Consultations", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text("Resume or delete your study sessions.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun ProgressTab(viewModel: ProgressViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshRecommendations()
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Text("Learning Analytics", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text("Monitoring your progressive growth", color = MaterialTheme.colorScheme.primary)
+        }
+
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.TrendingUp, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("AI Strategy & Recommendations", fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (uiState.isLoading) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    } else {
+                        Text(uiState.aiRecommendation, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+
+        item {
+            Text("Recent Portfolio Performance", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        }
+
+        if (uiState.quizHistory.isEmpty()) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Text("No quiz data yet. Start an assessment to see results!", color = Color.Gray)
+                }
+            }
+        }
+
+        items(uiState.quizHistory) { history ->
+            val date = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(history.timestamp))
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(history.unitName, fontWeight = FontWeight.Bold)
+                        Text(date, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                    Text(
+                        "${history.pnlScore.toInt()}%",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (history.pnlScore >= 70) Color(0xFF4CAF50) else Color(0xFFF44336)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ZenithTab() {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text("The Zenith Hub", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text("Settings & Daily Motivation", color = MaterialTheme.colorScheme.secondary)
+        Spacer(modifier = Modifier.height(24.dp))
+        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            Text(
+                "\"The expert in anything was once a beginner.\"",
+                modifier = Modifier.padding(16.dp),
+                fontWeight = FontWeight.Light
+            )
+        }
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\ModuleScreen.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\ProgressViewModel.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\screens\student\ProgressViewModel.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.screens.student
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.edu_ai.EduAIApplication
+import com.example.edu_ai.data.local.EduAIDao
+import com.example.edu_ai.data.local.QuizHistoryEntity
+import com.example.edu_ai.data.local.UserEntity
+import com.example.edu_ai.data.remote.ai.AiService
+import com.example.edu_ai.data.remote.ai.AiServiceFactory
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+
+data class ProgressUiState(
+    val quizHistory: List<QuizHistoryEntity> = emptyList(),
+    val aiRecommendation: String = "Generating your personalized strategy...",
+    val isLoading: Boolean = false
+)
+
+class ProgressViewModel(
+    private val aiService: AiService,
+    private val dao: EduAIDao,
+    private val user: UserEntity
+) : ViewModel() {
+
+    private val _aiRecommendation = MutableStateFlow("Analyze your recent quizzes to see where you can grow.")
+    private val _isLoading = MutableStateFlow(false)
+
+    val uiState: StateFlow<ProgressUiState> = combine(
+        dao.getQuizHistory(),
+        _aiRecommendation,
+        _isLoading
+    ) { history, recommendation, loading ->
+        ProgressUiState(history, recommendation, loading)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = ProgressUiState(isLoading = true)
+    )
+
+    fun refreshRecommendations() {
+        viewModelScope.launch {
+            val history = uiState.value.quizHistory
+            if (history.isEmpty()) {
+                _aiRecommendation.value = "Take your first quiz to unlock personalized AI strategy!"
+                return@launch
+            }
+
+            _isLoading.value = true
+            try {
+                val recommendation = aiService.getRecommendations(user, history)
+                _aiRecommendation.value = recommendation
+            } catch (e: Exception) {
+                _aiRecommendation.value = "Stay consistent! Your next breakthrough is just one study session away."
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    companion object {
+        fun provideFactory(user: UserEntity): ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val application = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as EduAIApplication)
+                val aiService = AiServiceFactory().createService(isProMode = false)
+                ProgressViewModel(aiService, application.database.dao(), user)
+            }
+        }
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\ProgressViewModel.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\QuizInterface.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\screens\student\QuizInterface.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.screens.student
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.edu_ai.data.local.UnitEntity
+
+@Composable
+fun QuizTabWrapper(
+    user: com.example.edu_ai.data.local.UserEntity?,
+    units: List<UnitEntity>,
+    viewModel: QuizViewModel
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    if (uiState.quiz == null) {
+        UnitSelectionScreen(units = units, onUnitSelected = { viewModel.startQuiz(it) }, isLoading = uiState.isLoading, error = uiState.error)
+    } else if (uiState.isQuizFinished) {
+        QuizResultScreen(
+            score = uiState.score,
+            total = uiState.quiz?.questions?.size ?: 0,
+            onRestart = { viewModel.startQuiz(uiState.quiz?.title ?: "") }
+        )
+    } else {
+        QuizQuestionScreen(
+            viewModel = viewModel,
+            uiState = uiState
+        )
+    }
+}
+
+@Composable
+fun UnitSelectionScreen(
+    units: List<UnitEntity>,
+    onUnitSelected: (String) -> Unit,
+    isLoading: Boolean,
+    error: String?
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Knowledge Retrieval", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text("Select a unit from your syllabus to start a personalized quiz.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (isLoading) {
+            CircularProgressIndicator()
+            Text("AI is drafting your assessment...", modifier = Modifier.padding(top = 16.dp))
+        } else {
+            error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 16.dp))
+            }
+            
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                itemsIndexed(units) { _, unit ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onUnitSelected(unit.unitName) }
+                    ) {
+                        Text(unit.unitName, modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuizQuestionScreen(
+    viewModel: QuizViewModel,
+    uiState: QuizUiState
+) {
+    val quiz = uiState.quiz ?: return
+    val currentIdx = uiState.currentQuestionIndex
+    val currentQuestion = quiz.questions[currentIdx]
+    val selectedIdx = uiState.selectedOptions[currentIdx]
+    val isSubmitted = uiState.submittedQuestions.contains(currentIdx)
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Progress
+        LinearProgressIndicator(
+            progress = { (currentIdx + 1).toFloat() / quiz.questions.size },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text("Question ${currentIdx + 1} of ${quiz.questions.size}", style = MaterialTheme.typography.labelMedium)
+
+        // Question
+        Text(text = currentQuestion.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+
+        // Options
+        currentQuestion.options.forEachIndexed { index, option ->
+            val isThisOptionSelected = selectedIdx == index
+            val isCorrect = index == currentQuestion.correctIndex
+            
+            val borderColor = when {
+                isSubmitted && isCorrect -> Color.Green
+                isSubmitted && isThisOptionSelected && !isCorrect -> Color.Red
+                isThisOptionSelected -> MaterialTheme.colorScheme.primary
+                else -> MaterialTheme.colorScheme.outline
+            }
+
+            OutlinedCard(
+                onClick = { if (!isSubmitted) viewModel.selectOption(index) },
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(2.dp, borderColor)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = option, modifier = Modifier.weight(1f))
+                    if (isSubmitted) {
+                        if (isCorrect) Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.Green)
+                        else if (isThisOptionSelected) Icon(Icons.Default.Error, contentDescription = null, tint = Color.Red)
+                    }
+                }
+            }
+        }
+
+        // Explanation
+        if (isSubmitted) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text("Explanation", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(currentQuestion.explanation, fontSize = 14.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Navigation Buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Previous Button
+            OutlinedButton(
+                onClick = { viewModel.previousQuestion() },
+                enabled = currentIdx > 0,
+                modifier = Modifier.weight(1f).height(56.dp)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("PREV")
+            }
+
+            if (!isSubmitted) {
+                // Submit Button
+                Button(
+                    onClick = { viewModel.submitAnswer() },
+                    enabled = selectedIdx != null,
+                    modifier = Modifier.weight(1f).height(56.dp)
+                ) {
+                    Text("SUBMIT")
+                }
+            } else {
+                // Next Button
+                Button(
+                    onClick = { viewModel.nextQuestion() },
+                    modifier = Modifier.weight(1f).height(56.dp)
+                ) {
+                    Text(if (currentIdx + 1 < quiz.questions.size) "NEXT" else "FINISH")
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuizResultScreen(score: Int, total: Int, onRestart: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Assessment Complete!", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Your PnL (Accuracy)", fontSize = 18.sp)
+        Text("${(score.toDouble()/total * 100).toInt()}%", fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+        Text("Score: $score / $total", fontSize = 20.sp)
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Button(onClick = onRestart, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+            Text("RETAKE ASSESSMENT")
+        }
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\QuizInterface.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\QuizViewModel.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\screens\student\QuizViewModel.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.screens.student
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.edu_ai.EduAIApplication
+import com.example.edu_ai.data.local.EduAIDao
+import com.example.edu_ai.data.local.QuizHistoryEntity
+import com.example.edu_ai.data.local.UserEntity
+import com.example.edu_ai.data.remote.ai.AiService
+import com.example.edu_ai.data.remote.ai.AiServiceFactory
+import com.example.edu_ai.data.remote.ai.QuizQuestion
+import com.example.edu_ai.data.remote.ai.QuizResponse
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+
+data class QuizUiState(
+    val quiz: QuizResponse? = null,
+    val currentQuestionIndex: Int = 0,
+    val selectedOptions: Map<Int, Int> = emptyMap(), // Map of question index to selected option
+    val submittedQuestions: Set<Int> = emptySet(), // Questions that have been submitted/locked
+    val score: Int = 0,
+    val isQuizFinished: Boolean = false,
+    val isLoading: Boolean = false,
+    val error: String? = null
+)
+
+class QuizViewModel(
+    private val aiService: AiService,
+    private val dao: EduAIDao,
+    private val user: UserEntity
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(QuizUiState())
+    val uiState: StateFlow<QuizUiState> = _uiState.asStateFlow()
+
+    fun startQuiz(unitName: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(
+                quiz = null,
+                currentQuestionIndex = 0,
+                selectedOptions = emptyMap(),
+                submittedQuestions = emptySet(),
+                score = 0,
+                isQuizFinished = false,
+                isLoading = true,
+                error = null
+            ) }
+            val quiz = aiService.generateQuiz(unitName, user)
+            if (quiz != null) {
+                _uiState.update { it.copy(quiz = quiz, isLoading = false) }
+            } else {
+                _uiState.update { it.copy(isLoading = false, error = "Failed to ignite the Quiz Engine.") }
+            }
+        }
+    }
+
+    fun selectOption(index: Int) {
+        val state = _uiState.value
+        if (state.submittedQuestions.contains(state.currentQuestionIndex)) return
+        
+        val newOptions = state.selectedOptions.toMutableMap()
+        newOptions[state.currentQuestionIndex] = index
+        _uiState.update { it.copy(selectedOptions = newOptions) }
+    }
+
+    fun submitAnswer() {
+        val state = _uiState.value
+        val quiz = state.quiz ?: return
+        val currentIdx = state.currentQuestionIndex
+        
+        if (state.submittedQuestions.contains(currentIdx)) return
+        val selectedIdx = state.selectedOptions[currentIdx] ?: return
+        
+        val currentQuestion = quiz.questions[currentIdx]
+        val isCorrect = selectedIdx == currentQuestion.correctIndex
+        val newScore = if (isCorrect) state.score + 1 else state.score
+
+        _uiState.update { it.copy(
+            score = newScore,
+            submittedQuestions = state.submittedQuestions + currentIdx
+        ) }
+    }
+
+    fun nextQuestion() {
+        val state = _uiState.value
+        val quiz = state.quiz ?: return
+        
+        if (state.currentQuestionIndex + 1 < quiz.questions.size) {
+            _uiState.update { it.copy(currentQuestionIndex = state.currentQuestionIndex + 1) }
+        } else {
+            finishQuiz()
+        }
+    }
+
+    fun previousQuestion() {
+        val state = _uiState.value
+        if (state.currentQuestionIndex > 0) {
+            _uiState.update { it.copy(currentQuestionIndex = state.currentQuestionIndex - 1) }
+        }
+    }
+
+    private fun finishQuiz() {
+        val state = _uiState.value
+        val quiz = state.quiz ?: return
+        
+        val finalScorePercentage = (state.score.toDouble() / quiz.questions.size) * 100
+        
+        viewModelScope.launch {
+            dao.insertQuizHistory(
+                QuizHistoryEntity(
+                    unitName = quiz.title,
+                    pnlScore = finalScorePercentage,
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+            _uiState.update { it.copy(isQuizFinished = true) }
+        }
+    }
+
+    companion object {
+        fun provideFactory(user: UserEntity): ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val application = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as EduAIApplication)
+                val aiService = AiServiceFactory().createService(isProMode = false)
+                QuizViewModel(aiService, application.database.dao(), user)
+            }
+        }
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\QuizViewModel.kt
+
 >>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\StudentDashboard.kt
 ################################################################################
 FILE: app\src\main\java\com\example\edu_ai\ui\screens\student\StudentDashboard.kt
@@ -1326,18 +2892,36 @@ package com.example.edu_ai.ui.screens.student
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StudentDashboard(onLogout: () -> Unit) {
+fun StudentDashboard(
+    userId: String,
+    onLogout: () -> Unit,
+    onLaunchModule: () -> Unit,
+    viewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    // Refresh data using the real User ID passed from login
+    LaunchedEffect(userId) {
+        viewModel.refreshDashboard(userId)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1353,51 +2937,68 @@ fun StudentDashboard(onLogout: () -> Unit) {
             )
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                Text("Welcome back, Future Doc!", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Text("Status: Year 4 - Redemption Arc 🔥", color = MaterialTheme.colorScheme.primary)
+        if (uiState.isLoading && uiState.user == null) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
             }
-
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Current PnL (Win Rate)", fontWeight = FontWeight.Bold)
-                        Text("📈 78.4% Accuracy in Internal Medicine", fontSize = 18.sp)
-                        Text("⚠️ Warning: Stop-loss getting tight in Biochemistry", color = MaterialTheme.colorScheme.error)
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                uiState.error?.let { error ->
+                    item {
+                        Text(text = "Error: $error", color = MaterialTheme.colorScheme.error)
                     }
                 }
-            }
 
-            item {
-                Button(
-                    onClick = { /* TODO: Navigate to Chaos Room! */ },
-                    modifier = Modifier.fillMaxWidth().height(60.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                ) {
-                    Text("LAUNCH AI CHAOS ENGINE 🧠", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            item {
-                Text("Active Contracts (Units)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            }
-
-            // Mock list of active units
-            val units = listOf("Biochemistry II", "General Surgery", "Community Health", "Internal Medicine I")
-            items(units.size) { index ->
-                Card(modifier = Modifier.fillMaxWidth()) {
+                item {
                     Text(
-                        text = "📘 ${units[index]}",
-                        modifier = Modifier.padding(16.dp),
-                        fontWeight = FontWeight.Medium
+                        text = "Welcome back, ${uiState.user?.username ?: "Future Doc"}!",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
                     )
+                    Text(
+                        text = "Status: ${uiState.user?.semesterStatus ?: "Year 4 - Redemption Arc 🔥"}",
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Current PnL (Win Rate)", fontWeight = FontWeight.Bold)
+                            Text("📈 AI Persona: ${uiState.user?.aiPersona ?: "N/A"}", fontSize = 18.sp)
+                            Text("Sensory Mode: ${uiState.user?.sensoryMode ?: "N/A"}", color = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+                }
+
+                item {
+                    Button(
+                        onClick = onLaunchModule,
+                        modifier = Modifier.fillMaxWidth().height(60.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                    ) {
+                        Text("LAUNCH MODULE 🧠", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                item {
+                    Text("Active Contracts (Units)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                }
+
+                items(uiState.units) { unit ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "📘 ${unit.unitName}",
+                            modifier = Modifier.padding(16.dp),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
@@ -1406,6 +3007,79 @@ fun StudentDashboard(onLogout: () -> Unit) {
 
 
  <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\StudentDashboard.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\StudentViewModel.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\ui\screens\student\StudentViewModel.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.ui.screens.student
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.edu_ai.EduAIApplication
+import com.example.edu_ai.data.local.UserEntity
+import com.example.edu_ai.data.local.UnitEntity
+import com.example.edu_ai.repository.EduAIRepository
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+
+data class StudentUiState(
+    val user: UserEntity? = null,
+    val units: List<UnitEntity> = emptyList(),
+    val isLoading: Boolean = false,
+    val error: String? = null
+)
+
+class StudentViewModel(private val repository: EduAIRepository, private val dao: com.example.edu_ai.data.local.EduAIDao) : ViewModel() {
+
+    private val _isLoading = MutableStateFlow(false)
+    private val _error = MutableStateFlow<String?>(null)
+
+    val uiState: StateFlow<StudentUiState> = combine(
+        dao.getUser(),
+        dao.getAllUnits(),
+        _isLoading,
+        _error
+    ) { user, units, isLoading, error ->
+        StudentUiState(user, units, isLoading, error)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = StudentUiState(isLoading = true)
+    )
+
+    fun refreshDashboard(userId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            try {
+                // repository.getDashboardData(userId) already updates the DAO
+                repository.getDashboardData(userId).collect()
+            } catch (e: Exception) {
+                _error.value = e.message
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val application = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as EduAIApplication)
+                StudentViewModel(application.repository, application.database.dao())
+            }
+        }
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\student\StudentViewModel.kt
 
 >>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\screens\teacher\TeacherDashboard.kt
 ################################################################################
@@ -1945,170 +3619,13 @@ VERSION: 1.0.0 | SYSTEM: N/A
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#3DDC84"
+        android:fillColor="#1A237E"
         android:pathData="M0,0h108v108h-108z" />
     <path
-        android:fillColor="#00000000"
-        android:pathData="M9,0L9,108"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M19,0L19,108"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M29,0L29,108"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M39,0L39,108"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M49,0L49,108"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M59,0L59,108"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M69,0L69,108"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M79,0L79,108"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M89,0L89,108"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M99,0L99,108"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,9L108,9"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,19L108,19"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,29L108,29"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,39L108,39"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,49L108,49"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,59L108,59"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,69L108,69"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,79L108,79"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,89L108,89"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M0,99L108,99"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M19,29L89,29"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M19,39L89,39"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M19,49L89,49"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M19,59L89,59"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M19,69L89,69"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M19,79L89,79"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M29,19L29,89"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M39,19L39,89"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M49,19L49,89"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M59,19L59,89"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M69,19L69,89"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M79,19L79,89"
-        android:strokeWidth="0.8"
-        android:strokeColor="#33FFFFFF" />
+        android:fillColor="#ffffff"
+        android:fillAlpha="0.05"
+        android:pathData="M0,0l108,108M108,0l-108,108M54,0l0,108M0,54l108,0" />
 </vector>
-
 
  <<<--- END_FILE_BLOCK: app\src\main\res\drawable\ic_launcher_background.xml
 
@@ -2119,34 +3636,33 @@ VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:endX="85.84757"
-                android:endY="92.4963"
-                android:startX="42.9492"
-                android:startY="49.59793"
-                android:type="linear">
-                <item
-                    android:color="#44000000"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00000000"
-                    android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
+
+    <!-- Outer Glow / Halo -->
+    <path
+        android:fillColor="#4DFFFFFF"
+        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0" />
+
+    <!-- Brain / AI Core (Stylized with Nodes) -->
     <path
         android:fillColor="#FFFFFF"
-        android:fillType="nonZero"
-        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
-        android:strokeWidth="1"
-        android:strokeColor="#00000000" />
+        android:pathData="M54,30c-13.25,0-24,10.75-24,24s10.75,24,24,24s24-10.75,24-24S67.25,30,54,30z M44,48c2.21,0,4,1.79,4,4s-1.79,4-4,4s-4-1.79-4-4S41.79,48,44,48z M64,48c2.21,0,4,1.79,4,4s-1.79,4-4,4s-4-1.79-4-4S61.79,48,64,48z M54,72c-5.52,0-10-4.48-10-10h20C64,67.52,59.52,72,54,72z" />
+
+    <!-- Trading / Growth Chart overlay (EduAI "Trader" theme) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M35,65 L45,55 L55,60 L73,42" />
+
+    <!-- Arrow Head for the chart -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M73,42 L66,42 L73,49 Z" />
+
 </vector>
 
  <<<--- END_FILE_BLOCK: app\src\main\res\drawable\ic_launcher_foreground.xml

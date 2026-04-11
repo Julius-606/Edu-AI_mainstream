@@ -1,8 +1,4 @@
 // IDENTITY: data/remote/EduAIApi.kt
-// VERSION: 1.1.0
-// ⚙️ GEAR 1.1: The Network Broker (Retrofit)
-// This handles the communication with our remote server.
-
 package com.example.edu_ai.data.remote
 
 import retrofit2.http.Body
@@ -15,6 +11,14 @@ interface EduAIApi {
     @GET("api/user/{user_id}/dashboard")
     suspend fun getDashboard(@Path("user_id") userId: String): DashboardResponse
 
-    @POST("api/chaos/generate_case")
-    suspend fun generateChaosCase(@Body request: ChaosRequest): ChaosResponse
+    // --- AI Endpoints ---
+
+    @POST("api/ai/chat")
+    suspend fun aiChat(@Body request: ChatRequest): ChatResponse
+
+    @POST("api/ai/quiz")
+    suspend fun generateAiQuiz(@Body request: QuizRequest): ApiQuizResponse
+
+    @POST("api/quiz/record")
+    suspend fun recordQuiz(@Body request: QuizRecordRequest): Map<String, String>
 }

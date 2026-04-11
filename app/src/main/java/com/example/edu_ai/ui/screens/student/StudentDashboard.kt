@@ -20,15 +20,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudentDashboard(
+    userId: String,
     onLogout: () -> Unit,
     onLaunchModule: () -> Unit,
     viewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Refresh data when the screen is first shown
-    LaunchedEffect(Unit) {
-        viewModel.refreshDashboard("STUDENT_001") // Using mock ID for now
+    // Refresh data using the real User ID passed from login
+    LaunchedEffect(userId) {
+        viewModel.refreshDashboard(userId)
     }
 
     Scaffold(
