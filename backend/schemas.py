@@ -1,5 +1,5 @@
 # IDENTITY: backend/schemas.py
-# VERSION: 1.5.0
+# VERSION: 1.6.1
 # ⚙️ Pydantic Models for Data Validation
 
 from pydantic import BaseModel
@@ -24,6 +24,16 @@ class UnitResponse(UnitBase):
     class Config:
         from_attributes = True
 
+class QuizHistoryResponse(BaseModel):
+    unit_name: str
+    pnl: float
+    timestamp: str
+
+class ChatMessageResponse(BaseModel):
+    role: str
+    content: str
+    timestamp: str
+
 class DashboardResponse(BaseModel):
     username: str
     role: str
@@ -34,6 +44,8 @@ class DashboardResponse(BaseModel):
     active_units: List[str]
     average_pnl: float
     total_quizzes: int
+    quiz_history: List[QuizHistoryResponse]
+    chat_history: List[ChatMessageResponse]
 
 class ChaosRequest(BaseModel):
     unit: str

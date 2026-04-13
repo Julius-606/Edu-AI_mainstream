@@ -4,6 +4,7 @@ import logging
 import re
 import json
 import os
+import random
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -40,7 +41,6 @@ class AiEngine:
 
         if GEMINI_API_KEYS:
             self._configure_genai()
-            logger.info(f"🚀 AI Engine initialized with {len(GEMINI_API_KEYS)} keys.")
         else:
             logger.error("❌ No Gemini API keys found in environment variables.")
 
@@ -52,7 +52,6 @@ class AiEngine:
         if not GEMINI_API_KEYS: return
         self.key_index = (self.key_index + 1) % len(GEMINI_API_KEYS)
         self._configure_genai()
-        logger.info(f"🔄 Rotated to Key Index: {self.key_index % len(GEMINI_API_KEYS)}")
 
     def _log_performance(self, model, key_idx, duration, status, task):
         log_entry = {
@@ -65,11 +64,6 @@ class AiEngine:
         }
         self.logs.append(log_entry)
         if len(self.logs) > 50: self.logs.pop(0)
-
-        # ANSI Colors for terminal visibility
-        color = "\033[92m" if status == "SUCCESS" else "\033[91m"
-        reset = "\033[0m"
-        logger.info(f"{color}[{status}]{reset} Task: {task} | Model: {model} | Key: #{key_idx} | Time: {duration:.2f}s")
 
     def ask(self, prompt, system_instruction=None):
         if not GEMINI_API_KEYS: return None
@@ -106,15 +100,17 @@ class AiEngine:
     def generate_quiz(self, unit_name, student_level, topic=None):
         if not GEMINI_API_KEYS: return None
 
+        num_questions = random.randint(7, 12)
         task_name = f"Quiz: {unit_name}"
         focus_clause = f" specifically focusing on '{topic}'" if topic else ""
         prompt = f"""
-        Generate a 5-question multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
+        Generate a {num_questions}-question multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
         Level: {student_level}.
+        Make the questions fun, engaging, and a little bit creative while remaining educational.
         Return ONLY valid JSON.
         Format:
         {{
-          "quiz_title": "{unit_name} Assessment",
+          "quiz_title": "{unit_name} Fun Assessment",
           "questions": [
             {{
               "question_text": "...",

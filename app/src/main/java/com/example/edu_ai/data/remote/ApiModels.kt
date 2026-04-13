@@ -12,7 +12,21 @@ data class DashboardResponse(
     @SerializedName("ai_persona") val aiPersona: String,
     @SerializedName("active_units") val activeUnits: List<String>,
     @SerializedName("average_pnl") val averagePnl: Double,
-    @SerializedName("total_quizzes") val totalQuizzes: Int
+    @SerializedName("total_quizzes") val totalQuizzes: Int,
+    @SerializedName("quiz_history") val quizHistory: List<ApiQuizHistory>,
+    @SerializedName("chat_history") val chatHistory: List<ApiChatHistory>
+)
+
+data class ApiQuizHistory(
+    @SerializedName("unit_name") val unitName: String,
+    @SerializedName("pnl") val pnl: Double,
+    @SerializedName("timestamp") val timestamp: String
+)
+
+data class ApiChatHistory(
+    @SerializedName("role") val role: String,
+    @SerializedName("content") val content: String,
+    @SerializedName("timestamp") val timestamp: String
 )
 
 // --- AI Models ---

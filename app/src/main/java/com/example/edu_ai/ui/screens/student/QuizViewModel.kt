@@ -77,7 +77,16 @@ class QuizViewModel(
             ) }
             val quiz = aiService.generateQuiz(unitName, user, topic)
             if (quiz != null) {
-                _uiState.update { it.copy(quiz = quiz, isLoading = false) }
+                // Shuffle options for each question to break predictable patterns
+                val shuffledQuestions = quiz.questions.map { question ->
+                    val optionsWithIndices = question.options.withIndex().toList()
+                    val shuffled = optionsWithIndices.shuffled()
+                    val newCorrectIndex = shuffled.indexOfFirst { it.index == question.correctIndex }
+                    val newOptions = shuffled.map { it.value }
+                    question.copy(options = newOptions, correctIndex = newCorrectIndex)
+                }
+                val shuffledQuiz = quiz.copy(questions = shuffledQuestions)
+                _uiState.update { it.copy(quiz = shuffledQuiz, isLoading = false) }
             } else {
                 _uiState.update { it.copy(isLoading = false, error = "Failed to ignite the Quiz Engine.") }
             }

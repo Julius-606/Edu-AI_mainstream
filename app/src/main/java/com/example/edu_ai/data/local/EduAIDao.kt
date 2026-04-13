@@ -17,6 +17,9 @@ interface EduAIDao {
     @Query("SELECT * FROM users WHERE id = :userId")
     suspend fun getUserById(userId: String): UserEntity?
 
+    @Query("DELETE FROM users")
+    suspend fun clearUsers()
+
     // Units
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUnits(units: List<UnitEntity>)
@@ -27,12 +30,15 @@ interface EduAIDao {
     @Query("DELETE FROM units")
     suspend fun deleteAllUnits()
 
-    // Quiz History
+    // Quiz History (Kept for local session if needed, but we'll prioritize Repository state)
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertQuizHistory(quiz: QuizHistoryEntity)
 
     @Query("SELECT * FROM quiz_history WHERE userId = :userId ORDER BY timestamp DESC")
     fun getQuizHistory(userId: String): Flow<List<QuizHistoryEntity>>
+
+    @Query("DELETE FROM quiz_history")
+    suspend fun clearAllQuizHistory()
 
     // Chat History
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -43,4 +49,7 @@ interface EduAIDao {
 
     @Query("DELETE FROM chat_messages WHERE userId = :userId")
     suspend fun clearChatHistory(userId: String)
+
+    @Query("DELETE FROM chat_messages")
+    suspend fun clearAllChatHistory()
 }

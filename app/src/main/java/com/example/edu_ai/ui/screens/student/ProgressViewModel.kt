@@ -29,7 +29,7 @@ class ProgressViewModel(
     private val _isLoading = MutableStateFlow(false)
 
     val uiState: StateFlow<ProgressUiState> = combine(
-        dao.getQuizHistory(),
+        dao.getQuizHistory(user.id),
         _isLoading
     ) { history, loading ->
         // We'll fetch the recommendation separately to keep UI reactive

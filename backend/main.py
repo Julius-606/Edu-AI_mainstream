@@ -1,5 +1,5 @@
 # IDENTITY: backend/main.py
-# VERSION: 1.6.0
+# VERSION: 1.7.0
 # ⚙️ GEAR 2: The API Routes (Executing the Trades)
 
 import os
@@ -23,7 +23,7 @@ except ImportError:
 # Create database tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Edu_AI Prop Firm Backend", version="1.6.0")
+app = FastAPI(title="Edu_AI Prop Firm Backend", version="1.7.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,7 +35,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "Bullish 📈", "message": "Edu_AI Backend v1.6.0 is Online."}
+    return {"status": "Bullish 📈", "message": "Edu_AI Backend v1.7.0 is Online."}
 
 # --- USER MANAGEMENT ENDPOINTS ---
 
@@ -240,6 +240,8 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     total_quizzes = len(quizzes)
     average_pnl = sum([q.pnl for q in quizzes]) / total_quizzes if total_quizzes > 0 else 0.0
 
+    chat_messages = db.query(models.ChatMessage).filter(models.ChatMessage.owner_id == user.id).order_by(models.ChatMessage.id.asc()).all()
+
     return schemas.DashboardResponse(
         username=user.username,
         role=user.role,
@@ -249,7 +251,9 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         ai_persona=user.ai_persona,
         active_units=unit_names,
         average_pnl=round(average_pnl, 2),
-        total_quizzes=total_quizzes
+        total_quizzes=total_quizzes,
+        quiz_history=[schemas.QuizHistoryResponse(unit_name=q.unit_name, pnl=q.pnl, timestamp=q.timestamp) for q in quizzes],
+        chat_history=[schemas.ChatMessageResponse(role=c.role, content=c.content, timestamp=c.timestamp or "") for c in chat_messages]
     )
 
 # --- AI ENDPOINTS ---
@@ -264,6 +268,11 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Record user message
+    user_msg = models.ChatMessage(role="user", content=request.prompt, owner_id=user.id)
+    db.add(user_msg)
+    db.commit()
+
     system_instruction = f"You are {user.ai_persona} (an AI Study Companion). " \
                          f"The student is at level: {user.semester_status}. " \
                          f"Be encouraging, concise, and educational. Recommend a YouTube link ONLY if it directly helps explain a complex concept."
@@ -277,6 +286,11 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
     response_text = ai_engine.ask(prompt=full_prompt, system_instruction=system_instruction)
     if not response_text:
         raise HTTPException(status_code=500, detail="Both AI engines are currently unavailable.")
+
+    # Record AI message
+    ai_msg = models.ChatMessage(role="model", content=response_text, owner_id=user.id)
+    db.add(ai_msg)
+    db.commit()
 
     return schemas.ChatResponse(response=response_text)
 

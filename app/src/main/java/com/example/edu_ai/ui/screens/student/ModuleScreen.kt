@@ -83,7 +83,10 @@ fun ModuleScreen(
                     0 -> ChatTabWrapper(uiState.user, onCloseChat = { selectedTab = 1 })
                     1 -> {
                         if (uiState.user != null) {
-                             ChatHistoryTab(userId = uiState.user!!.id)
+                             val chatViewModel: ChatViewModel = viewModel(
+                                factory = ChatViewModel.provideFactory(uiState.user!!)
+                            )
+                             ChatHistoryTab(viewModel = chatViewModel)
                         }
                     }
                     2 -> {
@@ -156,18 +159,33 @@ fun ChatTabWrapper(user: UserEntity?, onCloseChat: () -> Unit) {
 }
 
 @Composable
-fun ChatHistoryTab(userId: String) {
-    // For now simple listing of messages as a session history placeholder
+fun ChatHistoryTab(viewModel: ChatViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Previous Consultations", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Text("Review your study sessions with the AI.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Session: General Inquiry", fontWeight = FontWeight.Bold)
-                Text("Click to view full transcript (Feature coming soon)", style = MaterialTheme.typography.bodySmall)
+        if (uiState.messages.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No previous chats found.")
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(uiState.messages) { message ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = if (message.role == "user") "You" else "AI",
+                                fontWeight = FontWeight.Bold,
+                                color = if (message.role == "user") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                            )
+                            Text(text = message.content)
+                        }
+                    }
+                }
             }
         }
     }
