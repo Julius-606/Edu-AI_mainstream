@@ -1,5 +1,6 @@
 package com.example.edu_ai.ui.screens.student
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -8,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TrendingUp
@@ -78,8 +80,12 @@ fun ModuleScreen(
                 }
             } else {
                 when (selectedTab) {
-                    0 -> ChatTabWrapper(uiState.user)
-                    1 -> ChatHistoryTab()
+                    0 -> ChatTabWrapper(uiState.user, onCloseChat = { selectedTab = 1 })
+                    1 -> {
+                        if (uiState.user != null) {
+                             ChatHistoryTab(userId = uiState.user!!.id)
+                        }
+                    }
                     2 -> {
                         if (uiState.user != null) {
                             val quizViewModel: QuizViewModel = viewModel(
@@ -100,7 +106,14 @@ fun ModuleScreen(
                             ProgressTab(viewModel = progressViewModel)
                         }
                     }
-                    4 -> ZenithTab()
+                    4 -> {
+                        if (uiState.user != null) {
+                            val progressViewModel: ProgressViewModel = viewModel(
+                                factory = ProgressViewModel.provideFactory(uiState.user!!)
+                            )
+                            ZenithTab(viewModel = progressViewModel)
+                        }
+                    }
                 }
             }
         }
@@ -108,7 +121,7 @@ fun ModuleScreen(
 }
 
 @Composable
-fun ChatTabWrapper(user: UserEntity?) {
+fun ChatTabWrapper(user: UserEntity?, onCloseChat: () -> Unit) {
     var isChatStarted by remember { mutableStateOf(false) }
 
     if (!isChatStarted) {
@@ -134,26 +147,35 @@ fun ChatTabWrapper(user: UserEntity?) {
             val chatViewModel: ChatViewModel = viewModel(
                 factory = ChatViewModel.provideFactory(user)
             )
-            ChatInterface(viewModel = chatViewModel)
+            ChatInterface(
+                viewModel = chatViewModel,
+                onCloseChat = onCloseChat
+            )
         }
     }
 }
 
 @Composable
-fun ChatHistoryTab() {
+fun ChatHistoryTab(userId: String) {
+    // For now simple listing of messages as a session history placeholder
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Previous Consultations", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text("Resume or delete your study sessions.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Review your study sessions with the AI.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Session: General Inquiry", fontWeight = FontWeight.Bold)
+                Text("Click to view full transcript (Feature coming soon)", style = MaterialTheme.typography.bodySmall)
+            }
+        }
     }
 }
 
 @Composable
 fun ProgressTab(viewModel: ProgressViewModel) {
     val uiState by viewModel.uiState.collectAsState()
-
-    LaunchedEffect(Unit) {
-        viewModel.refreshRecommendations()
-    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -162,27 +184,6 @@ fun ProgressTab(viewModel: ProgressViewModel) {
         item {
             Text("Learning Analytics", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Text("Monitoring your progressive growth", color = MaterialTheme.colorScheme.primary)
-        }
-
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.TrendingUp, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("AI Strategy & Recommendations", fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    if (uiState.isLoading) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    } else {
-                        Text(uiState.aiRecommendation, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
         }
 
         item {
@@ -199,7 +200,11 @@ fun ProgressTab(viewModel: ProgressViewModel) {
 
         items(uiState.quizHistory) { history ->
             val date = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(history.timestamp))
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { /* Logic to open specific quiz for review */ }
+            ) {
                 Row(
                     modifier = Modifier.padding(16.dp).fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -222,11 +227,57 @@ fun ProgressTab(viewModel: ProgressViewModel) {
 }
 
 @Composable
-fun ZenithTab() {
+fun ZenithTab(viewModel: ProgressViewModel) {
+    val recommendation by viewModel.recommendation.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshRecommendations()
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("The Zenith Hub", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text("Settings & Daily Motivation", color = MaterialTheme.colorScheme.secondary)
+        Text("The Zenith Hub 🏔️", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text("Your AI Guide for peak academic performance.", color = MaterialTheme.colorScheme.secondary)
+        
         Spacer(modifier = Modifier.height(24.dp))
+        
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Strategic Guidance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                } else {
+                    Text(
+                        text = recommendation,
+                        style = MaterialTheme.typography.bodyLarge,
+                        lineHeight = 24.sp
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                Button(
+                    onClick = { viewModel.refreshRecommendations() },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("REFRESH STRATEGY")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Text("Daily Motivation", fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             Text(
                 "\"The expert in anything was once a beginner.\"",

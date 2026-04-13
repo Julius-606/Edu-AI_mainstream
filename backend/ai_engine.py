@@ -4,108 +4,117 @@ import logging
 import re
 import json
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Setup Logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("AI_ENGINE")
 
 # --- 🔐 SECURE KEYCHAIN ---
-GEMINI_API_KEYS = [
-    os.getenv("GEMINI_API_KEY_1"),
-    os.getenv("GEMINI_API_KEY_2"),
-    os.getenv("GEMINI_API_KEY_3"),
-    os.getenv("GEMINI_API_KEY_4")
-]
-GEMINI_API_KEYS = [key for key in GEMINI_API_KEYS if key]
+GEMINI_API_KEYS = []
+i = 1
+while True:
+    key = os.getenv(f"GEMINI_API_KEY_{i}")
+    if not key:
+        if i == 1:
+            key = os.getenv("GEMINI_API_KEY")
+            if key:
+                GEMINI_API_KEYS.append(key)
+        break
+    GEMINI_API_KEYS.append(key)
+    i += 1
 
 class AiEngine:
     def __init__(self):
         self.key_index = 0
-        # 🎯 FIXATED: Start with the proven winner.
-        # Fallbacks are kept at the end for extreme safety.
-        self.model_variants = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"]
+        # Recommended sure-bet models
+        self.model_variants = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]
+        self.logs = [] # Internal store for recent activities
 
         if GEMINI_API_KEYS:
             self._configure_genai()
-            self._discover_models()
+            logger.info(f"🚀 AI Engine initialized with {len(GEMINI_API_KEYS)} keys.")
         else:
             logger.error("❌ No Gemini API keys found in environment variables.")
 
     def _configure_genai(self):
         key = GEMINI_API_KEYS[self.key_index % len(GEMINI_API_KEYS)]
         genai.configure(api_key=key)
-        logger.info(f"🔑 AI Engine configured with key index {self.key_index % len(GEMINI_API_KEYS)}")
-
-    def _discover_models(self):
-        """🚀 Dynamically discovers available models without overwriting our fixated preference."""
-        try:
-            available = []
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods:
-                    name = m.name.split('/')[-1]
-                    available.append(name)
-
-            gemini_only = [m for m in available if 'gemini' in m.lower()]
-
-            if gemini_only:
-                # Keep our preferred order, but add any new ones found as extra fallbacks
-                current_set = set(self.model_variants)
-                new_discoveries = [m for m in gemini_only if m not in current_set]
-                self.model_variants += new_discoveries
-                logger.info(f"📡 Dynamic Discovery added: {new_discoveries}")
-                logger.info(f"📊 Final Model Priority: {self.model_variants}")
-            else:
-                logger.warning("⚠️ Discovery found no Gemini models. Using defaults.")
-        except Exception as e:
-            logger.warning(f"⚠️ Model discovery failed: {e}. Keeping defaults.")
 
     def _rotate_key(self):
         if not GEMINI_API_KEYS: return
         self.key_index = (self.key_index + 1) % len(GEMINI_API_KEYS)
         self._configure_genai()
+        logger.info(f"🔄 Rotated to Key Index: {self.key_index % len(GEMINI_API_KEYS)}")
+
+    def _log_performance(self, model, key_idx, duration, status, task):
+        log_entry = {
+            "timestamp": datetime.now().strftime("%H:%M:%S"),
+            "task": task,
+            "model": model,
+            "key_index": key_idx,
+            "latency": f"{duration:.2f}s",
+            "status": status
+        }
+        self.logs.append(log_entry)
+        if len(self.logs) > 50: self.logs.pop(0)
+
+        # ANSI Colors for terminal visibility
+        color = "\033[92m" if status == "SUCCESS" else "\033[91m"
+        reset = "\033[0m"
+        logger.info(f"{color}[{status}]{reset} Task: {task} | Model: {model} | Key: #{key_idx} | Time: {duration:.2f}s")
 
     def ask(self, prompt, system_instruction=None):
         if not GEMINI_API_KEYS: return None
 
-        # Logic: Try each model one by one. For each model, try ALL keys before giving up.
+        task_name = "Chat/General"
         for variant in self.model_variants:
             for _ in range(len(GEMINI_API_KEYS)):
+                start_time = time.time()
+                current_key_idx = self.key_index % len(GEMINI_API_KEYS)
                 try:
                     model = genai.GenerativeModel(
                         model_name=variant,
                         system_instruction=system_instruction
                     )
                     response = model.generate_content(prompt)
+
                     if response and response.text:
+                        duration = time.time() - start_time
+                        self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
                         return response.text
                 except Exception as e:
+                    duration = time.time() - start_time
                     err_msg = str(e).lower()
-                    logger.warning(f"⚠️ {variant} failed with key index {self.key_index % len(GEMINI_API_KEYS)}: {err_msg}")
+                    self._log_performance(variant, current_key_idx, duration, "FAILED", task_name)
 
-                    # If key is exhausted, blocked, or invalid -> Rotate to next key and RETRY same model
                     if any(x in err_msg for x in ["429", "quota", "limit", "401", "403", "expired", "permission", "invalid"]):
                         self._rotate_key()
                         time.sleep(0.5)
                         continue
                     else:
-                        # If the error is model-specific (like 404), break to try next model variant
                         break
         return None
 
-    def generate_quiz(self, unit_name, student_level):
+    def generate_quiz(self, unit_name, student_level, topic=None):
         if not GEMINI_API_KEYS: return None
 
+        task_name = f"Quiz: {unit_name}"
+        focus_clause = f" specifically focusing on '{topic}'" if topic else ""
         prompt = f"""
-        Generate a 5-question multiple choice quiz for the unit: '{unit_name}'.
+        Generate a 5-question multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
         Level: {student_level}.
         Return ONLY valid JSON.
         Format:
         {{
-          "quiz_title": "Title",
+          "quiz_title": "{unit_name} Assessment",
           "questions": [
             {{
               "question_text": "...",
@@ -119,13 +128,15 @@ class AiEngine:
 
         for variant in self.model_variants:
             for _ in range(len(GEMINI_API_KEYS)):
+                start_time = time.time()
+                current_key_idx = self.key_index % len(GEMINI_API_KEYS)
                 try:
                     model = genai.GenerativeModel(model_name=variant)
-                    config = None
-                    if any(v in variant for v in ["1.5", "2.0", "exp"]):
-                        config = genai.types.GenerationConfig(response_mime_type="application/json")
+                    generation_config = None
+                    if "1.5" in variant:
+                        generation_config = {"response_mime_type": "application/json"}
 
-                    response = model.generate_content(prompt, generation_config=config)
+                    response = model.generate_content(prompt, generation_config=generation_config)
 
                     if response and response.text:
                         raw_text = response.text.strip()
@@ -134,15 +145,36 @@ class AiEngine:
                         elif raw_text.startswith("```"):
                             raw_text = raw_text.replace("```", "", 1).rsplit("```", 1)[0].strip()
 
+                        duration = time.time() - start_time
+                        self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
                         return json.loads(raw_text)
                 except Exception as e:
-                    err_msg = str(e).lower()
-                    logger.warning(f"⚠️ Quiz Gen Failed ({variant}) with key index {self.key_index % len(GEMINI_API_KEYS)}: {err_msg}")
-
-                    # Rotate key and retry same model
+                    duration = time.time() - start_time
+                    self._log_performance(variant, current_key_idx, duration, "FAILED", task_name)
                     self._rotate_key()
                     time.sleep(0.5)
                     continue
         return None
+
+    def get_recommendations(self, user_info, quiz_history, active_units):
+        if not GEMINI_API_KEYS: return "AI Guidance unavailable."
+
+        history_summary = ""
+        for q in quiz_history:
+            history_summary += f"- {q.unit_name}: {q.pnl}% score\n"
+
+        prompt = f"""
+        Student: {user_info['username']}
+        Persona: {user_info['ai_persona']}
+        Level: {user_info['semester_status']}
+        Active Units: {', '.join(active_units)}
+        Recent Performance:
+        {history_summary if history_summary else "No assessments taken yet."}
+
+        Based on the above, provide a concise (max 3 sentences) study strategy or recommendation.
+        Act as the assigned AI Persona. Focus on specific units or areas of improvement.
+        """
+
+        return self.ask(prompt)
 
 ai_engine = AiEngine()

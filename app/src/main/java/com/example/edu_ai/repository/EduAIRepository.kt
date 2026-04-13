@@ -34,7 +34,7 @@ class EduAIRepository(
                 UnitEntity(unitName = unitName, isActive = true)
             }
             dao.insertUnits(unitEntities)
-            
+
             emit(userEntity)
         } catch (e: Exception) {
             // 2. Fallback: Check Local DB
@@ -52,7 +52,7 @@ class EduAIRepository(
                     aiPersona = "Socratic Mentor"
                 )
                 dao.insertUser(devUser)
-                
+
                 // Add some default units so the Quiz tab isn't empty
                 val devUnits = listOf(
                     UnitEntity(unitName = "Biochemistry II", isActive = true),
@@ -60,7 +60,7 @@ class EduAIRepository(
                     UnitEntity(unitName = "Internal Medicine", isActive = true)
                 )
                 dao.insertUnits(devUnits)
-                
+
                 emit(devUser)
             }
         }

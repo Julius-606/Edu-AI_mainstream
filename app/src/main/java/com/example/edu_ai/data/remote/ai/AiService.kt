@@ -10,7 +10,6 @@ import com.example.edu_ai.data.remote.ChatMessage as ApiChatMessage
 
 /**
  * 🚀 The New Network-First AI Service
- * This service now talks to your Python Backend instead of Gemini directly.
  */
 class GeminiAiService : AiService {
 
@@ -24,7 +23,7 @@ class GeminiAiService : AiService {
             val response = RetrofitClient.instance.aiChat(
                 ChatRequest(
                     prompt = prompt,
-                    user_id = userContext.id.filter { it.isDigit() }.toIntOrNull() ?: 1,
+                    user_id = userContext.id,
                     history = apiHistory
                 )
             )
@@ -36,16 +35,17 @@ class GeminiAiService : AiService {
 
     override suspend fun generateQuiz(
         unitName: String,
-        userContext: UserEntity
+        userContext: UserEntity,
+        topic: String?
     ): QuizResponse? {
         return try {
             val response = RetrofitClient.instance.generateAiQuiz(
-                QuizRequest(
+                request = QuizRequest(
                     unit_name = unitName,
-                    user_id = userContext.id.filter { it.isDigit() }.toIntOrNull() ?: 1
-                )
+                    user_id = userContext.id
+                ),
+                topic = topic
             )
-            // Map API response to UI model
             QuizResponse(
                 title = response.quiz_title,
                 questions = response.questions.map { q ->
@@ -57,20 +57,44 @@ class GeminiAiService : AiService {
         }
     }
 
+    override suspend fun recordQuizResult(
+        unitName: String,
+        score: Int,
+        total: Int,
+        userContext: UserEntity
+    ) {
+        try {
+            RetrofitClient.instance.recordQuiz(
+                QuizRecordRequest(
+                    unit_name = unitName,
+                    score = score,
+                    total = total,
+                    user_id = userContext.id,
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            // Log error
+        }
+    }
+
     override suspend fun getRecommendations(
-        userContext: UserEntity,
-        quizHistory: List<QuizHistoryEntity>
+        userContext: UserEntity
     ): String {
-        // We'll let the chat endpoint handle recommendations for now to keep it simple
-        return "Keep focusing on your active units! Your personalized strategy is being updated."
+        return try {
+            val response = RetrofitClient.instance.getRecommendations(userContext.id)
+            response.recommendation
+        } catch (e: Exception) {
+            "Keep focusing on your active units! Your personalized strategy is being updated."
+        }
     }
 }
 
-// Interface stays the same to avoid breaking UI code
 interface AiService {
     suspend fun getChatResponse(prompt: String, userContext: UserEntity, history: List<ChatMessage> = emptyList()): String
-    suspend fun generateQuiz(unitName: String, userContext: UserEntity): QuizResponse?
-    suspend fun getRecommendations(userContext: UserEntity, quizHistory: List<QuizHistoryEntity>): String
+    suspend fun generateQuiz(unitName: String, userContext: UserEntity, topic: String? = null): QuizResponse?
+    suspend fun recordQuizResult(unitName: String, score: Int, total: Int, userContext: UserEntity)
+    suspend fun getRecommendations(userContext: UserEntity): String
 }
 
 data class ChatMessage(val role: String, val content: String)

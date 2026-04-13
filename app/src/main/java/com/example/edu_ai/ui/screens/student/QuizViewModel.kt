@@ -14,20 +14,25 @@ import com.example.edu_ai.data.remote.ai.AiServiceFactory
 import com.example.edu_ai.data.remote.ai.QuizQuestion
 import com.example.edu_ai.data.remote.ai.QuizResponse
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class QuizUiState(
     val quiz: QuizResponse? = null,
     val currentQuestionIndex: Int = 0,
-    val selectedOptions: Map<Int, Int> = emptyMap(), // Map of question index to selected option
-    val submittedQuestions: Set<Int> = emptySet(), // Questions that have been submitted/locked
+    val selectedOptions: Map<Int, Int> = emptyMap(),
+    val submittedQuestions: Set<Int> = emptySet(),
     val score: Int = 0,
     val isQuizFinished: Boolean = false,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val selectedUnit: String? = null,
+    val isReviewMode: Boolean = false,
+    val quizHistory: List<QuizHistoryEntity> = emptyList()
 )
 
 class QuizViewModel(
@@ -39,7 +44,24 @@ class QuizViewModel(
     private val _uiState = MutableStateFlow(QuizUiState())
     val uiState: StateFlow<QuizUiState> = _uiState.asStateFlow()
 
-    fun startQuiz(unitName: String) {
+    init {
+        loadQuizHistory()
+    }
+
+    private fun loadQuizHistory() {
+        viewModelScope.launch {
+            // Filter history by the current user's ID
+            dao.getQuizHistory(user.id).collect { history ->
+                _uiState.update { it.copy(quizHistory = history) }
+            }
+        }
+    }
+
+    fun selectUnit(unitName: String) {
+        _uiState.update { it.copy(selectedUnit = unitName) }
+    }
+
+    fun startQuiz(unitName: String, topic: String? = null) {
         viewModelScope.launch {
             _uiState.update { it.copy(
                 quiz = null,
@@ -49,9 +71,11 @@ class QuizViewModel(
                 score = 0,
                 isQuizFinished = false,
                 isLoading = true,
-                error = null
+                error = null,
+                selectedUnit = unitName,
+                isReviewMode = false
             ) }
-            val quiz = aiService.generateQuiz(unitName, user)
+            val quiz = aiService.generateQuiz(unitName, user, topic)
             if (quiz != null) {
                 _uiState.update { it.copy(quiz = quiz, isLoading = false) }
             } else {
@@ -94,7 +118,11 @@ class QuizViewModel(
         if (state.currentQuestionIndex + 1 < quiz.questions.size) {
             _uiState.update { it.copy(currentQuestionIndex = state.currentQuestionIndex + 1) }
         } else {
-            finishQuiz()
+            if (state.isReviewMode) {
+                 _uiState.update { it.copy(isQuizFinished = true) }
+            } else {
+                finishQuiz()
+            }
         }
     }
 
@@ -112,15 +140,32 @@ class QuizViewModel(
         val finalScorePercentage = (state.score.toDouble() / quiz.questions.size) * 100
         
         viewModelScope.launch {
+            // Save locally with user isolation
             dao.insertQuizHistory(
                 QuizHistoryEntity(
+                    userId = user.id,
                     unitName = quiz.title,
                     pnlScore = finalScorePercentage,
                     timestamp = System.currentTimeMillis()
                 )
             )
+            // Save to backend
+            aiService.recordQuizResult(
+                unitName = quiz.title,
+                score = state.score,
+                total = quiz.questions.size,
+                userContext = user
+            )
             _uiState.update { it.copy(isQuizFinished = true) }
         }
+    }
+
+    fun enterReviewMode() {
+        _uiState.update { it.copy(isQuizFinished = false, isReviewMode = true, currentQuestionIndex = 0) }
+    }
+
+    fun resetQuizSelection() {
+        _uiState.update { it.copy(quiz = null, selectedUnit = null, isQuizFinished = false, isReviewMode = false) }
     }
 
     companion object {

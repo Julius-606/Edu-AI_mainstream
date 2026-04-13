@@ -31,8 +31,8 @@ interface EduAIDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertQuizHistory(quiz: QuizHistoryEntity)
 
-    @Query("SELECT * FROM quiz_history ORDER BY timestamp DESC")
-    fun getQuizHistory(): Flow<List<QuizHistoryEntity>>
+    @Query("SELECT * FROM quiz_history WHERE userId = :userId ORDER BY timestamp DESC")
+    fun getQuizHistory(userId: String): Flow<List<QuizHistoryEntity>>
 
     // Chat History
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -40,4 +40,7 @@ interface EduAIDao {
 
     @Query("SELECT * FROM chat_messages WHERE userId = :userId ORDER BY timestamp ASC")
     fun getChatMessages(userId: String): Flow<List<ChatMessageEntity>>
+
+    @Query("DELETE FROM chat_messages WHERE userId = :userId")
+    suspend fun clearChatHistory(userId: String)
 }

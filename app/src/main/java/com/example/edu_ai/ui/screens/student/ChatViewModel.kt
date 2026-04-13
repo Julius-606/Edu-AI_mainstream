@@ -89,6 +89,12 @@ class ChatViewModel(
         }
     }
 
+    fun clearChat() {
+        viewModelScope.launch {
+            dao.clearChatHistory(user.id)
+        }
+    }
+
     companion object {
         fun provideFactory(user: UserEntity): ViewModelProvider.Factory = viewModelFactory {
             initializer {

@@ -1,5 +1,5 @@
 # IDENTITY: backend/models.py
-# VERSION: 1.1.0
+# VERSION: 1.3.0
 # ⚙️ GEAR 1.2: Database Models (Entities)
 
 from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, JSON
@@ -21,7 +21,12 @@ class User(Base):
     # Relationships
     units = relationship("Unit", back_populates="owner")
     quiz_history = relationship("QuizHistory", back_populates="owner")
+    chat_messages = relationship("ChatMessage", back_populates="owner")
     performance_logs = relationship("PerformanceLog", back_populates="owner")
+
+    @property
+    def active_units_list(self):
+        return [u.name for u in self.units if u.is_active]
 
 class Unit(Base):
     __tablename__ = "units"
@@ -46,6 +51,17 @@ class QuizHistory(Base):
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="quiz_history")
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    role = Column(String) # "user" or "model"
+    content = Column(String)
+    timestamp = Column(String)
+
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="chat_messages")
 
 class PerformanceLog(Base):
     """Tracks performance over time for the AI predictive chart."""

@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.PlayCircleFilled
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
@@ -28,13 +30,53 @@ import java.util.regex.Pattern
 @Composable
 fun ChatInterface(
     viewModel: ChatViewModel,
+    onCloseChat: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var inputText by remember { mutableStateOf("") }
     val context = LocalContext.current
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize()) {
+        // Chat Header
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("AI Consultation", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Row {
+                IconButton(onClick = { showDeleteDialog = true }) {
+                    Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Chat", tint = MaterialTheme.colorScheme.error)
+                }
+                IconButton(onClick = onCloseChat) {
+                    Icon(Icons.Default.Close, contentDescription = "Close Chat")
+                }
+            }
+        }
+
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("Clear Consultation?") },
+                text = { Text("This will permanently delete your current chat history with the AI.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.clearChat()
+                        showDeleteDialog = false
+                    }) {
+                        Text("CLEAR", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("CANCEL")
+                    }
+                }
+            )
+        }
+
         // 1. Message List
         LazyColumn(
             modifier = Modifier

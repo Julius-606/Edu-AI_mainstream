@@ -24,7 +24,7 @@ data class ChatMessage(
 
 data class ChatRequest(
     @SerializedName("prompt") val prompt: String,
-    @SerializedName("user_id") val user_id: Int,
+    @SerializedName("user_id") val user_id: String,
     @SerializedName("history") val history: List<ChatMessage> = emptyList()
 )
 
@@ -34,7 +34,7 @@ data class ChatResponse(
 
 data class QuizRequest(
     @SerializedName("unit_name") val unit_name: String,
-    @SerializedName("user_id") val user_id: Int
+    @SerializedName("user_id") val user_id: String
 )
 
 data class ApiQuizQuestion(
@@ -53,6 +53,6 @@ data class QuizRecordRequest(
     @SerializedName("unit_name") val unit_name: String,
     @SerializedName("score") val score: Int,
     @SerializedName("total") val total: Int,
-    @SerializedName("user_id") val user_id: Int,
+    @SerializedName("user_id") val user_id: String,
     @SerializedName("timestamp") val timestamp: Long
 )
