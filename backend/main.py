@@ -1,5 +1,5 @@
 # IDENTITY: backend/main.py
-# VERSION: 1.7.0
+# VERSION: 1.8.0
 # ⚙️ GEAR 2: The API Routes (Executing the Trades)
 
 import os
@@ -21,9 +21,10 @@ except ImportError:
     from .ai_engine import ai_engine
 
 # Create database tables if they don't exist
+# Note: On production, you might want to use Alembic migrations
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Edu_AI Prop Firm Backend", version="1.7.0")
+app = FastAPI(title="Edu_AI Prop Firm Backend", version="1.8.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,7 +36,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "Bullish 📈", "message": "Edu_AI Backend v1.7.0 is Online."}
+    return {"status": "Bullish 📈", "message": "Edu_AI Backend v1.8.0 is Online."}
 
 # --- USER MANAGEMENT ENDPOINTS ---
 
@@ -367,4 +368,6 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Hugging Face Spaces uses port 7860 by default
+    port = int(os.environ.get("PORT", 7860))
+    uvicorn.run(app, host="0.0.0.0", port=port)

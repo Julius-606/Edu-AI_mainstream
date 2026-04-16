@@ -1,18 +1,25 @@
 # IDENTITY: backend/database.py
-# VERSION: 1.1.0
-# ⚙️ GEAR 1.2: The Local Database (SQLite)
-# This is our base currency. It handles the local ledger of all our data.
+# VERSION: 1.2.0
+# ⚙️ GEAR 1.2: The Cloud-Ready Database (PostgreSQL/SQLite)
 
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# SQLite database file will be created in the local directory (survives KPLC blackouts)
-SQLALCHEMY_DATABASE_URL = "sqlite:///./edu_ai_vault.db"
+# Use DATABASE_URL from environment (Neon), fallback to local SQLite for development
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./edu_ai_vault.db")
 
-# Setting up the engine. connect_args are needed for SQLite to allow multiple threads
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+# Fix for Neon/Heroku: SQLAlchemy requires 'postgresql://' instead of 'postgres://'
+if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# connect_args={"check_same_thread": False} is ONLY required for SQLite
+engine_args = {}
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    engine_args["connect_args"] = {"check_same_thread": False}
+
+# Setting up the engine
+engine = create_engine(SQLALCHEMY_DATABASE_URL, **engine_args)
 
 # SessionLocal is the actual database session we use to query and save data
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
