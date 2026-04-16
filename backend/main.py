@@ -216,8 +216,8 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
             username=user_id,
             role="Student",
             sensory_mode="Standard",
-            ai_persona="Socratic Mentor",
-            semester_status="Year 4 - Redemption Arc"
+            ai_persona="Socratic Tutor",
+            semester_status="Brace for the clinicals"
         )
         db.add(user)
         db.commit()
