@@ -1,0 +1,6 @@
+.env
+__init__.py
+edu_ai_vault.db
+venv
+.vscode
+.idea
