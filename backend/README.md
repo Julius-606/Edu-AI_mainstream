@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 ---
 title: Edu-AI Backend
 emoji: 🎓
