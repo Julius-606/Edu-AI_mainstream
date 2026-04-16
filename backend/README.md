@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ---
 title: Edu-AI Backend
 emoji: 🎓
@@ -10,12 +11,18 @@ pinned: false
 
 Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
 
+=======
+>>>>>>> c230b89d102cae6b52dc586eb3f313b093b6d894
 # 🎓 Edu-AI Backend
 
 Welcome to the **Edu-AI Prop Firm Backend**, a robust and scalable API powered by **FastAPI** and **Google Gemini AI**. This backend serves as the core intelligence engine for the Edu-AI mobile application, handling everything from AI-driven mentorship to dynamic quiz generation.
 
 ## 🚀 Live on Hugging Face
+<<<<<<< HEAD
 This backend is hosted on **Hugging Face Spaces** using Docker, providing a global endpoint for the mobile app while maintaining a stateful connection to a cloud database.
+=======
+This backend is designed to be hosted on **Hugging Face Spaces** using Docker, providing a global endpoint for the mobile app while maintaining a stateful connection to a cloud database.
+>>>>>>> c230b89d102cae6b52dc586eb3f313b093b6d894
 
 ---
 
@@ -38,7 +45,11 @@ This backend is hosted on **Hugging Face Spaces** using Docker, providing a glob
 ---
 
 ## 🛠️ Environment Variables
+<<<<<<< HEAD
 To run this project, you must configure the following secrets/environment variables in your Space settings:
+=======
+To run this project, you must configure the following secrets/environment variables:
+>>>>>>> c230b89d102cae6b52dc586eb3f313b093b6d894
 
 | Variable | Description |
 | :--- | :--- |
@@ -92,4 +103,13 @@ python migrate_data.py
 
 ---
 
+<<<<<<< HEAD
+=======
+## 🛡️ Robots & Security
+- `GET /robots.txt`: Configured to prevent unauthorized crawling of API endpoints.
+- **CORS:** Pre-configured for cross-origin requests from the Edu-AI mobile app.
+
+---
+
+>>>>>>> c230b89d102cae6b52dc586eb3f313b093b6d894
 **Built with ❤️ for the next generation of learners.**
