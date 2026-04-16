@@ -1,5 +1,5 @@
 # IDENTITY: backend/main.py
-# VERSION: 1.8.0
+# VERSION: 1.9.0
 # ⚙️ GEAR 2: The API Routes (Executing the Trades)
 
 import os
@@ -21,10 +21,9 @@ except ImportError:
     from .ai_engine import ai_engine
 
 # Create database tables if they don't exist
-# Note: On production, you might want to use Alembic migrations
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Edu_AI Prop Firm Backend", version="1.8.0")
+app = FastAPI(title="Edu_AI Prop Firm Backend", version="1.9.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,7 +35,20 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "Bullish 📈", "message": "Edu_AI Backend v1.8.0 is Online."}
+    return {"status": "Bullish 📈", "message": "Edu_AI Backend v1.9.0 is Online."}
+
+# Helper to find user by ID (int) or Username (string)
+def find_user(user_id_or_name: str, db: Session):
+    user = None
+    # If the input is a numeric string, try searching by primary key (ID)
+    if str(user_id_or_name).isdigit():
+        user = db.query(models.User).filter(models.User.id == int(user_id_or_name)).first()
+
+    # If not found by ID or if the input was non-numeric, search by username
+    if not user:
+        user = db.query(models.User).filter(models.User.username == str(user_id_or_name)).first()
+
+    return user
 
 # --- USER MANAGEMENT ENDPOINTS ---
 
@@ -73,14 +85,7 @@ def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
 
 @app.get("/api/users/{user_id}", response_model=schemas.UserResponseSchema, tags=["User Management"])
 def get_user(user_id: str, db: Session = Depends(get_db)):
-    # Try ID first, then username
-    user = None
-    if user_id.isdigit():
-        user = db.query(models.User).filter(models.User.id == int(user_id)).first()
-
-    if not user:
-        user = db.query(models.User).filter(models.User.username == user_id).first()
-
+    user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -90,13 +95,7 @@ def get_user(user_id: str, db: Session = Depends(get_db)):
 
 @app.put("/api/users/{user_id}", response_model=schemas.UserResponseSchema, tags=["User Management"])
 def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Depends(get_db)):
-    user = None
-    if user_id.isdigit():
-        user = db.query(models.User).filter(models.User.id == int(user_id)).first()
-
-    if not user:
-        user = db.query(models.User).filter(models.User.username == user_id).first()
-
+    user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -105,7 +104,7 @@ def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Dep
     # Handle units separately if provided
     if "active_units" in update_data:
         new_unit_names = update_data.pop("active_units")
-        # Deactivate all current units first (or delete if preferred, but deactivating is safer)
+        # Deactivate all current units first
         db.query(models.Unit).filter(models.Unit.owner_id == user.id).update({"is_active": False})
 
         for name in new_unit_names:
@@ -191,13 +190,7 @@ def delete_unit(unit_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/users/{user_id}/units", response_model=List[schemas.UnitResponse], tags=["Unit Management"])
 def get_user_units(user_id: str, db: Session = Depends(get_db)):
-    user = None
-    if user_id.isdigit():
-        user = db.query(models.User).filter(models.User.id == int(user_id)).first()
-
-    if not user:
-        user = db.query(models.User).filter(models.User.username == user_id).first()
-
+    user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -207,11 +200,10 @@ def get_user_units(user_id: str, db: Session = Depends(get_db)):
 
 @app.get("/api/user/{user_id}/dashboard", response_model=schemas.DashboardResponse)
 def get_dashboard(user_id: str, db: Session = Depends(get_db)):
-    # Try to find user by string ID (username)
-    user = db.query(models.User).filter(models.User.username == user_id).first()
+    user = find_user(user_id, db)
 
     if not user:
-        # Auto-create user for testing if not exists using the provided username
+        # Auto-create user for testing if not exists
         user = models.User(
             username=user_id,
             role="Student",
@@ -229,7 +221,6 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     ).all()
 
     if not active_units:
-        # Add default units
         defaults = ["Biochemistry II", "General Surgery", "Internal Medicine"]
         for name in defaults:
             db.add(models.Unit(name=name, owner_id=user.id))
@@ -261,22 +252,17 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
 
 @app.post("/api/ai/chat", response_model=schemas.ChatResponse)
 def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
-    # User ID coming from app is the local integer ID or username
-    user = db.query(models.User).filter(models.User.id == request.user_id).first()
-    if not user:
-         user = db.query(models.User).filter(models.User.username == str(request.user_id)).first()
-
+    user = find_user(str(request.user_id), db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Record user message
     user_msg = models.ChatMessage(role="user", content=request.prompt, owner_id=user.id)
     db.add(user_msg)
     db.commit()
 
     system_instruction = f"You are {user.ai_persona} (an AI Study Companion). " \
                          f"The student is at level: {user.semester_status}. " \
-                         f"Be encouraging, concise, and educational. Recommend a YouTube link ONLY if it directly helps explain a complex concept."
+                         f"Be encouraging, concise, and educational."
     
     history_text = ""
     for msg in request.history:
@@ -286,9 +272,8 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
 
     response_text = ai_engine.ask(prompt=full_prompt, system_instruction=system_instruction)
     if not response_text:
-        raise HTTPException(status_code=500, detail="Both AI engines are currently unavailable.")
+        raise HTTPException(status_code=500, detail="AI engine is currently unavailable.")
 
-    # Record AI message
     ai_msg = models.ChatMessage(role="model", content=response_text, owner_id=user.id)
     db.add(ai_msg)
     db.commit()
@@ -301,10 +286,7 @@ def generate_quiz(
     topic: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    user = db.query(models.User).filter(models.User.id == request.user_id).first()
-    if not user:
-        user = db.query(models.User).filter(models.User.username == str(request.user_id)).first()
-
+    user = find_user(str(request.user_id), db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -321,10 +303,7 @@ def generate_quiz(
 
 @app.post("/api/quiz/record")
 def record_quiz(history: schemas.QuizRecordRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.id == history.user_id).first()
-    if not user:
-         user = db.query(models.User).filter(models.User.username == str(history.user_id)).first()
-
+    user = find_user(str(history.user_id), db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -342,14 +321,10 @@ def record_quiz(history: schemas.QuizRecordRequest, db: Session = Depends(get_db
 
 @app.get("/api/user/{user_id}/recommendations", response_model=schemas.RecommendationResponse)
 def get_recommendations(user_id: str, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.username == user_id).first()
-    if not user:
-        user = db.query(models.User).filter(models.User.id == (int(user_id) if user_id.isdigit() else 0)).first()
-
+    user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Fetch history and active units for context
     quiz_history = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
     active_units = db.query(models.Unit).filter(models.Unit.owner_id == user.id, models.Unit.is_active == True).all()
     unit_names = [u.name for u in active_units]
@@ -368,6 +343,5 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    # Hugging Face Spaces uses port 7860 by default
-    port = int(os.environ.get("PORT", 7860))
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
