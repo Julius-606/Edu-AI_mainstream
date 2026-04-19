@@ -1,11 +1,12 @@
 # IDENTITY: backend/main.py
-# VERSION: 1.9.0
+# VERSION: 2.2.0
 # ⚙️ GEAR 2: The API Routes (Executing the Trades)
 
 import os
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 import logging
 
@@ -15,7 +16,7 @@ try:
     import schemas as schemas
     from ai_engine import ai_engine
 except ImportError:
-    from .database import Base, engine, get_db
+    from database import Base, engine, get_db
     from . import models as models
     from . import schemas as schemas
     from .ai_engine import ai_engine
@@ -23,7 +24,7 @@ except ImportError:
 # Create database tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Edu_AI Prop Firm Backend", version="1.9.0")
+app = FastAPI(title="Edu_AI Prop Firm Backend", version="2.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,7 +36,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "Bullish 📈", "message": "Edu_AI Backend v1.9.0 is Online."}
+    return {"status": "Bullish 📈", "message": "Edu_AI Backend v2.2.0 is Online."}
 
 # Helper to find user by ID (int) or Username (string)
 def find_user(user_id_or_name: str, db: Session):
@@ -87,7 +88,22 @@ def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
 def get_user(user_id: str, db: Session = Depends(get_db)):
     user = find_user(user_id, db)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        # Check if this looks like a login attempt for a teacher
+        # For Dev: Auto-create teacher if username contains 'teacher' or 'admin'
+        role = "Student"
+        if "teacher" in user_id.lower() or "admin" in user_id.lower():
+            role = "Teacher"
+
+        user = models.User(
+            username=user_id,
+            role=role,
+            sensory_mode="Standard",
+            ai_persona="Standard Edu_AI",
+            semester_status="Active"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
     response = schemas.UserResponseSchema.from_orm(user)
     response.active_units = user.active_units_list
@@ -128,73 +144,77 @@ def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Dep
     response.active_units = user.active_units_list
     return response
 
-@app.get("/api/users", response_model=List[schemas.UserResponseSchema], tags=["User Management"])
-def list_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    users = db.query(models.User).offset(skip).limit(limit).all()
-    results = []
-    for u in users:
-        resp = schemas.UserResponseSchema.from_orm(u)
-        resp.active_units = u.active_units_list
-        results.append(resp)
-    return results
+# --- TEACHER PORTAL ENDPOINTS ---
 
-# --- UNIT MANAGEMENT ENDPOINTS ---
+@app.get("/api/teacher/dashboard", response_model=schemas.TeacherDashboardResponse, tags=["Teacher Portal"])
+def get_teacher_dashboard(db: Session = Depends(get_db)):
+    students = db.query(models.User).filter(models.User.role == "Student").all()
 
-@app.post("/api/units", response_model=schemas.UnitResponse, tags=["Unit Management"])
-def create_unit(unit: schemas.UnitCreate, db: Session = Depends(get_db)):
-    db_user = db.query(models.User).filter(models.User.id == unit.owner_id).first()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
+    # If no students exist, create some mock students for the teacher to see
+    if not students:
+        mock_students = [
+            ("Neema Ongaga", "Year 4 - Redemption Arc"),
+            ("Grace Naliaka", "Clinical Rotations"),
+            ("Rayvins Otieno", "Pre-med Hustle"),
+            ("Hillary Lweya", "Final Year"),
+            ("Tatiana A.", "Anatomy Focus")
+        ]
+        for name, status in mock_students:
+            s = models.User(username=name, role="Student", semester_status=status)
+            db.add(s)
+            db.commit()
+            db.refresh(s)
+            # Add some mock units
+            db.add(models.Unit(name="Biochemistry II", owner_id=s.id))
+            db.add(models.Unit(name="General Surgery", owner_id=s.id))
+            db.commit()
+        students = db.query(models.User).filter(models.User.role == "Student").all()
 
-    new_unit = models.Unit(
-        name=unit.name,
-        is_active=unit.is_active,
-        category=unit.category,
-        owner_id=unit.owner_id
+    student_summaries = []
+    risk_alerts = []
+
+    for student in students:
+        quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == student.id).all()
+        total_quizzes = len(quizzes)
+        avg_pnl = sum([q.pnl for q in quizzes]) / total_quizzes if total_quizzes > 0 else 0.0
+
+        # Risk Management logic: If avg_pnl < 60, flag as risk
+        if avg_pnl < 60 and total_quizzes > 0:
+            risk_alerts.append(f"🚨 Risk: {student.username} is hitting stop-loss with {round(avg_pnl, 2)}% performance.")
+
+        student_summaries.append(schemas.StudentSummary(
+            id=student.id,
+            username=student.username,
+            average_pnl=round(avg_pnl, 2),
+            total_quizzes=total_quizzes,
+            semester_status=student.semester_status,
+            active_units=student.active_units_list
+        ))
+
+    return schemas.TeacherDashboardResponse(
+        students=student_summaries,
+        total_active_portfolios=len(students),
+        risk_alerts=risk_alerts
     )
-    db.add(new_unit)
-    db.commit()
-    db.refresh(new_unit)
-    return new_unit
 
-@app.get("/api/units/{unit_id}", response_model=schemas.UnitResponse, tags=["Unit Management"])
-def get_unit(unit_id: int, db: Session = Depends(get_db)):
-    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
-    if not unit:
-        raise HTTPException(status_code=404, detail="Unit not found")
-    return unit
+@app.post("/api/teacher/class-report", response_model=schemas.ClassReportResponse, tags=["Teacher Portal"])
+def generate_class_report(db: Session = Depends(get_db)):
+    students = db.query(models.User).filter(models.User.role == "Student").all()
 
-@app.put("/api/units/{unit_id}", response_model=schemas.UnitResponse, tags=["Unit Management"])
-def update_unit(unit_id: int, unit_update: schemas.UnitUpdate, db: Session = Depends(get_db)):
-    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
-    if not unit:
-        raise HTTPException(status_code=404, detail="Unit not found")
+    report_context = "Class Performance Overview:\n"
+    for s in students:
+        quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == s.id).all()
+        avg_pnl = sum([q.pnl for q in quizzes]) / len(quizzes) if quizzes else 0
+        report_context += f"- {s.username}: {round(avg_pnl, 2)}% avg score across {len(quizzes)} quizzes. Units: {', '.join(s.active_units_list)}\n"
 
-    update_data = unit_update.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(unit, key, value)
+    system_instruction = "You are an AI Class Supervisor. Generate a professional summary report for the teacher."
+    prompt = f"Based on the following class data, generate a high-level performance report with insights and intervention suggestions:\n\n{report_context}"
 
-    db.commit()
-    db.refresh(unit)
-    return unit
+    report_text = ai_engine.ask(prompt=prompt, system_instruction=system_instruction)
+    if not report_text:
+        report_text = "Standard report: Class is performing within expected parameters. Monitor students with < 60% scores."
 
-@app.delete("/api/units/{unit_id}", tags=["Unit Management"])
-def delete_unit(unit_id: int, db: Session = Depends(get_db)):
-    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
-    if not unit:
-        raise HTTPException(status_code=404, detail="Unit not found")
-
-    db.delete(unit)
-    db.commit()
-    return {"status": "Success", "message": f"Unit {unit_id} deleted."}
-
-@app.get("/api/users/{user_id}/units", response_model=List[schemas.UnitResponse], tags=["Unit Management"])
-def get_user_units(user_id: str, db: Session = Depends(get_db)):
-    user = find_user(user_id, db)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return db.query(models.Unit).filter(models.Unit.owner_id == user.id).all()
+    return schemas.ClassReportResponse(report=report_text)
 
 # --- DASHBOARD & ACTIVITY ---
 

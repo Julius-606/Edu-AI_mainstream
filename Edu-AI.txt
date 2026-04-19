@@ -1,7 +1,7 @@
 ================================================================================
 SYSTEM INSTRUCTIONS FOR PROJECT ORBIT (THE JARVIS PROTOCOL)
 ================================================================================
-DATE: 2026-04-11 18:35:55
+DATE: 2026-04-18 22:12:12
 STATUS: VERSION 3.1 (STABILITY UPGRADE)
 
 INSTRUCTIONS FOR THE AI ASSISTANT:
@@ -21,17 +21,20 @@ INSTRUCTIONS FOR THE AI ASSISTANT:
 FILE MANIFEST (TABLE OF CONTENTS)
 ================================================================================
 - backend\ai_engine.py [v1.0.0]
-- backend\database.py [v1.1.0]
-- backend\main.py [v1.2.2]
-- backend\migrate_data.py [v1.1.0]
-- backend\models.py [v1.1.0]
-- backend\schemas.py [v1.1.1]
+- backend\database.py [v1.2.0]
+- backend\Dockerfile [v1.0.0]
+- backend\main.py [v1.9.0]
+- backend\migrate_data.py [v1.0.0]
+- backend\models.py [v1.4.0]
+- backend\README.md [v1.0.0]
+- backend\requirements.txt [v1.0.0]
+- backend\schemas.py [v1.6.1]
 - backend\__init__.py [v1.0.0]
 - build.gradle.kts [v1.0.0]
-- logs.txt [v1.0.0]
 - requirements.txt [v1.0.0]
 - run.txt [v1.0.0]
 - settings.gradle.kts [v1.0.0]
+- .github\workflows\hf-sync.yml [v1.0.0]
 - app\build.gradle.kts [v1.0.0]
 - app\src\androidTest\java\com\example\edu_ai\ExampleInstrumentedTest.kt [v1.0.0]
 - app\src\main\AndroidManifest.xml [v1.0.0]
@@ -40,7 +43,7 @@ FILE MANIFEST (TABLE OF CONTENTS)
 - app\src\main\java\com\example\edu_ai\data\local\ChatMessageEntity.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\data\local\EduAIDao.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\data\local\EduAIDatabase.kt [v1.0.0]
-- app\src\main\java\com\example\edu_ai\data\local\QuizHistoryEntity.kt [v1.1.0]
+- app\src\main\java\com\example\edu_ai\data\local\QuizHistoryEntity.kt [v1.2.0]
 - app\src\main\java\com\example\edu_ai\data\local\UnitEntity.kt [v1.1.0]
 - app\src\main\java\com\example\edu_ai\data\local\UserEntity.kt [v1.1.0]
 - app\src\main\java\com\example\edu_ai\data\remote\ApiModels.kt [v1.0.0]
@@ -95,108 +98,113 @@ import logging
 import re
 import json
 import os
+import random
+from datetime import datetime
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Setup Logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("AI_ENGINE")
 
 # --- 🔐 SECURE KEYCHAIN ---
-GEMINI_API_KEYS = [
-    os.getenv("GEMINI_API_KEY_1"),
-    os.getenv("GEMINI_API_KEY_2"),
-    os.getenv("GEMINI_API_KEY_3"),
-    os.getenv("GEMINI_API_KEY_4")
-]
-GEMINI_API_KEYS = [key for key in GEMINI_API_KEYS if key]
+GEMINI_API_KEYS = []
+i = 1
+while True:
+    key = os.getenv(f"GEMINI_API_KEY_{i}")
+    if not key:
+        if i == 1:
+            key = os.getenv("GEMINI_API_KEY")
+            if key:
+                GEMINI_API_KEYS.append(key)
+        break
+    GEMINI_API_KEYS.append(key)
+    i += 1
 
 class AiEngine:
     def __init__(self):
         self.key_index = 0
-        # 🎯 FIXATED: Start with the proven winner.
-        # Fallbacks are kept at the end for extreme safety.
-        self.model_variants = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"]
+        # Recommended sure-bet models
+        self.model_variants = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]
+        self.logs = [] # Internal store for recent activities
 
         if GEMINI_API_KEYS:
             self._configure_genai()
-            self._discover_models()
         else:
             logger.error("❌ No Gemini API keys found in environment variables.")
 
     def _configure_genai(self):
         key = GEMINI_API_KEYS[self.key_index % len(GEMINI_API_KEYS)]
         genai.configure(api_key=key)
-        logger.info(f"🔑 AI Engine configured with key index {self.key_index % len(GEMINI_API_KEYS)}")
-
-    def _discover_models(self):
-        """🚀 Dynamically discovers available models without overwriting our fixated preference."""
-        try:
-            available = []
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods:
-                    name = m.name.split('/')[-1]
-                    available.append(name)
-
-            gemini_only = [m for m in available if 'gemini' in m.lower()]
-
-            if gemini_only:
-                # Keep our preferred order, but add any new ones found as extra fallbacks
-                current_set = set(self.model_variants)
-                new_discoveries = [m for m in gemini_only if m not in current_set]
-                self.model_variants += new_discoveries
-                logger.info(f"📡 Dynamic Discovery added: {new_discoveries}")
-                logger.info(f"📊 Final Model Priority: {self.model_variants}")
-            else:
-                logger.warning("⚠️ Discovery found no Gemini models. Using defaults.")
-        except Exception as e:
-            logger.warning(f"⚠️ Model discovery failed: {e}. Keeping defaults.")
 
     def _rotate_key(self):
         if not GEMINI_API_KEYS: return
         self.key_index = (self.key_index + 1) % len(GEMINI_API_KEYS)
         self._configure_genai()
 
+    def _log_performance(self, model, key_idx, duration, status, task):
+        log_entry = {
+            "timestamp": datetime.now().strftime("%H:%M:%S"),
+            "task": task,
+            "model": model,
+            "key_index": key_idx,
+            "latency": f"{duration:.2f}s",
+            "status": status
+        }
+        self.logs.append(log_entry)
+        if len(self.logs) > 50: self.logs.pop(0)
+
     def ask(self, prompt, system_instruction=None):
         if not GEMINI_API_KEYS: return None
 
-        # Logic: Try each model one by one. For each model, try ALL keys before giving up.
+        task_name = "Chat/General"
         for variant in self.model_variants:
             for _ in range(len(GEMINI_API_KEYS)):
+                start_time = time.time()
+                current_key_idx = self.key_index % len(GEMINI_API_KEYS)
                 try:
                     model = genai.GenerativeModel(
                         model_name=variant,
                         system_instruction=system_instruction
                     )
                     response = model.generate_content(prompt)
+
                     if response and response.text:
+                        duration = time.time() - start_time
+                        self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
                         return response.text
                 except Exception as e:
+                    duration = time.time() - start_time
                     err_msg = str(e).lower()
-                    logger.warning(f"⚠️ {variant} failed with key index {self.key_index % len(GEMINI_API_KEYS)}: {err_msg}")
+                    self._log_performance(variant, current_key_idx, duration, "FAILED", task_name)
 
-                    # If key is exhausted, blocked, or invalid -> Rotate to next key and RETRY same model
                     if any(x in err_msg for x in ["429", "quota", "limit", "401", "403", "expired", "permission", "invalid"]):
                         self._rotate_key()
                         time.sleep(0.5)
                         continue
                     else:
-                        # If the error is model-specific (like 404), break to try next model variant
                         break
         return None
 
-    def generate_quiz(self, unit_name, student_level):
+    def generate_quiz(self, unit_name, student_level, topic=None):
         if not GEMINI_API_KEYS: return None
 
+        num_questions = random.randint(7, 12)
+        task_name = f"Quiz: {unit_name}"
+        focus_clause = f" specifically focusing on '{topic}'" if topic else ""
         prompt = f"""
-        Generate a 5-question multiple choice quiz for the unit: '{unit_name}'.
+        Generate a {num_questions}-question multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
         Level: {student_level}.
+        Make the questions fun, engaging, and a little bit creative while remaining educational.
         Return ONLY valid JSON.
         Format:
         {{
-          "quiz_title": "Title",
+          "quiz_title": "{unit_name} Fun Assessment",
           "questions": [
             {{
               "question_text": "...",
@@ -210,13 +218,15 @@ class AiEngine:
 
         for variant in self.model_variants:
             for _ in range(len(GEMINI_API_KEYS)):
+                start_time = time.time()
+                current_key_idx = self.key_index % len(GEMINI_API_KEYS)
                 try:
                     model = genai.GenerativeModel(model_name=variant)
-                    config = None
-                    if any(v in variant for v in ["1.5", "2.0", "exp"]):
-                        config = genai.types.GenerationConfig(response_mime_type="application/json")
+                    generation_config = None
+                    if "1.5" in variant:
+                        generation_config = {"response_mime_type": "application/json"}
 
-                    response = model.generate_content(prompt, generation_config=config)
+                    response = model.generate_content(prompt, generation_config=generation_config)
 
                     if response and response.text:
                         raw_text = response.text.strip()
@@ -225,16 +235,37 @@ class AiEngine:
                         elif raw_text.startswith("```"):
                             raw_text = raw_text.replace("```", "", 1).rsplit("```", 1)[0].strip()
 
+                        duration = time.time() - start_time
+                        self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
                         return json.loads(raw_text)
                 except Exception as e:
-                    err_msg = str(e).lower()
-                    logger.warning(f"⚠️ Quiz Gen Failed ({variant}) with key index {self.key_index % len(GEMINI_API_KEYS)}: {err_msg}")
-
-                    # Rotate key and retry same model
+                    duration = time.time() - start_time
+                    self._log_performance(variant, current_key_idx, duration, "FAILED", task_name)
                     self._rotate_key()
                     time.sleep(0.5)
                     continue
         return None
+
+    def get_recommendations(self, user_info, quiz_history, active_units):
+        if not GEMINI_API_KEYS: return "AI Guidance unavailable."
+
+        history_summary = ""
+        for q in quiz_history:
+            history_summary += f"- {q.unit_name}: {q.pnl}% score\n"
+
+        prompt = f"""
+        Student: {user_info['username']}
+        Persona: {user_info['ai_persona']}
+        Level: {user_info['semester_status']}
+        Active Units: {', '.join(active_units)}
+        Recent Performance:
+        {history_summary if history_summary else "No assessments taken yet."}
+
+        Based on the above, provide a concise (max 3 sentences) study strategy or recommendation.
+        Act as the assigned AI Persona. Focus on specific units or areas of improvement.
+        """
+
+        return self.ask(prompt)
 
 ai_engine = AiEngine()
 
@@ -244,24 +275,31 @@ ai_engine = AiEngine()
 >>>--- START_FILE_BLOCK: backend\database.py
 ################################################################################
 FILE: backend\database.py
-VERSION: 1.1.0 | SYSTEM: N/A
+VERSION: 1.2.0 | SYSTEM: N/A
 ################################################################################
 
 # IDENTITY: backend/database.py
-# VERSION: 1.1.0
-# ⚙️ GEAR 1.2: The Local Database (SQLite)
-# This is our base currency. It handles the local ledger of all our data.
+# VERSION: 1.2.0
+# ⚙️ GEAR 1.2: The Cloud-Ready Database (PostgreSQL/SQLite)
 
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# SQLite database file will be created in the local directory (survives KPLC blackouts)
-SQLALCHEMY_DATABASE_URL = "sqlite:///./edu_ai_vault.db"
+# Use DATABASE_URL from environment (Neon), fallback to local SQLite for development
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./edu_ai_vault.db")
 
-# Setting up the engine. connect_args are needed for SQLite to allow multiple threads
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+# Fix for Neon/Heroku: SQLAlchemy requires 'postgresql://' instead of 'postgres://'
+if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# connect_args={"check_same_thread": False} is ONLY required for SQLite
+engine_args = {}
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    engine_args["connect_args"] = {"check_same_thread": False}
+
+# Setting up the engine
+engine = create_engine(SQLALCHEMY_DATABASE_URL, **engine_args)
 
 # SessionLocal is the actual database session we use to query and save data
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -277,22 +315,59 @@ def get_db():
     finally:
         db.close()
 
+
  <<<--- END_FILE_BLOCK: backend\database.py
+
+>>>--- START_FILE_BLOCK: backend\Dockerfile
+################################################################################
+FILE: backend\Dockerfile
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies for PostgreSQL driver
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+# This assumes requirements.txt is in the same folder as Dockerfile
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy all files from the current directory (the backend folder)
+COPY . .
+
+# Hugging Face Spaces uses port 7860 by default
+ENV PORT=7860
+EXPOSE 7860
+
+# Run uvicorn. Since we are in the root of the backend files,
+# main:app refers to main.py in the current directory.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+
+
+ <<<--- END_FILE_BLOCK: backend\Dockerfile
 
 >>>--- START_FILE_BLOCK: backend\main.py
 ################################################################################
 FILE: backend\main.py
-VERSION: 1.2.2 | SYSTEM: N/A
+VERSION: 1.9.0 | SYSTEM: N/A
 ################################################################################
 
 # IDENTITY: backend/main.py
-# VERSION: 1.2.2
+# VERSION: 1.9.0
 # ⚙️ GEAR 2: The API Routes (Executing the Trades)
 
 import os
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from typing import List, Optional
 import logging
 
 try:
@@ -309,7 +384,7 @@ except ImportError:
 # Create database tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Edu_AI Prop Firm Backend", version="1.2.2")
+app = FastAPI(title="Edu_AI Prop Firm Backend", version="1.9.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -321,42 +396,204 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "Bullish 📈", "message": "Edu_AI Backend v1.2.2 is Online."}
+    return {"status": "Bullish 📈", "message": "Edu_AI Backend v1.9.0 is Online."}
+
+# Helper to find user by ID (int) or Username (string)
+def find_user(user_id_or_name: str, db: Session):
+    user = None
+    # If the input is a numeric string, try searching by primary key (ID)
+    if str(user_id_or_name).isdigit():
+        user = db.query(models.User).filter(models.User.id == int(user_id_or_name)).first()
+
+    # If not found by ID or if the input was non-numeric, search by username
+    if not user:
+        user = db.query(models.User).filter(models.User.username == str(user_id_or_name)).first()
+
+    return user
+
+# --- USER MANAGEMENT ENDPOINTS ---
+
+@app.post("/api/users", response_model=schemas.UserResponseSchema, tags=["User Management"])
+def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.username == user_data.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+
+    new_user = models.User(
+        username=user_data.username,
+        role=user_data.role,
+        sensory_mode=user_data.sensory_mode,
+        difficulty=user_data.difficulty,
+        ai_persona=user_data.ai_persona,
+        semester_status=user_data.semester_status,
+        interests=user_data.interests
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    # Handle initial units if provided
+    if user_data.active_units:
+        for unit_name in user_data.active_units:
+            db.add(models.Unit(name=unit_name, owner_id=new_user.id, is_active=True))
+        db.commit()
+        db.refresh(new_user)
+
+    # Prepare response manually to include active_units
+    response = schemas.UserResponseSchema.from_orm(new_user)
+    response.active_units = new_user.active_units_list
+    return response
+
+@app.get("/api/users/{user_id}", response_model=schemas.UserResponseSchema, tags=["User Management"])
+def get_user(user_id: str, db: Session = Depends(get_db)):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    response = schemas.UserResponseSchema.from_orm(user)
+    response.active_units = user.active_units_list
+    return response
+
+@app.put("/api/users/{user_id}", response_model=schemas.UserResponseSchema, tags=["User Management"])
+def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Depends(get_db)):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update_data = user_update.dict(exclude_unset=True)
+
+    # Handle units separately if provided
+    if "active_units" in update_data:
+        new_unit_names = update_data.pop("active_units")
+        # Deactivate all current units first
+        db.query(models.Unit).filter(models.Unit.owner_id == user.id).update({"is_active": False})
+
+        for name in new_unit_names:
+            # Check if unit already exists for this user
+            existing_unit = db.query(models.Unit).filter(
+                models.Unit.owner_id == user.id,
+                models.Unit.name == name
+            ).first()
+            if existing_unit:
+                existing_unit.is_active = True
+            else:
+                db.add(models.Unit(name=name, owner_id=user.id, is_active=True))
+
+    for key, value in update_data.items():
+        setattr(user, key, value)
+
+    db.commit()
+    db.refresh(user)
+
+    response = schemas.UserResponseSchema.from_orm(user)
+    response.active_units = user.active_units_list
+    return response
+
+@app.get("/api/users", response_model=List[schemas.UserResponseSchema], tags=["User Management"])
+def list_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    users = db.query(models.User).offset(skip).limit(limit).all()
+    results = []
+    for u in users:
+        resp = schemas.UserResponseSchema.from_orm(u)
+        resp.active_units = u.active_units_list
+        results.append(resp)
+    return results
+
+# --- UNIT MANAGEMENT ENDPOINTS ---
+
+@app.post("/api/units", response_model=schemas.UnitResponse, tags=["Unit Management"])
+def create_unit(unit: schemas.UnitCreate, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.id == unit.owner_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_unit = models.Unit(
+        name=unit.name,
+        is_active=unit.is_active,
+        category=unit.category,
+        owner_id=unit.owner_id
+    )
+    db.add(new_unit)
+    db.commit()
+    db.refresh(new_unit)
+    return new_unit
+
+@app.get("/api/units/{unit_id}", response_model=schemas.UnitResponse, tags=["Unit Management"])
+def get_unit(unit_id: int, db: Session = Depends(get_db)):
+    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unit not found")
+    return unit
+
+@app.put("/api/units/{unit_id}", response_model=schemas.UnitResponse, tags=["Unit Management"])
+def update_unit(unit_id: int, unit_update: schemas.UnitUpdate, db: Session = Depends(get_db)):
+    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unit not found")
+
+    update_data = unit_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(unit, key, value)
+
+    db.commit()
+    db.refresh(unit)
+    return unit
+
+@app.delete("/api/units/{unit_id}", tags=["Unit Management"])
+def delete_unit(unit_id: int, db: Session = Depends(get_db)):
+    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unit not found")
+
+    db.delete(unit)
+    db.commit()
+    return {"status": "Success", "message": f"Unit {unit_id} deleted."}
+
+@app.get("/api/users/{user_id}/units", response_model=List[schemas.UnitResponse], tags=["Unit Management"])
+def get_user_units(user_id: str, db: Session = Depends(get_db)):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return db.query(models.Unit).filter(models.Unit.owner_id == user.id).all()
+
+# --- DASHBOARD & ACTIVITY ---
 
 @app.get("/api/user/{user_id}/dashboard", response_model=schemas.DashboardResponse)
-def get_dashboard(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
+def get_dashboard(user_id: str, db: Session = Depends(get_db)):
+    user = find_user(user_id, db)
+
     if not user:
         # Auto-create user for testing if not exists
         user = models.User(
-            id=user_id,
-            username=f"Trader_{user_id}",
+            username=user_id,
             role="Student",
             sensory_mode="Standard",
-            ai_persona="Socratic Mentor",
-            semester_status="Year 4 - Redemption Arc"
+            ai_persona="Socratic Tutor",
+            semester_status="Brace for the clinicals"
         )
         db.add(user)
         db.commit()
         db.refresh(user)
 
     active_units = db.query(models.Unit).filter(
-        models.Unit.owner_id == user_id, 
+        models.Unit.owner_id == user.id,
         models.Unit.is_active == True
     ).all()
 
     if not active_units:
-        # Add default units
         defaults = ["Biochemistry II", "General Surgery", "Internal Medicine"]
         for name in defaults:
-            db.add(models.Unit(name=name, owner_id=user_id))
+            db.add(models.Unit(name=name, owner_id=user.id))
         db.commit()
-        active_units = db.query(models.Unit).filter(models.Unit.owner_id == user_id).all()
+        active_units = db.query(models.Unit).filter(models.Unit.owner_id == user.id).all()
 
     unit_names = [u.name for u in active_units]
-    quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user_id).all()
+    quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
     total_quizzes = len(quizzes)
     average_pnl = sum([q.pnl for q in quizzes]) / total_quizzes if total_quizzes > 0 else 0.0
+
+    chat_messages = db.query(models.ChatMessage).filter(models.ChatMessage.owner_id == user.id).order_by(models.ChatMessage.id.asc()).all()
 
     return schemas.DashboardResponse(
         username=user.username,
@@ -367,22 +604,27 @@ def get_dashboard(user_id: int, db: Session = Depends(get_db)):
         ai_persona=user.ai_persona,
         active_units=unit_names,
         average_pnl=round(average_pnl, 2),
-        total_quizzes=total_quizzes
+        total_quizzes=total_quizzes,
+        quiz_history=[schemas.QuizHistoryResponse(unit_name=q.unit_name, pnl=q.pnl, timestamp=q.timestamp) for q in quizzes],
+        chat_history=[schemas.ChatMessageResponse(role=c.role, content=c.content, timestamp=c.timestamp or "") for c in chat_messages]
     )
 
 # --- AI ENDPOINTS ---
 
 @app.post("/api/ai/chat", response_model=schemas.ChatResponse)
 def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.id == request.user_id).first()
+    user = find_user(str(request.user_id), db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    user_msg = models.ChatMessage(role="user", content=request.prompt, owner_id=user.id)
+    db.add(user_msg)
+    db.commit()
+
     system_instruction = f"You are {user.ai_persona} (an AI Study Companion). " \
                          f"The student is at level: {user.semester_status}. " \
-                         f"Be encouraging, concise, and educational. Recommend a YouTube link ONLY if it directly helps explain a complex concept."
+                         f"Be encouraging, concise, and educational."
     
-    # Pre-pend history if available
     history_text = ""
     for msg in request.history:
         history_text += f"{msg.role}: {msg.content}\n"
@@ -391,19 +633,28 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
 
     response_text = ai_engine.ask(prompt=full_prompt, system_instruction=system_instruction)
     if not response_text:
-        raise HTTPException(status_code=500, detail="Both AI engines are currently unavailable.")
-    
+        raise HTTPException(status_code=500, detail="AI engine is currently unavailable.")
+
+    ai_msg = models.ChatMessage(role="model", content=response_text, owner_id=user.id)
+    db.add(ai_msg)
+    db.commit()
+
     return schemas.ChatResponse(response=response_text)
 
 @app.post("/api/ai/quiz", response_model=schemas.QuizResponse)
-def generate_quiz(request: schemas.QuizRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.id == request.user_id).first()
+def generate_quiz(
+    request: schemas.QuizRequest,
+    topic: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    user = find_user(str(request.user_id), db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     quiz_data = ai_engine.generate_quiz(
         unit_name=request.unit_name,
-        student_level=user.semester_status
+        student_level=user.semester_status,
+        topic=topic
     )
     
     if not quiz_data:
@@ -413,21 +664,48 @@ def generate_quiz(request: schemas.QuizRequest, db: Session = Depends(get_db)):
 
 @app.post("/api/quiz/record")
 def record_quiz(history: schemas.QuizRecordRequest, db: Session = Depends(get_db)):
+    user = find_user(str(history.user_id), db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     new_record = models.QuizHistory(
         unit_name=history.unit_name,
         score=history.score,
         total=history.total,
         pnl=(history.score / history.total) * 100 if history.total > 0 else 0,
-        owner_id=history.user_id,
+        owner_id=user.id,
         timestamp=str(history.timestamp)
     )
     db.add(new_record)
     db.commit()
     return {"status": "Success", "message": "Trade recorded."}
 
+@app.get("/api/user/{user_id}/recommendations", response_model=schemas.RecommendationResponse)
+def get_recommendations(user_id: str, db: Session = Depends(get_db)):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    quiz_history = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
+    active_units = db.query(models.Unit).filter(models.Unit.owner_id == user.id, models.Unit.is_active == True).all()
+    unit_names = [u.name for u in active_units]
+
+    user_info = {
+        "username": user.username,
+        "ai_persona": user.ai_persona,
+        "semester_status": user.semester_status
+    }
+
+    rec_text = ai_engine.get_recommendations(user_info, quiz_history, unit_names)
+    if not rec_text:
+        rec_text = "Keep focusing on your current units! You're making progress."
+
+    return schemas.RecommendationResponse(recommendation=rec_text)
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
  <<<--- END_FILE_BLOCK: backend\main.py
@@ -435,131 +713,169 @@ if __name__ == "__main__":
 >>>--- START_FILE_BLOCK: backend\migrate_data.py
 ################################################################################
 FILE: backend\migrate_data.py
-VERSION: 1.1.0 | SYSTEM: N/A
+VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
 # IDENTITY: backend/migrate_data.py
-# VERSION: 1.1.0
-# ⚙️ GEAR 1.3: Data Migration
+# ⚙️ GEAR: Data Migration (SQLite -> PostgreSQL)
 
-import json
-from database import SessionLocal, engine, Base
-import models
-from datetime import datetime, timedelta
-import random
+import sqlite3
+import os
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
 
-Base.metadata.create_all(bind=engine)
+# Load environment variables
+load_dotenv()
+
+# Configuration
+SQLITE_DB_PATH = "edu_ai_vault.db"
+POSTGRES_URL = os.getenv("DATABASE_URL")
+
+if not POSTGRES_URL:
+    print("❌ Error: DATABASE_URL not found in .env file.")
+    exit(1)
+
+# Fix for Neon/Heroku: SQLAlchemy requires 'postgresql://' instead of 'postgres://'
+if POSTGRES_URL.startswith("postgres://"):
+    POSTGRES_URL = POSTGRES_URL.replace("postgres://", "postgresql://", 1)
 
 def migrate():
-    db = SessionLocal()
-    
+    print(f"🚀 Starting migration from {SQLITE_DB_PATH} to Neon PostgreSQL...")
+
+    # Connect to SQLite
+    if not os.path.exists(SQLITE_DB_PATH):
+        print(f"❌ Error: SQLite file {SQLITE_DB_PATH} not found.")
+        return
+
+    sqlite_conn = sqlite3.connect(SQLITE_DB_PATH)
+    sqlite_conn.row_factory = sqlite3.Row
+    sqlite_cursor = sqlite_conn.cursor()
+
+    # Connect to PostgreSQL
+    pg_engine = create_engine(POSTGRES_URL)
+    PgSession = sessionmaker(bind=pg_engine)
+    pg_session = PgSession()
+
     try:
-        with open('../config.json', 'r') as f:
-            data = json.load(f)
-            
-        print("📥 config.json loaded. Preparing to migrate...")
-
-        username = data.get("user_name", "Future Doc")
-        user = db.query(models.User).filter(models.User.username == username).first()
-        
-        if not user:
-            user = models.User(
-                username=username,
-                role="Student",
-                sensory_mode="Standard",
-                difficulty=data.get("difficulty", "Asian Parent Expectations (Extreme)"),
-                semester_status=data.get("semester_status", "Year 4 - Redemption Arc"),
-                interests=data.get("interests", [])
+        # 1. Migrate Users
+        print("👤 Migrating Users...")
+        sqlite_cursor.execute("SELECT * FROM users")
+        users = sqlite_cursor.fetchall()
+        for row in users:
+            # We use raw SQL to ensure IDs are preserved
+            pg_session.execute(
+                text("INSERT INTO users (id, username, role, sensory_mode, difficulty, ai_persona, semester_status, interests) "
+                     "VALUES (:id, :username, :role, :sensory_mode, :difficulty, :ai_persona, :semester_status, :interests) "
+                     "ON CONFLICT (id) DO NOTHING"),
+                dict(row)
             )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-            print(f"✅ User '{username}' created in DB with ID: {user.id}")
-        else:
-            print(f"⚠️ User '{username}' already exists. Skipping creation.")
 
-        # Migrate Units
-        current_units = data.get("current_units", [])
-        for unit_name in current_units:
-            existing_unit = db.query(models.Unit).filter(
-                models.Unit.owner_id == user.id, 
-                models.Unit.name == unit_name
-            ).first()
-            
-            if not existing_unit:
-                new_unit = models.Unit(name=unit_name, is_active=True, owner_id=user.id)
-                db.add(new_unit)
-                
-        # Generate some mock performance data for the charts
-        print("📊 Generating mock performance logs...")
-        subjects = ["Biochemistry II", "General Surgery", "Internal Medicine I"]
-        base_date = datetime.now() - timedelta(days=30)
-        
-        for subject in subjects:
-            for i in range(5):
-                log_date = base_date + timedelta(days=i*6)
-                grade = random.uniform(50.0, 95.0)
-                new_log = models.PerformanceLog(
-                    subject=subject,
-                    grade=grade,
-                    timestamp=log_date.strftime("%Y-%m-%d"),
-                    owner_id=user.id
-                )
-                db.add(new_log)
+        # 2. Migrate Units
+        print("📚 Migrating Units...")
+        sqlite_cursor.execute("SELECT * FROM units")
+        units = sqlite_cursor.fetchall()
+        for row in units:
+            pg_session.execute(
+                text("INSERT INTO units (id, name, is_active, category, owner_id) "
+                     "VALUES (:id, :name, :is_active, :category, :owner_id) "
+                     "ON CONFLICT (id) DO NOTHING"),
+                dict(row)
+            )
 
-        db.commit()
-        print("✅ Account funded! Units and mock performance data migrated successfully. 📈")
+        # 3. Migrate Quiz History
+        print("📊 Migrating Quiz History...")
+        sqlite_cursor.execute("SELECT * FROM quiz_history")
+        quizzes = sqlite_cursor.fetchall()
+        for row in quizzes:
+            pg_session.execute(
+                text("INSERT INTO quiz_history (id, unit_name, score, total, pnl, timestamp, owner_id) "
+                     "VALUES (:id, :unit_name, :score, :total, :pnl, :timestamp, :owner_id) "
+                     "ON CONFLICT (id) DO NOTHING"),
+                dict(row)
+            )
 
-    except FileNotFoundError:
-        print("❌ Error: config.json not found. Ensure it is one directory above this script (../config.json).")
+        # 4. Migrate Chat Messages
+        print("💬 Migrating Chat Messages...")
+        sqlite_cursor.execute("SELECT * FROM chat_messages")
+        chats = sqlite_cursor.fetchall()
+        for row in chats:
+            pg_session.execute(
+                text("INSERT INTO chat_messages (id, role, content, timestamp, owner_id) "
+                     "VALUES (:id, :role, :content, :timestamp, :owner_id) "
+                     "ON CONFLICT (id) DO NOTHING"),
+                dict(row)
+            )
+
+        pg_session.commit()
+        print("✅ Migration successful! All records synced to Neon.")
+
+        # Update sequences in Postgres (Important for ID generation)
+        print("🔄 Updating ID sequences...")
+        tables = ["users", "units", "quiz_history", "chat_messages"]
+        for table in tables:
+            pg_session.execute(text(f"SELECT setval('{table}_id_seq', (SELECT MAX(id) FROM {table}))"))
+        pg_session.commit()
+
     except Exception as e:
-        print(f"❌ Critical Error during migration: {e}")
+        print(f"❌ Migration failed: {e}")
+        pg_session.rollback()
     finally:
-        db.close()
+        sqlite_conn.close()
+        pg_session.close()
 
 if __name__ == "__main__":
     migrate()
+
 
  <<<--- END_FILE_BLOCK: backend\migrate_data.py
 
 >>>--- START_FILE_BLOCK: backend\models.py
 ################################################################################
 FILE: backend\models.py
-VERSION: 1.1.0 | SYSTEM: N/A
+VERSION: 1.4.0 | SYSTEM: N/A
 ################################################################################
 
 # IDENTITY: backend/models.py
-# VERSION: 1.1.0
-# ⚙️ GEAR 1.2: Database Models (Entities)
+# VERSION: 1.4.0
+# ⚙️ GEAR 1.2: Database Models (Entities) - PostgreSQL Optimized
 
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, JSON, Text
 from sqlalchemy.orm import relationship
-from database import Base
+try:
+    from database import Base
+except ImportError:
+    from .database import Base
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    role = Column(String, default="Student") # "Student" or "Teacher"
-    sensory_mode = Column(String, default="Standard") # "Standard", "Low-Sensory", "High-Stim"
-    difficulty = Column(String, default="Medium (Standard)")
-    ai_persona = Column(String, default="Standard Edu_AI")
-    semester_status = Column(String, default="Year 4 - Redemption Arc")
+    username = Column(String(100), unique=True, index=True)
+    role = Column(String(50), default="Student")
+    sensory_mode = Column(String(50), default="Standard")
+    difficulty = Column(String(50), default="Medium (Standard)")
+    ai_persona = Column(String(100), default="Standard Edu_AI")
+    semester_status = Column(String(100), default="Year 4 - Redemption Arc")
     interests = Column(JSON, default=list)
 
     # Relationships
-    units = relationship("Unit", back_populates="owner")
-    quiz_history = relationship("QuizHistory", back_populates="owner")
-    performance_logs = relationship("PerformanceLog", back_populates="owner")
+    units = relationship("Unit", back_populates="owner", cascade="all, delete-orphan")
+    quiz_history = relationship("QuizHistory", back_populates="owner", cascade="all, delete-orphan")
+    chat_messages = relationship("ChatMessage", back_populates="owner", cascade="all, delete-orphan")
+    performance_logs = relationship("PerformanceLog", back_populates="owner", cascade="all, delete-orphan")
+
+    @property
+    def active_units_list(self):
+        return [u.name for u in self.units if u.is_active]
 
 class Unit(Base):
     __tablename__ = "units"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
+    name = Column(String(200), index=True)
     is_active = Column(Boolean, default=True)
-    category = Column(String, default="General")
+    category = Column(String(100), default="General")
     
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="units")
@@ -568,37 +884,190 @@ class QuizHistory(Base):
     __tablename__ = "quiz_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    unit_name = Column(String)
+    unit_name = Column(String(200))
     score = Column(Integer)
     total = Column(Integer)
     pnl = Column(Float)
-    timestamp = Column(String)
+    timestamp = Column(String(100))
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="quiz_history")
 
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    role = Column(String(20)) # "user" or "model"
+    content = Column(Text) # Using Text instead of String for long chat messages
+    timestamp = Column(String(100))
+
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="chat_messages")
+
 class PerformanceLog(Base):
-    """Tracks performance over time for the AI predictive chart."""
     __tablename__ = "performance_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    subject = Column(String)
+    subject = Column(String(200))
     grade = Column(Float)
-    timestamp = Column(String)
+    timestamp = Column(String(100))
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="performance_logs")
 
+
  <<<--- END_FILE_BLOCK: backend\models.py
+
+>>>--- START_FILE_BLOCK: backend\README.md
+################################################################################
+FILE: backend\README.md
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+
+---
+title: Edu-AI Backend
+emoji: 🎓
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_file: main.py
+pinned: false
+---
+
+Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
+
+=======
+>>>>>>> c230b89d102cae6b52dc586eb3f313b093b6d894
+# 🎓 Edu-AI Backend
+
+Welcome to the **Edu-AI Prop Firm Backend**, a robust and scalable API powered by **FastAPI** and **Google Gemini AI**. This backend serves as the core intelligence engine for the Edu-AI mobile application, handling everything from AI-driven mentorship to dynamic quiz generation.
+
+## 🚀 Live on Hugging Face
+<<<<<<< HEAD
+This backend is hosted on **Hugging Face Spaces** using Docker, providing a global endpoint for the mobile app while maintaining a stateful connection to a cloud database.
+=======
+This backend is designed to be hosted on **Hugging Face Spaces** using Docker, providing a global endpoint for the mobile app while maintaining a stateful connection to a cloud database.
+>>>>>>> c230b89d102cae6b52dc586eb3f313b093b6d894
+
+---
+
+## ⚙️ Tech Stack
+- **Framework:** FastAPI (Python 3.10+)
+- **AI Engine:** Google Gemini (Generative AI) with intelligent key rotation.
+- **Database:** PostgreSQL (Cloud-hosted via **Neon.tech**) with local SQLite fallback.
+- **ORM:** SQLAlchemy 2.0
+- **Deployment:** Docker on Hugging Face Spaces.
+
+---
+
+## ✨ Key Features
+- **AI Socratic Mentor:** Context-aware chat system that adopts specific educational personas.
+- **Dynamic Quiz Engine:** Generates personalized multiple-choice quizzes based on the student's level and active units.
+- **Performance Analytics:** Tracks student "PnL" (Performance & Learning) and provides strategic recommendations.
+- **Unit Management:** Allows students to organize their curriculum and focus areas.
+- **Fault Tolerance:** Built-in Gemini API key rotation to handle rate limits and quotas automatically.
+
+---
+
+## 🛠️ Environment Variables
+<<<<<<< HEAD
+To run this project, you must configure the following secrets/environment variables in your Space settings:
+=======
+To run this project, you must configure the following secrets/environment variables:
+>>>>>>> c230b89d102cae6b52dc586eb3f313b093b6d894
+
+| Variable | Description |
+| :--- | :--- |
+| `DATABASE_URL` | Neon.tech PostgreSQL connection string. |
+| `GEMINI_API_KEY_1` | Primary Google Gemini API Key. |
+| `GEMINI_API_KEY_2` | Secondary Key (for rotation/failover). |
+| `GEMINI_API_KEY_N` | Additional keys as needed. |
+
+---
+
+## 🏗️ Local Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone <your-repo-url>
+   cd backend
+   ```
+
+2. **Create a Virtual Environment:**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # Windows: venv\Scripts\activate
+   ```
+
+3. **Install Dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Run the Server:**
+   ```bash
+   uvicorn main:app --reload
+   ```
+
+---
+
+## 📊 Database Migration
+To sync your local SQLite data to the cloud (Neon.tech):
+```bash
+python migrate_data.py
+```
+
+---
+
+## 📡 API Endpoints (Snapshot)
+- `GET /`: Health check.
+- `GET /api/user/{user_id}/dashboard`: Fetch comprehensive student stats.
+- `POST /api/ai/chat`: Interact with the AI Mentor.
+- `POST /api/ai/quiz`: Generate a new assessment.
+- `POST /api/quiz/record`: Save quiz performance to history.
+
+---
+
+<<<<<<< HEAD
+=======
+## 🛡️ Robots & Security
+- `GET /robots.txt`: Configured to prevent unauthorized crawling of API endpoints.
+- **CORS:** Pre-configured for cross-origin requests from the Edu-AI mobile app.
+
+---
+
+>>>>>>> c230b89d102cae6b52dc586eb3f313b093b6d894
+**Built with ❤️ for the next generation of learners.**
+
+
+ <<<--- END_FILE_BLOCK: backend\README.md
+
+>>>--- START_FILE_BLOCK: backend\requirements.txt
+################################################################################
+FILE: backend\requirements.txt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+fastapi==0.109.2
+uvicorn==0.27.1
+sqlalchemy==2.0.25
+pydantic==2.6.1
+google-generativeai>=0.7.2
+python-dotenv==1.0.1
+psycopg2-binary==2.9.9
+
+
+ <<<--- END_FILE_BLOCK: backend\requirements.txt
 
 >>>--- START_FILE_BLOCK: backend\schemas.py
 ################################################################################
 FILE: backend\schemas.py
-VERSION: 1.1.1 | SYSTEM: N/A
+VERSION: 1.6.1 | SYSTEM: N/A
 ################################################################################
 
 # IDENTITY: backend/schemas.py
-# VERSION: 1.1.1
+# VERSION: 1.6.1
 # ⚙️ Pydantic Models for Data Validation
 
 from pydantic import BaseModel
@@ -609,10 +1078,29 @@ class UnitBase(BaseModel):
     is_active: bool = True
     category: str = "General"
 
+class UnitCreate(UnitBase):
+    owner_id: int
+
+class UnitUpdate(BaseModel):
+    name: Optional[str] = None
+    is_active: Optional[bool] = None
+    category: Optional[str] = None
+
 class UnitResponse(UnitBase):
     id: int
+    owner_id: int
     class Config:
         from_attributes = True
+
+class QuizHistoryResponse(BaseModel):
+    unit_name: str
+    pnl: float
+    timestamp: str
+
+class ChatMessageResponse(BaseModel):
+    role: str
+    content: str
+    timestamp: str
 
 class DashboardResponse(BaseModel):
     username: str
@@ -624,15 +1112,50 @@ class DashboardResponse(BaseModel):
     active_units: List[str]
     average_pnl: float
     total_quizzes: int
+    quiz_history: List[QuizHistoryResponse]
+    chat_history: List[ChatMessageResponse]
 
 class ChaosRequest(BaseModel):
     unit: str
     focus_area: Optional[str] = None
     difficulty: str = "Asian Parent Expectations (Extreme)"
-    student_id: int
+    student_id: str
 
 class ChaosResponse(BaseModel):
     case_study: str
+
+class UserCreate(BaseModel):
+    username: str
+    role: str = "Student"
+    sensory_mode: str = "Standard"
+    difficulty: str = "Medium (Standard)"
+    ai_persona: str = "Standard Edu_AI"
+    semester_status: str = "Year 4 - Redemption Arc"
+    interests: List[str] = []
+    active_units: List[str] = []
+
+class UserUpdate(BaseModel):
+    role: Optional[str] = None
+    sensory_mode: Optional[str] = None
+    difficulty: Optional[str] = None
+    ai_persona: Optional[str] = None
+    semester_status: Optional[str] = None
+    interests: Optional[List[str]] = None
+    active_units: Optional[List[str]] = None
+
+class UserResponseSchema(BaseModel):
+    id: int
+    username: str
+    role: str
+    sensory_mode: str
+    difficulty: str
+    ai_persona: str
+    semester_status: str
+    interests: List[str]
+    active_units: List[str] = []
+
+    class Config:
+        from_attributes = True
 
 class UserPreferencesUpdate(BaseModel):
     sensory_mode: Optional[str] = None
@@ -645,7 +1168,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     prompt: str
-    user_id: int
+    user_id: str
     history: List[ChatMessage] = []
 
 class ChatResponse(BaseModel):
@@ -653,7 +1176,7 @@ class ChatResponse(BaseModel):
 
 class QuizRequest(BaseModel):
     unit_name: str
-    user_id: int
+    user_id: str
 
 class QuizQuestion(BaseModel):
     question_text: str
@@ -669,8 +1192,11 @@ class QuizRecordRequest(BaseModel):
     unit_name: str
     score: int
     total: int
-    user_id: int
+    user_id: str
     timestamp: Any
+
+class RecommendationResponse(BaseModel):
+    recommendation: str
 
 
  <<<--- END_FILE_BLOCK: backend\schemas.py
@@ -701,62 +1227,6 @@ plugins {
 
  <<<--- END_FILE_BLOCK: build.gradle.kts
 
->>>--- START_FILE_BLOCK: logs.txt
-################################################################################
-FILE: logs.txt
-VERSION: 1.0.0 | SYSTEM: N/A
-################################################################################
-
-(venv) PS C:\Users\ADMIN\edu_ai\Scale\backend> uvicorn main:app --reload
-INFO:     Will watch for changes in these directories: ['C:\\Users\\ADMIN\\edu_ai\\Scale\\backend']
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [13660] using StatReload
-Process SpawnProcess-1:
-Traceback (most recent call last):
-  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python312\Lib\multiprocessing\process.py", line 314, in _bootstrap
-    self.run()
-  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python312\Lib\multiprocessing\process.py", line 108, in run
-    self._target(*self._args, **self._kwargs)
-  File "C:\Users\ADMIN\edu_ai\Scale\backend\venv\Lib\site-packages\uvicorn\_subprocess.py", line 78, in subprocess_started
-    target(sockets=sockets)
-  File "C:\Users\ADMIN\edu_ai\Scale\backend\venv\Lib\site-packages\uvicorn\server.py", line 62, in run
-    return asyncio.run(self.serve(sockets=sockets))
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 194, in run
-    return runner.run(main)
-           ^^^^^^^^^^^^^^^^
-  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
-    return self._loop.run_until_complete(task)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 686, in run_until_complete
-    return future.result()
-           ^^^^^^^^^^^^^^^
-  File "C:\Users\ADMIN\edu_ai\Scale\backend\venv\Lib\site-packages\uvicorn\server.py", line 69, in serve
-    config.load()
-  File "C:\Users\ADMIN\edu_ai\Scale\backend\venv\Lib\site-packages\uvicorn\config.py", line 458, in load
-    self.loaded_app = import_from_string(self.app)
-                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\ADMIN\edu_ai\Scale\backend\venv\Lib\site-packages\uvicorn\importer.py", line 24, in import_from_string
-    raise exc from None
-  File "C:\Users\ADMIN\edu_ai\Scale\backend\venv\Lib\site-packages\uvicorn\importer.py", line 21, in import_from_string
-    module = importlib.import_module(module_str)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py", line 90, in import_module
-    return _bootstrap._gcd_import(name[level:], package, level)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
-  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
-  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
-  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
-  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
-  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
-  File "C:\Users\ADMIN\edu_ai\Scale\backend\main.py", line 12, in <module>
-    from backend.database import engine, Base, get_db
-ModuleNotFoundError: No module named 'backend'
-
-
- <<<--- END_FILE_BLOCK: logs.txt
-
 >>>--- START_FILE_BLOCK: requirements.txt
 ################################################################################
 FILE: requirements.txt
@@ -769,6 +1239,7 @@ sqlalchemy==2.0.25
 pydantic==2.6.1
 google-generativeai>=0.7.2
 python-dotenv==1.0.1
+psycopg2-binary==2.9.9
 
 
  <<<--- END_FILE_BLOCK: requirements.txt
@@ -823,6 +1294,76 @@ include(":app")
 
 
  <<<--- END_FILE_BLOCK: settings.gradle.kts
+
+>>>--- START_FILE_BLOCK: .github\workflows\hf-sync.yml
+################################################################################
+FILE: .github\workflows\hf-sync.yml
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+################################################################################
+# FILE: .github/workflows/hf-sync.yml
+# VERSION: 1.0.0 | SYSTEM: Hugging Face CI/CD Bot
+################################################################################
+#
+# HOW IT WORKS:
+# This acts as an automated "Expert Advisor" (EA). 
+# Every time you push code to the 'main' branch, it checks if the 'backend' folder changed.
+# If yes, it creates a temporary git repo inside the 'backend' folder and force-pushes
+# ONLY that folder to Hugging Face Spaces. Zero drawdown deployment! 🚀
+
+name: Sync Backend to Hugging Face Space
+
+on:
+  push:
+    branches: [ "main" ]
+    # Optional: Only run this workflow if something in the backend actually changed
+    paths:
+      - 'backend/**'
+  
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Fetch all history for all branches and tags
+
+      - name: Push ONLY Backend to HF Spaces
+        env:
+          # We will set this secret up in GitHub next
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          
+          # ⚠️ EDIT THESE VARIABLES BEFORE PUSHING ⚠️
+          HF_USERNAME: "Agent606"
+          HF_SPACE_NAME: "Edu-AI"
+        run: |
+          echo "🪐 Booting up the Orbit Deployment EA..."
+          
+          # Move into the backend folder so it becomes the "root"
+          cd backend
+          
+          # Initialize a fresh, temporary git repository just for this deployment
+          git init
+          git config user.name "Orbit Automations"
+          git config user.email "bot@orbit.local"
+          
+          # Stage all backend files (including the Dockerfile and README.md)
+          git add .
+          git commit -m "Auto-sync from Julius-606/Orbit monorepo"
+          
+          # Force push to the Hugging Face Space
+          # This completely overwrites the HF Space with ONLY the backend files
+          git push --force https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$HF_SPACE_NAME master:main
+          
+          echo "📈 Take Profit Hit! Backend deployed successfully to Hugging Face."
+
+
+ <<<--- END_FILE_BLOCK: .github\workflows\hf-sync.yml
 
 >>>--- START_FILE_BLOCK: app\build.gradle.kts
 ################################################################################
@@ -1117,6 +1658,9 @@ interface EduAIDao {
     @Query("SELECT * FROM users WHERE id = :userId")
     suspend fun getUserById(userId: String): UserEntity?
 
+    @Query("DELETE FROM users")
+    suspend fun clearUsers()
+
     // Units
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUnits(units: List<UnitEntity>)
@@ -1127,12 +1671,15 @@ interface EduAIDao {
     @Query("DELETE FROM units")
     suspend fun deleteAllUnits()
 
-    // Quiz History
+    // Quiz History (Kept for local session if needed, but we'll prioritize Repository state)
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertQuizHistory(quiz: QuizHistoryEntity)
 
-    @Query("SELECT * FROM quiz_history ORDER BY timestamp DESC")
-    fun getQuizHistory(): Flow<List<QuizHistoryEntity>>
+    @Query("SELECT * FROM quiz_history WHERE userId = :userId ORDER BY timestamp DESC")
+    fun getQuizHistory(userId: String): Flow<List<QuizHistoryEntity>>
+
+    @Query("DELETE FROM quiz_history")
+    suspend fun clearAllQuizHistory()
 
     // Chat History
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -1140,6 +1687,12 @@ interface EduAIDao {
 
     @Query("SELECT * FROM chat_messages WHERE userId = :userId ORDER BY timestamp ASC")
     fun getChatMessages(userId: String): Flow<List<ChatMessageEntity>>
+
+    @Query("DELETE FROM chat_messages WHERE userId = :userId")
+    suspend fun clearChatHistory(userId: String)
+
+    @Query("DELETE FROM chat_messages")
+    suspend fun clearAllChatHistory()
 }
 
 
@@ -1177,13 +1730,12 @@ abstract class EduAIDatabase : RoomDatabase() {
 >>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\local\QuizHistoryEntity.kt
 ################################################################################
 FILE: app\src\main\java\com\example\edu_ai\data\local\QuizHistoryEntity.kt
-VERSION: 1.1.0 | SYSTEM: N/A
+VERSION: 1.2.0 | SYSTEM: N/A
 ################################################################################
 
 // IDENTITY: data/local/QuizHistoryEntity.kt
-// VERSION: 1.1.0
+// VERSION: 1.2.0
 // ⚙️ GEAR 1.2: The Local Database (SQLite)
-// This is our base currency. It handles the local ledger of all our data.
 
 package com.example.edu_ai.data.local
 
@@ -1193,6 +1745,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "quiz_history")
 data class QuizHistoryEntity(
     @PrimaryKey(autoGenerate = true) val localId: Long = 0,
+    val userId: String, // Added to support multi-user isolation
     val unitName: String,
     val pnlScore: Double,
     val timestamp: Long
@@ -1276,7 +1829,21 @@ data class DashboardResponse(
     @SerializedName("ai_persona") val aiPersona: String,
     @SerializedName("active_units") val activeUnits: List<String>,
     @SerializedName("average_pnl") val averagePnl: Double,
-    @SerializedName("total_quizzes") val totalQuizzes: Int
+    @SerializedName("total_quizzes") val totalQuizzes: Int,
+    @SerializedName("quiz_history") val quizHistory: List<ApiQuizHistory>,
+    @SerializedName("chat_history") val chatHistory: List<ApiChatHistory>
+)
+
+data class ApiQuizHistory(
+    @SerializedName("unit_name") val unitName: String,
+    @SerializedName("pnl") val pnl: Double,
+    @SerializedName("timestamp") val timestamp: String
+)
+
+data class ApiChatHistory(
+    @SerializedName("role") val role: String,
+    @SerializedName("content") val content: String,
+    @SerializedName("timestamp") val timestamp: String
 )
 
 // --- AI Models ---
@@ -1288,7 +1855,7 @@ data class ChatMessage(
 
 data class ChatRequest(
     @SerializedName("prompt") val prompt: String,
-    @SerializedName("user_id") val user_id: Int,
+    @SerializedName("user_id") val user_id: String,
     @SerializedName("history") val history: List<ChatMessage> = emptyList()
 )
 
@@ -1298,7 +1865,7 @@ data class ChatResponse(
 
 data class QuizRequest(
     @SerializedName("unit_name") val unit_name: String,
-    @SerializedName("user_id") val user_id: Int
+    @SerializedName("user_id") val user_id: String
 )
 
 data class ApiQuizQuestion(
@@ -1317,7 +1884,7 @@ data class QuizRecordRequest(
     @SerializedName("unit_name") val unit_name: String,
     @SerializedName("score") val score: Int,
     @SerializedName("total") val total: Int,
-    @SerializedName("user_id") val user_id: Int,
+    @SerializedName("user_id") val user_id: String,
     @SerializedName("timestamp") val timestamp: Long
 )
 
@@ -1333,10 +1900,12 @@ VERSION: 1.0.0 | SYSTEM: N/A
 // IDENTITY: data/remote/EduAIApi.kt
 package com.example.edu_ai.data.remote
 
+import com.google.gson.annotations.SerializedName
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface EduAIApi {
 
@@ -1349,11 +1918,21 @@ interface EduAIApi {
     suspend fun aiChat(@Body request: ChatRequest): ChatResponse
 
     @POST("api/ai/quiz")
-    suspend fun generateAiQuiz(@Body request: QuizRequest): ApiQuizResponse
+    suspend fun generateAiQuiz(
+        @Body request: QuizRequest,
+        @Query("topic") topic: String? = null
+    ): ApiQuizResponse
 
     @POST("api/quiz/record")
     suspend fun recordQuiz(@Body request: QuizRecordRequest): Map<String, String>
+
+    @GET("api/user/{user_id}/recommendations")
+    suspend fun getRecommendations(@Path("user_id") userId: String): RecommendationResponse
 }
+
+data class RecommendationResponse(
+    @SerializedName("recommendation") val recommendation: String
+)
 
 
  <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\data\remote\EduAIApi.kt
@@ -1414,7 +1993,6 @@ import com.example.edu_ai.data.remote.ChatMessage as ApiChatMessage
 
 /**
  * 🚀 The New Network-First AI Service
- * This service now talks to your Python Backend instead of Gemini directly.
  */
 class GeminiAiService : AiService {
 
@@ -1428,7 +2006,7 @@ class GeminiAiService : AiService {
             val response = RetrofitClient.instance.aiChat(
                 ChatRequest(
                     prompt = prompt,
-                    user_id = userContext.id.filter { it.isDigit() }.toIntOrNull() ?: 1,
+                    user_id = userContext.id,
                     history = apiHistory
                 )
             )
@@ -1440,16 +2018,17 @@ class GeminiAiService : AiService {
 
     override suspend fun generateQuiz(
         unitName: String,
-        userContext: UserEntity
+        userContext: UserEntity,
+        topic: String?
     ): QuizResponse? {
         return try {
             val response = RetrofitClient.instance.generateAiQuiz(
-                QuizRequest(
+                request = QuizRequest(
                     unit_name = unitName,
-                    user_id = userContext.id.filter { it.isDigit() }.toIntOrNull() ?: 1
-                )
+                    user_id = userContext.id
+                ),
+                topic = topic
             )
-            // Map API response to UI model
             QuizResponse(
                 title = response.quiz_title,
                 questions = response.questions.map { q ->
@@ -1461,20 +2040,44 @@ class GeminiAiService : AiService {
         }
     }
 
+    override suspend fun recordQuizResult(
+        unitName: String,
+        score: Int,
+        total: Int,
+        userContext: UserEntity
+    ) {
+        try {
+            RetrofitClient.instance.recordQuiz(
+                QuizRecordRequest(
+                    unit_name = unitName,
+                    score = score,
+                    total = total,
+                    user_id = userContext.id,
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            // Log error
+        }
+    }
+
     override suspend fun getRecommendations(
-        userContext: UserEntity,
-        quizHistory: List<QuizHistoryEntity>
+        userContext: UserEntity
     ): String {
-        // We'll let the chat endpoint handle recommendations for now to keep it simple
-        return "Keep focusing on your active units! Your personalized strategy is being updated."
+        return try {
+            val response = RetrofitClient.instance.getRecommendations(userContext.id)
+            response.recommendation
+        } catch (e: Exception) {
+            "Keep focusing on your active units! Your personalized strategy is being updated."
+        }
     }
 }
 
-// Interface stays the same to avoid breaking UI code
 interface AiService {
     suspend fun getChatResponse(prompt: String, userContext: UserEntity, history: List<ChatMessage> = emptyList()): String
-    suspend fun generateQuiz(unitName: String, userContext: UserEntity): QuizResponse?
-    suspend fun getRecommendations(userContext: UserEntity, quizHistory: List<QuizHistoryEntity>): String
+    suspend fun generateQuiz(unitName: String, userContext: UserEntity, topic: String? = null): QuizResponse?
+    suspend fun recordQuizResult(unitName: String, score: Int, total: Int, userContext: UserEntity)
+    suspend fun getRecommendations(userContext: UserEntity): String
 }
 
 data class ChatMessage(val role: String, val content: String)
@@ -1604,6 +2207,8 @@ package com.example.edu_ai.repository
 import com.example.edu_ai.data.local.EduAIDao
 import com.example.edu_ai.data.local.UserEntity
 import com.example.edu_ai.data.local.UnitEntity
+import com.example.edu_ai.data.local.QuizHistoryEntity
+import com.example.edu_ai.data.local.ChatMessageEntity
 import com.example.edu_ai.data.remote.EduAIApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -1619,6 +2224,12 @@ class EduAIRepository(
             // 1. Try to fetch from remote
             val response = api.getDashboard(userId)
             
+            // Clear all local data to ensure "not locally saving" persistently and preventing leaks
+            dao.clearUsers()
+            dao.deleteAllUnits()
+            dao.clearAllChatHistory()
+            dao.clearAllQuizHistory()
+
             val userEntity = UserEntity(
                 id = userId,
                 username = response.username,
@@ -1629,38 +2240,59 @@ class EduAIRepository(
             )
             dao.insertUser(userEntity)
             
-            dao.deleteAllUnits()
             val unitEntities = response.activeUnits.map { unitName ->
                 UnitEntity(unitName = unitName, isActive = true)
             }
             dao.insertUnits(unitEntities)
-            
+
+            // 2. Re-populate from remote response
+            for (q in response.quizHistory) {
+                dao.insertQuizHistory(
+                    QuizHistoryEntity(
+                        userId = userId,
+                        unitName = q.unitName,
+                        pnlScore = q.pnl,
+                        timestamp = q.timestamp.toLongOrNull() ?: System.currentTimeMillis()
+                    )
+                )
+            }
+
+            for (c in response.chatHistory) {
+                dao.insertChatMessage(
+                    ChatMessageEntity(
+                        userId = userId,
+                        role = c.role,
+                        content = c.content,
+                        timestamp = c.timestamp.toLongOrNull() ?: System.currentTimeMillis()
+                    )
+                )
+            }
+
             emit(userEntity)
         } catch (e: Exception) {
-            // 2. Fallback: Check Local DB
-            val cachedUser = dao.getUser().firstOrNull()
+            // 3. Fallback: Check Local DB (Still keep for offline, but it'll only have current user's last session)
+            val cachedUser = dao.getUserById(userId)
             if (cachedUser != null) {
                 emit(cachedUser)
             } else {
-                // 3. Dev Fallback: If everything fails and DB is empty, provide a mock user
+                // 4. Dev Fallback
                 val devUser = UserEntity(
                     id = userId,
-                    username = "Dev Trader",
+                    username = userId,
                     role = "Student",
                     sensoryMode = "Visual",
                     semesterStatus = "Year 4 - Redemption Arc 🔥",
                     aiPersona = "Socratic Mentor"
                 )
                 dao.insertUser(devUser)
-                
-                // Add some default units so the Quiz tab isn't empty
+
                 val devUnits = listOf(
                     UnitEntity(unitName = "Biochemistry II", isActive = true),
                     UnitEntity(unitName = "General Surgery", isActive = true),
                     UnitEntity(unitName = "Internal Medicine", isActive = true)
                 )
                 dao.insertUnits(devUnits)
-                
+
                 emit(devUser)
             }
         }
@@ -1886,6 +2518,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.PlayCircleFilled
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
@@ -1904,13 +2538,53 @@ import java.util.regex.Pattern
 @Composable
 fun ChatInterface(
     viewModel: ChatViewModel,
+    onCloseChat: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var inputText by remember { mutableStateOf("") }
     val context = LocalContext.current
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize()) {
+        // Chat Header
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("AI Consultation", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Row {
+                IconButton(onClick = { showDeleteDialog = true }) {
+                    Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Chat", tint = MaterialTheme.colorScheme.error)
+                }
+                IconButton(onClick = onCloseChat) {
+                    Icon(Icons.Default.Close, contentDescription = "Close Chat")
+                }
+            }
+        }
+
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("Clear Consultation?") },
+                text = { Text("This will permanently delete your current chat history with the AI.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.clearChat()
+                        showDeleteDialog = false
+                    }) {
+                        Text("CLEAR", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("CANCEL")
+                    }
+                }
+            )
+        }
+
         // 1. Message List
         LazyColumn(
             modifier = Modifier
@@ -2166,6 +2840,12 @@ class ChatViewModel(
         }
     }
 
+    fun clearChat() {
+        viewModelScope.launch {
+            dao.clearChatHistory(user.id)
+        }
+    }
+
     companion object {
         fun provideFactory(user: UserEntity): ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -2188,6 +2868,7 @@ VERSION: 1.0.0 | SYSTEM: N/A
 
 package com.example.edu_ai.ui.screens.student
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -2196,6 +2877,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TrendingUp
@@ -2266,8 +2948,15 @@ fun ModuleScreen(
                 }
             } else {
                 when (selectedTab) {
-                    0 -> ChatTabWrapper(uiState.user)
-                    1 -> ChatHistoryTab()
+                    0 -> ChatTabWrapper(uiState.user, onCloseChat = { selectedTab = 1 })
+                    1 -> {
+                        if (uiState.user != null) {
+                             val chatViewModel: ChatViewModel = viewModel(
+                                factory = ChatViewModel.provideFactory(uiState.user!!)
+                            )
+                             ChatHistoryTab(viewModel = chatViewModel)
+                        }
+                    }
                     2 -> {
                         if (uiState.user != null) {
                             val quizViewModel: QuizViewModel = viewModel(
@@ -2288,7 +2977,14 @@ fun ModuleScreen(
                             ProgressTab(viewModel = progressViewModel)
                         }
                     }
-                    4 -> ZenithTab()
+                    4 -> {
+                        if (uiState.user != null) {
+                            val progressViewModel: ProgressViewModel = viewModel(
+                                factory = ProgressViewModel.provideFactory(uiState.user!!)
+                            )
+                            ZenithTab(viewModel = progressViewModel)
+                        }
+                    }
                 }
             }
         }
@@ -2296,7 +2992,7 @@ fun ModuleScreen(
 }
 
 @Composable
-fun ChatTabWrapper(user: UserEntity?) {
+fun ChatTabWrapper(user: UserEntity?, onCloseChat: () -> Unit) {
     var isChatStarted by remember { mutableStateOf(false) }
 
     if (!isChatStarted) {
@@ -2322,26 +3018,50 @@ fun ChatTabWrapper(user: UserEntity?) {
             val chatViewModel: ChatViewModel = viewModel(
                 factory = ChatViewModel.provideFactory(user)
             )
-            ChatInterface(viewModel = chatViewModel)
+            ChatInterface(
+                viewModel = chatViewModel,
+                onCloseChat = onCloseChat
+            )
         }
     }
 }
 
 @Composable
-fun ChatHistoryTab() {
+fun ChatHistoryTab(viewModel: ChatViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Previous Consultations", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text("Resume or delete your study sessions.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Review your study sessions with the AI.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        if (uiState.messages.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No previous chats found.")
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(uiState.messages) { message ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = if (message.role == "user") "You" else "AI",
+                                fontWeight = FontWeight.Bold,
+                                color = if (message.role == "user") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                            )
+                            Text(text = message.content)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
 fun ProgressTab(viewModel: ProgressViewModel) {
     val uiState by viewModel.uiState.collectAsState()
-
-    LaunchedEffect(Unit) {
-        viewModel.refreshRecommendations()
-    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -2350,27 +3070,6 @@ fun ProgressTab(viewModel: ProgressViewModel) {
         item {
             Text("Learning Analytics", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Text("Monitoring your progressive growth", color = MaterialTheme.colorScheme.primary)
-        }
-
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.TrendingUp, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("AI Strategy & Recommendations", fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    if (uiState.isLoading) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    } else {
-                        Text(uiState.aiRecommendation, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
         }
 
         item {
@@ -2387,7 +3086,11 @@ fun ProgressTab(viewModel: ProgressViewModel) {
 
         items(uiState.quizHistory) { history ->
             val date = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(history.timestamp))
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { /* Logic to open specific quiz for review */ }
+            ) {
                 Row(
                     modifier = Modifier.padding(16.dp).fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -2410,11 +3113,57 @@ fun ProgressTab(viewModel: ProgressViewModel) {
 }
 
 @Composable
-fun ZenithTab() {
+fun ZenithTab(viewModel: ProgressViewModel) {
+    val recommendation by viewModel.recommendation.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshRecommendations()
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("The Zenith Hub", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text("Settings & Daily Motivation", color = MaterialTheme.colorScheme.secondary)
+        Text("The Zenith Hub 🏔️", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text("Your AI Guide for peak academic performance.", color = MaterialTheme.colorScheme.secondary)
+        
         Spacer(modifier = Modifier.height(24.dp))
+        
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Strategic Guidance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                } else {
+                    Text(
+                        text = recommendation,
+                        style = MaterialTheme.typography.bodyLarge,
+                        lineHeight = 24.sp
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                Button(
+                    onClick = { viewModel.refreshRecommendations() },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("REFRESH STRATEGY")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Text("Daily Motivation", fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             Text(
                 "\"The expert in anything was once a beginner.\"",
@@ -2462,35 +3211,31 @@ class ProgressViewModel(
     private val user: UserEntity
 ) : ViewModel() {
 
-    private val _aiRecommendation = MutableStateFlow("Analyze your recent quizzes to see where you can grow.")
     private val _isLoading = MutableStateFlow(false)
 
     val uiState: StateFlow<ProgressUiState> = combine(
-        dao.getQuizHistory(),
-        _aiRecommendation,
+        dao.getQuizHistory(user.id),
         _isLoading
-    ) { history, recommendation, loading ->
-        ProgressUiState(history, recommendation, loading)
+    ) { history, loading ->
+        // We'll fetch the recommendation separately to keep UI reactive
+        ProgressUiState(history, "Analyze your recent quizzes to see where you can grow.", loading)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = ProgressUiState(isLoading = true)
     )
 
+    private val _recommendation = MutableStateFlow("Analyze your recent quizzes to see where you can grow.")
+    val recommendation: StateFlow<String> = _recommendation.asStateFlow()
+
     fun refreshRecommendations() {
         viewModelScope.launch {
-            val history = uiState.value.quizHistory
-            if (history.isEmpty()) {
-                _aiRecommendation.value = "Take your first quiz to unlock personalized AI strategy!"
-                return@launch
-            }
-
             _isLoading.value = true
             try {
-                val recommendation = aiService.getRecommendations(user, history)
-                _aiRecommendation.value = recommendation
+                val rec = aiService.getRecommendations(user)
+                _recommendation.value = rec
             } catch (e: Exception) {
-                _aiRecommendation.value = "Stay consistent! Your next breakthrough is just one study session away."
+                _recommendation.value = "Stay consistent! Your next breakthrough is just one study session away."
             } finally {
                 _isLoading.value = false
             }
@@ -2519,19 +3264,25 @@ VERSION: 1.0.0 | SYSTEM: N/A
 
 package com.example.edu_ai.ui.screens.student
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -2539,7 +3290,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.edu_ai.data.local.QuizHistoryEntity
 import com.example.edu_ai.data.local.UnitEntity
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
 fun QuizTabWrapper(
@@ -2550,12 +3304,23 @@ fun QuizTabWrapper(
     val uiState by viewModel.uiState.collectAsState()
 
     if (uiState.quiz == null) {
-        UnitSelectionScreen(units = units, onUnitSelected = { viewModel.startQuiz(it) }, isLoading = uiState.isLoading, error = uiState.error)
+        UnitSelectionScreen(
+            units = units,
+            history = uiState.quizHistory,
+            selectedUnit = uiState.selectedUnit,
+            onUnitClicked = { viewModel.selectUnit(it) },
+            onStartQuiz = { unit, topic -> viewModel.startQuiz(unit, topic) },
+            isLoading = uiState.isLoading,
+            error = uiState.error
+        )
     } else if (uiState.isQuizFinished) {
         QuizResultScreen(
             score = uiState.score,
             total = uiState.quiz?.questions?.size ?: 0,
-            onRestart = { viewModel.startQuiz(uiState.quiz?.title ?: "") }
+            onReview = { viewModel.enterReviewMode() },
+            onRetake = { viewModel.startQuiz(uiState.quiz?.title ?: "") },
+            onTakeNew = { viewModel.resetQuizSelection() },
+            onGoBack = { viewModel.resetQuizSelection() }
         )
     } else {
         QuizQuestionScreen(
@@ -2568,10 +3333,15 @@ fun QuizTabWrapper(
 @Composable
 fun UnitSelectionScreen(
     units: List<UnitEntity>,
-    onUnitSelected: (String) -> Unit,
+    history: List<QuizHistoryEntity>,
+    selectedUnit: String?,
+    onUnitClicked: (String) -> Unit,
+    onStartQuiz: (String, String?) -> Unit,
     isLoading: Boolean,
     error: String?
 ) {
+    var focusArea by remember { mutableStateOf("") }
+
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -2582,20 +3352,108 @@ fun UnitSelectionScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         if (isLoading) {
-            CircularProgressIndicator()
-            Text("AI is drafting your assessment...", modifier = Modifier.padding(top = 16.dp))
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("AI is drafting your assessment...", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         } else {
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 16.dp))
             }
             
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                itemsIndexed(units) { _, unit ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Active Contracts (Units)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                }
+
+                items(units) { unit ->
+                    val isSelected = selectedUnit == unit.unitName
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = { onUnitSelected(unit.unitName) }
+                        onClick = { onUnitClicked(unit.unitName) },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                        )
                     ) {
-                        Text(unit.unitName, modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Medium)
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(unit.unitName, fontWeight = FontWeight.Bold)
+                            
+                            AnimatedVisibility(visible = isSelected) {
+                                Column {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    OutlinedTextField(
+                                        value = focusArea,
+                                        onValueChange = { focusArea = it },
+                                        placeholder = { Text("Area of focus (Optional)") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
+                                        shape = MaterialTheme.shapes.medium
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Button(
+                                        onClick = { onStartQuiz(unit.unitName, focusArea.ifBlank { null }) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("GENERATE QUIZ 🧠")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (history.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Recent Trades (Performance)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        }
+                    }
+
+                    items(history) { record ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(record.unitName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text(
+                                        SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(record.timestamp)),
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                
+                                val pnlColor = if (record.pnlScore >= 70) Color(0xFF4CAF50) else Color(0xFFF44336)
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        "${record.pnlScore.toInt()}%",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 18.sp,
+                                        color = pnlColor
+                                    )
+                                    Text("PnL", fontSize = 10.sp, color = pnlColor)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2612,73 +3470,73 @@ fun QuizQuestionScreen(
     val currentIdx = uiState.currentQuestionIndex
     val currentQuestion = quiz.questions[currentIdx]
     val selectedIdx = uiState.selectedOptions[currentIdx]
-    val isSubmitted = uiState.submittedQuestions.contains(currentIdx)
+    val isSubmitted = uiState.submittedQuestions.contains(currentIdx) || uiState.isReviewMode
+    val scrollState = rememberScrollState()
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = Modifier.fillMaxSize().padding(16.dp)
     ) {
-        // Progress
-        LinearProgressIndicator(
-            progress = { (currentIdx + 1).toFloat() / quiz.questions.size },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Text("Question ${currentIdx + 1} of ${quiz.questions.size}", style = MaterialTheme.typography.labelMedium)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            LinearProgressIndicator(
+                progress = { (currentIdx + 1).toFloat() / quiz.questions.size },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text("Question ${currentIdx + 1} of ${quiz.questions.size}", style = MaterialTheme.typography.labelMedium)
 
-        // Question
-        Text(text = currentQuestion.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(text = currentQuestion.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
 
-        // Options
-        currentQuestion.options.forEachIndexed { index, option ->
-            val isThisOptionSelected = selectedIdx == index
-            val isCorrect = index == currentQuestion.correctIndex
-            
-            val borderColor = when {
-                isSubmitted && isCorrect -> Color.Green
-                isSubmitted && isThisOptionSelected && !isCorrect -> Color.Red
-                isThisOptionSelected -> MaterialTheme.colorScheme.primary
-                else -> MaterialTheme.colorScheme.outline
-            }
+            currentQuestion.options.forEachIndexed { index, option ->
+                val isThisOptionSelected = selectedIdx == index
+                val isCorrect = index == currentQuestion.correctIndex
+                
+                val borderColor = when {
+                    isSubmitted && isCorrect -> Color.Green
+                    isSubmitted && isThisOptionSelected && !isCorrect -> Color.Red
+                    isThisOptionSelected -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.outline
+                }
 
-            OutlinedCard(
-                onClick = { if (!isSubmitted) viewModel.selectOption(index) },
-                modifier = Modifier.fillMaxWidth(),
-                border = BorderStroke(2.dp, borderColor)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                OutlinedCard(
+                    onClick = { if (!isSubmitted) viewModel.selectOption(index) },
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(2.dp, borderColor)
                 ) {
-                    Text(text = option, modifier = Modifier.weight(1f))
-                    if (isSubmitted) {
-                        if (isCorrect) Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.Green)
-                        else if (isThisOptionSelected) Icon(Icons.Default.Error, contentDescription = null, tint = Color.Red)
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = option, modifier = Modifier.weight(1f))
+                        if (isSubmitted) {
+                            if (isCorrect) Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.Green)
+                            else if (isThisOptionSelected) Icon(Icons.Default.Error, contentDescription = null, tint = Color.Red)
+                        }
                     }
                 }
             }
-        }
 
-        // Explanation
-        if (isSubmitted) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("Explanation", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text(currentQuestion.explanation, fontSize = 14.sp)
+            if (isSubmitted) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text("Explanation", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(currentQuestion.explanation, fontSize = 14.sp)
+                    }
                 }
             }
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Navigation Buttons
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Previous Button
             OutlinedButton(
                 onClick = { viewModel.previousQuestion() },
                 enabled = currentIdx > 0,
@@ -2690,7 +3548,6 @@ fun QuizQuestionScreen(
             }
 
             if (!isSubmitted) {
-                // Submit Button
                 Button(
                     onClick = { viewModel.submitAnswer() },
                     enabled = selectedIdx != null,
@@ -2699,12 +3556,11 @@ fun QuizQuestionScreen(
                     Text("SUBMIT")
                 }
             } else {
-                // Next Button
                 Button(
                     onClick = { viewModel.nextQuestion() },
                     modifier = Modifier.weight(1f).height(56.dp)
                 ) {
-                    Text(if (currentIdx + 1 < quiz.questions.size) "NEXT" else "FINISH")
+                    Text(if (currentIdx + 1 < quiz.questions.size) "NEXT" else if (uiState.isReviewMode) "BACK TO RESULT" else "FINISH")
                     Spacer(modifier = Modifier.width(4.dp))
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                 }
@@ -2714,22 +3570,62 @@ fun QuizQuestionScreen(
 }
 
 @Composable
-fun QuizResultScreen(score: Int, total: Int, onRestart: () -> Unit) {
+fun QuizResultScreen(
+    score: Int, 
+    total: Int, 
+    onReview: () -> Unit,
+    onRetake: () -> Unit,
+    onTakeNew: () -> Unit,
+    onGoBack: () -> Unit
+) {
+    val percentage = (score.toDouble() / total * 100).toInt()
+    
+    val congratulationMessage = when {
+        percentage == 100 -> "UNSTOPPABLE! 🏆 Perfect score. You've mastered this contract."
+        percentage >= 80 -> "EXCELLENT! 🌟 High-tier performance. You're dominating the syllabus."
+        else -> "Assessment Complete!"
+    }
+
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("Assessment Complete!", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Text(
+            text = congratulationMessage, 
+            fontSize = 24.sp, 
+            fontWeight = FontWeight.Bold, 
+            textAlign = TextAlign.Center,
+            color = if (percentage >= 80) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+        )
+        
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Your PnL (Accuracy)", fontSize = 18.sp)
-        Text("${(score.toDouble()/total * 100).toInt()}%", fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+        Text("Your PnL (Accuracy)", fontSize = 16.sp)
+        Text("$percentage%", fontSize = 64.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
         Text("Score: $score / $total", fontSize = 20.sp)
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(48.dp))
         
-        Button(onClick = onRestart, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-            Text("RETAKE ASSESSMENT")
+        // Options Grid
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = onReview, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
+                    Icon(Icons.Default.Search, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("REVIEW")
+                }
+                Button(onClick = onRetake, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("RETAKE")
+                }
+            }
+            Button(onClick = onTakeNew, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                Text("TAKE NEW ASSESSMENT")
+            }
+            TextButton(onClick = onGoBack) {
+                Text("Go Back to Units")
+            }
         }
     }
 }
@@ -2759,20 +3655,25 @@ import com.example.edu_ai.data.remote.ai.AiServiceFactory
 import com.example.edu_ai.data.remote.ai.QuizQuestion
 import com.example.edu_ai.data.remote.ai.QuizResponse
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class QuizUiState(
     val quiz: QuizResponse? = null,
     val currentQuestionIndex: Int = 0,
-    val selectedOptions: Map<Int, Int> = emptyMap(), // Map of question index to selected option
-    val submittedQuestions: Set<Int> = emptySet(), // Questions that have been submitted/locked
+    val selectedOptions: Map<Int, Int> = emptyMap(),
+    val submittedQuestions: Set<Int> = emptySet(),
     val score: Int = 0,
     val isQuizFinished: Boolean = false,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val selectedUnit: String? = null,
+    val isReviewMode: Boolean = false,
+    val quizHistory: List<QuizHistoryEntity> = emptyList()
 )
 
 class QuizViewModel(
@@ -2784,7 +3685,24 @@ class QuizViewModel(
     private val _uiState = MutableStateFlow(QuizUiState())
     val uiState: StateFlow<QuizUiState> = _uiState.asStateFlow()
 
-    fun startQuiz(unitName: String) {
+    init {
+        loadQuizHistory()
+    }
+
+    private fun loadQuizHistory() {
+        viewModelScope.launch {
+            // Filter history by the current user's ID
+            dao.getQuizHistory(user.id).collect { history ->
+                _uiState.update { it.copy(quizHistory = history) }
+            }
+        }
+    }
+
+    fun selectUnit(unitName: String) {
+        _uiState.update { it.copy(selectedUnit = unitName) }
+    }
+
+    fun startQuiz(unitName: String, topic: String? = null) {
         viewModelScope.launch {
             _uiState.update { it.copy(
                 quiz = null,
@@ -2794,11 +3712,22 @@ class QuizViewModel(
                 score = 0,
                 isQuizFinished = false,
                 isLoading = true,
-                error = null
+                error = null,
+                selectedUnit = unitName,
+                isReviewMode = false
             ) }
-            val quiz = aiService.generateQuiz(unitName, user)
+            val quiz = aiService.generateQuiz(unitName, user, topic)
             if (quiz != null) {
-                _uiState.update { it.copy(quiz = quiz, isLoading = false) }
+                // Shuffle options for each question to break predictable patterns
+                val shuffledQuestions = quiz.questions.map { question ->
+                    val optionsWithIndices = question.options.withIndex().toList()
+                    val shuffled = optionsWithIndices.shuffled()
+                    val newCorrectIndex = shuffled.indexOfFirst { it.index == question.correctIndex }
+                    val newOptions = shuffled.map { it.value }
+                    question.copy(options = newOptions, correctIndex = newCorrectIndex)
+                }
+                val shuffledQuiz = quiz.copy(questions = shuffledQuestions)
+                _uiState.update { it.copy(quiz = shuffledQuiz, isLoading = false) }
             } else {
                 _uiState.update { it.copy(isLoading = false, error = "Failed to ignite the Quiz Engine.") }
             }
@@ -2839,7 +3768,11 @@ class QuizViewModel(
         if (state.currentQuestionIndex + 1 < quiz.questions.size) {
             _uiState.update { it.copy(currentQuestionIndex = state.currentQuestionIndex + 1) }
         } else {
-            finishQuiz()
+            if (state.isReviewMode) {
+                 _uiState.update { it.copy(isQuizFinished = true) }
+            } else {
+                finishQuiz()
+            }
         }
     }
 
@@ -2857,15 +3790,32 @@ class QuizViewModel(
         val finalScorePercentage = (state.score.toDouble() / quiz.questions.size) * 100
         
         viewModelScope.launch {
+            // Save locally with user isolation
             dao.insertQuizHistory(
                 QuizHistoryEntity(
+                    userId = user.id,
                     unitName = quiz.title,
                     pnlScore = finalScorePercentage,
                     timestamp = System.currentTimeMillis()
                 )
             )
+            // Save to backend
+            aiService.recordQuizResult(
+                unitName = quiz.title,
+                score = state.score,
+                total = quiz.questions.size,
+                userContext = user
+            )
             _uiState.update { it.copy(isQuizFinished = true) }
         }
+    }
+
+    fun enterReviewMode() {
+        _uiState.update { it.copy(isQuizFinished = false, isReviewMode = true, currentQuestionIndex = 0) }
+    }
+
+    fun resetQuizSelection() {
+        _uiState.update { it.copy(quiz = null, selectedUnit = null, isQuizFinished = false, isReviewMode = false) }
     }
 
     companion object {

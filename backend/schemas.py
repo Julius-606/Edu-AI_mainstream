@@ -1,5 +1,5 @@
 # IDENTITY: backend/schemas.py
-# VERSION: 1.6.1
+# VERSION: 1.7.0
 # ⚙️ Pydantic Models for Data Validation
 
 from pydantic import BaseModel
@@ -92,6 +92,24 @@ class UserResponseSchema(BaseModel):
 class UserPreferencesUpdate(BaseModel):
     sensory_mode: Optional[str] = None
     ai_persona: Optional[str] = None
+
+# --- TEACHER PORTAL SCHEMAS ---
+
+class StudentSummary(BaseModel):
+    id: int
+    username: str
+    average_pnl: float
+    total_quizzes: int
+    semester_status: str
+    active_units: List[str]
+
+class TeacherDashboardResponse(BaseModel):
+    students: List[StudentSummary]
+    total_active_portfolios: int
+    risk_alerts: List[str]
+
+class ClassReportResponse(BaseModel):
+    report: str
 
 # --- AI Models ---
 class ChatMessage(BaseModel):

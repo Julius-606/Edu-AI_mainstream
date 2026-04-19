@@ -1,10 +1,10 @@
 // IDENTITY: data/remote/EduAIApi.kt
 package com.example.edu_ai.data.remote
 
-import com.google.gson.annotations.SerializedName
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -29,8 +29,18 @@ interface EduAIApi {
 
     @GET("api/user/{user_id}/recommendations")
     suspend fun getRecommendations(@Path("user_id") userId: String): RecommendationResponse
-}
 
-data class RecommendationResponse(
-    @SerializedName("recommendation") val recommendation: String
-)
+    // --- Teacher Portal Endpoints ---
+
+    @GET("api/teacher/dashboard")
+    suspend fun getTeacherDashboard(): TeacherDashboardResponse
+
+    @POST("api/teacher/class-report")
+    suspend fun generateClassReport(): ClassReportResponse
+
+    @PUT("api/users/{user_id}")
+    suspend fun updateStudentProfile(
+        @Path("user_id") userId: String,
+        @Body updates: Map<String, Any?>
+    ): Map<String, Any?>
+}

@@ -17,7 +17,9 @@ class EduAIApplication : Application() {
             applicationContext,
             EduAIDatabase::class.java,
             "edu_ai_db"
-        ).build()
+        )
+        .fallbackToDestructiveMigration(dropAllTables = true) // Updated to non-deprecated version
+        .build()
 
         repository = EduAIRepository(
             api = RetrofitClient.instance,

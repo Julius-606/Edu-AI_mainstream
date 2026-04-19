@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.PlayCircleFilled
@@ -38,20 +39,42 @@ fun ChatInterface(
     val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        // Chat Header
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+        // Chat Header - Enhanced with Dynamic Title
+        Surface(
+            tonalElevation = 4.dp,
+            shadowElevation = 2.dp,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text("AI Consultation", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Row {
-                IconButton(onClick = { showDeleteDialog = true }) {
-                    Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Chat", tint = MaterialTheme.colorScheme.error)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = uiState.currentSessionTitle,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = "The Differential Assistant",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
                 }
-                IconButton(onClick = onCloseChat) {
-                    Icon(Icons.Default.Close, contentDescription = "Close Chat")
+                Row {
+                    IconButton(onClick = { viewModel.startNewChat() }) {
+                        Icon(Icons.Default.Add, contentDescription = "New Chat", tint = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Chat", tint = MaterialTheme.colorScheme.error)
+                    }
+                    IconButton(onClick = onCloseChat) {
+                        Icon(Icons.Default.Close, contentDescription = "Close Chat")
+                    }
                 }
             }
         }
@@ -59,14 +82,14 @@ fun ChatInterface(
         if (showDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
-                title = { Text("Clear Consultation?") },
-                text = { Text("This will permanently delete your current chat history with the AI.") },
+                title = { Text("Delete This Session?") },
+                text = { Text("This will permanently remove this consultation from your records.") },
                 confirmButton = {
                     TextButton(onClick = {
                         viewModel.clearChat()
                         showDeleteDialog = false
                     }) {
-                        Text("CLEAR", color = MaterialTheme.colorScheme.error)
+                        Text("DELETE", color = MaterialTheme.colorScheme.error)
                     }
                 },
                 dismissButton = {
@@ -102,40 +125,52 @@ fun ChatInterface(
             Text(
                 text = it,
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(8.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 fontSize = 12.sp
             )
         }
 
         // 3. Input Area
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            tonalElevation = 2.dp,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = { inputText = it },
-                placeholder = { Text("Ask about your syllabus...") },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(24.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            IconButton(
-                onClick = {
-                    if (inputText.isNotBlank()) {
-                        viewModel.sendMessage(inputText)
-                        inputText = ""
-                    }
-                },
-                enabled = !uiState.isTyping
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send",
-                    tint = MaterialTheme.colorScheme.primary
+                OutlinedTextField(
+                    value = inputText,
+                    onValueChange = { inputText = it },
+                    placeholder = { Text("Ask about pathology, anatomy...") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = {
+                        if (inputText.isNotBlank()) {
+                            viewModel.sendMessage(inputText)
+                            inputText = ""
+                        }
+                    },
+                    enabled = !uiState.isTyping,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }
@@ -164,7 +199,7 @@ fun TypingIndicator() {
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(
-            text = "Gemini is thinking... (${seconds}s)",
+            text = "Analyzing... (${seconds}s)",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.secondary
         )
@@ -185,12 +220,17 @@ fun ChatBubble(message: ChatMessage) {
             shape = RoundedCornerShape(
                 topStart = 16.dp,
                 topEnd = 16.dp,
-                bottomStart = if (isUser) 16.dp else 0.dp,
-                bottomEnd = if (isUser) 0.dp else 16.dp
-            )
+                bottomStart = if (isUser) 16.dp else 4.dp,
+                bottomEnd = if (isUser) 4.dp else 16.dp
+            ),
+            tonalElevation = if (isUser) 0.dp else 1.dp
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Text(text = message.content)
+                Text(
+                    text = message.content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    lineHeight = 20.sp
+                )
                 
                 // Detect YouTube Links
                 val youtubeUrl = extractYoutubeUrl(message.content)
