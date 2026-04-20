@@ -57,6 +57,15 @@ class TeacherViewModel(private val repository: EduAIRepository) : ViewModel() {
             }
         }
     }
+
+    suspend fun sendProgressReport(studentId: String) {
+        try {
+            repository.sendProgressReport(studentId)
+        } catch (e: Exception) {
+            // Rethrow or handle as needed by the UI
+            throw e
+        }
+    }
     
     fun clearReport() {
         _classReport.value = null

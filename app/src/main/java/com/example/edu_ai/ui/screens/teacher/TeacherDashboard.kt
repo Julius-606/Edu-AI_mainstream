@@ -4,9 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assessment
-import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.edu_ai.data.remote.StudentSummary
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,17 +25,20 @@ fun TeacherDashboard(
     val uiState by viewModel.uiState.collectAsState()
     val classReport by viewModel.classReport.collectAsState()
     var editingStudent by remember { mutableStateOf<StudentSummary?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("👨‍🏫 Teacher Portal") },
+                title = { Text("👨‍🏫 Educator Command Center") },
                 actions = {
                     IconButton(onClick = { viewModel.loadDashboard() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh Data")
                     }
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.ExitToApp, contentDescription = "Logout")
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -46,7 +48,7 @@ fun TeacherDashboard(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { viewModel.generateClassReport() }) {
-                Icon(Icons.Default.Assessment, contentDescription = "Generate AI Report")
+                Icon(Icons.Default.AutoAwesome, contentDescription = "AI Performance Analysis")
             }
         }
     ) { padding ->
@@ -58,76 +60,66 @@ fun TeacherDashboard(
                 is TeacherUiState.Success -> {
                     val data = state.data
                     LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         item {
-                            Text("Class Overview", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                            Text("Monitoring ${data.totalActivePortfolios} Active Portfolios", color = MaterialTheme.colorScheme.secondary)
+                            Text("Action Required Queue", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                            Text("Priority focus on ${data.actionRequiredQueue.size} students requiring intervention.", 
+                                color = MaterialTheme.colorScheme.secondary)
                         }
 
-                        if (data.riskAlerts.isNotEmpty()) {
+                        if (data.actionRequiredQueue.isEmpty()) {
                             item {
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("🚨 Risk Management Alerts", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                                        data.riskAlerts.forEach { alert ->
-                                            Text(alert, fontSize = 14.sp)
+                                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                    Text("All students are currently meeting learning milestones. ✨", color = Color.Gray)
+                                }
+                            }
+                        } else {
+                            items(data.actionRequiredQueue) { student ->
+                                ActionRequiredCard(
+                                    student = student,
+                                    onAdjust = { editingStudent = student },
+                                    onSendReport = {
+                                        scope.launch {
+                                            viewModel.sendProgressReport(student.id.toString())
+                                            snackbarHostState.showSnackbar("Progress report routed to Parent Portal for ${student.username}")
                                         }
                                     }
-                                }
+                                )
                             }
                         }
 
                         item {
-                            Text("Student Ledger", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        items(data.students) { student ->
-                            StudentCard(
-                                student = student,
-                                onManipulate = { editingStudent = student }
-                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Divider()
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Class Health Score: ${data.classHealthScore}%", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
                 is TeacherUiState.Error -> {
-                    Text(
-                        text = "Error: ${state.message}",
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.align(Alignment.Center).padding(16.dp)
-                    )
+                    Text("Error: ${state.message}", color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.Center))
                 }
             }
 
-            // Report Dialog
+            // Analysis Modal
             classReport?.let { report ->
                 AlertDialog(
                     onDismissRequest = { viewModel.clearReport() },
-                    title = { Text("AI Class Performance Report") },
+                    title = { Text("AI Educator Insights") },
                     text = {
                         Box(modifier = Modifier.heightIn(max = 400.dp)) {
-                            LazyColumn {
-                                item { Text(report) }
-                            }
+                            LazyColumn { item { Text(report) } }
                         }
                     },
-                    confirmButton = {
-                        TextButton(onClick = { viewModel.clearReport() }) {
-                            Text("Close")
-                        }
-                    }
+                    confirmButton = { TextButton(onClick = { viewModel.clearReport() }) { Text("Acknowledge") } }
                 )
             }
 
-            // Manipulation Dialog
+            // Adjust Plan Modal
             editingStudent?.let { student ->
-                ManipulationDialog(
+                AdjustmentModal(
                     student = student,
                     onDismiss = { editingStudent = null },
                     onSave = { units, status ->
@@ -141,39 +133,35 @@ fun TeacherDashboard(
 }
 
 @Composable
-fun StudentCard(student: StudentSummary, onManipulate: () -> Unit) {
+fun ActionRequiredCard(
+    student: StudentSummary, 
+    onAdjust: () -> Unit,
+    onSendReport: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = "👤 ${student.username}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                PerformanceBadge(student.averagePnl)
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text(text = student.username, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(text = "${student.averagePnl}%", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = student.riskReason ?: "Deviating from learning path", 
+                color = MaterialTheme.colorScheme.error, 
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium)
             
-            Text(text = "Status: ${student.semesterStatus}", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
-            Text(text = "Quizzes Taken: ${student.totalQuizzes}", fontSize = 14.sp)
+            Spacer(modifier = Modifier.height(12.dp))
             
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            Text(text = "Study Path: ${student.activeUnits.joinToString(", ")}", 
-                fontSize = 13.sp, 
-                color = MaterialTheme.colorScheme.secondary,
-                fontWeight = FontWeight.Medium
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onManipulate) {
-                    Text("MANIPULATE PATH")
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onAdjust, modifier = Modifier.weight(1f)) {
+                    Text("Adjust Plan", fontSize = 12.sp)
+                }
+                OutlinedButton(onClick = onSendReport, modifier = Modifier.weight(1f)) {
+                    Text("Route to Parent", fontSize = 12.sp)
                 }
             }
         }
@@ -181,7 +169,7 @@ fun StudentCard(student: StudentSummary, onManipulate: () -> Unit) {
 }
 
 @Composable
-fun ManipulationDialog(
+fun AdjustmentModal(
     student: StudentSummary,
     onDismiss: () -> Unit,
     onSave: (List<String>, String) -> Unit
@@ -191,63 +179,19 @@ fun ManipulationDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Manipulate Path: ${student.username}") },
+        title = { Text("Intervention: ${student.username}") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = status,
-                    onValueChange = { status = it },
-                    label = { Text("Semester Status / AI Context") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = unitsText,
-                    onValueChange = { unitsText = it },
-                    label = { Text("Active Units (comma separated)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    "Note: Directly editing the path bypasses AI automation for these parameters.",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.secondary
-                )
+                OutlinedTextField(value = status, onValueChange = { status = it }, label = { Text("Learning Stage") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = unitsText, onValueChange = { unitsText = it }, label = { Text("Core Units") }, modifier = Modifier.fillMaxWidth())
             }
         },
         confirmButton = {
             Button(onClick = {
                 val unitsList = unitsText.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                 onSave(unitsList, status)
-            }) {
-                Text("Save Changes")
-            }
+            }) { Text("Deploy Update") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
-}
-
-@Composable
-fun PerformanceBadge(pnl: Double) {
-    val color = when {
-        pnl >= 80 -> Color(0xFF2E7D32) // Green
-        pnl >= 60 -> Color(0xFFF57C00) // Orange
-        else -> Color(0xFFD32F2F) // Red
-    }
-    
-    Surface(
-        color = color.copy(alpha = 0.1f),
-        shape = MaterialTheme.shapes.small,
-        border = androidx.compose.foundation.BorderStroke(1.dp, color)
-    ) {
-        Text(
-            text = "${if (pnl >= 60) "Bullish 📈" else "Bearish 📉"} (${pnl}%)",
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            color = color,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
 }

@@ -26,12 +26,12 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "EduAI Terminal 📈",
+            text = "EduAI Learning Portal",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
-        Text(text = "Authenticate to access the market", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text = "Sign in to access your workspace", color = MaterialTheme.colorScheme.onSurfaceVariant)
         
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -39,7 +39,7 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
         OutlinedTextField(
             value = username,
             onValueChange = { username = it },
-            label = { Text("Trader ID (Username)") },
+            label = { Text("User ID (Username)") },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -49,7 +49,7 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Passkey") },
+            label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth()
         )
@@ -74,11 +74,11 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
                 onDismissRequest = { expanded = false }
             ) {
                 DropdownMenuItem(
-                    text = { Text("👩‍🎓 Student Portal (Worker)") },
+                    text = { Text("👩‍🎓 Student Portal") },
                     onClick = { selectedRole = "Student"; expanded = false }
                 )
                 DropdownMenuItem(
-                    text = { Text("👨‍🏫 Teacher Portal (Admin)") },
+                    text = { Text("👨‍🏫 Teacher Portal") },
                     onClick = { selectedRole = "Teacher"; expanded = false }
                 )
             }
@@ -95,7 +95,7 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
             },
             modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
-            Text("EXECUTE LOGIN", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("LOGIN", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

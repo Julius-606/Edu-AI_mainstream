@@ -74,4 +74,14 @@ interface EduAIDao {
 
     @Query("DELETE FROM chat_messages")
     suspend fun clearAllChatHistory()
+
+    // Timetable
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTimetable(timetable: TimetableEntity)
+
+    @Query("SELECT * FROM timetables WHERE userId = :userId")
+    suspend fun getTimetableByUserId(userId: String): TimetableEntity?
+
+    @Query("DELETE FROM timetables WHERE userId = :userId")
+    suspend fun deleteTimetable(userId: String)
 }

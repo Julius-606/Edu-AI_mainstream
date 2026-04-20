@@ -10,9 +10,10 @@ import androidx.room.RoomDatabase
         UnitEntity::class, 
         QuizHistoryEntity::class,
         ChatMessageEntity::class,
-        ChatSessionEntity::class
+        ChatSessionEntity::class,
+        TimetableEntity::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 abstract class EduAIDatabase : RoomDatabase() {

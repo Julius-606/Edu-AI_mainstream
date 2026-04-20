@@ -1,5 +1,5 @@
 # IDENTITY: backend/models.py
-# VERSION: 1.4.0
+# VERSION: 1.6.0
 # ⚙️ GEAR 1.2: Database Models (Entities) - PostgreSQL Optimized
 
 from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, JSON, Text
@@ -25,7 +25,9 @@ class User(Base):
     units = relationship("Unit", back_populates="owner", cascade="all, delete-orphan")
     quiz_history = relationship("QuizHistory", back_populates="owner", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="owner", cascade="all, delete-orphan")
+    chat_sessions = relationship("ChatSession", back_populates="owner", cascade="all, delete-orphan")
     performance_logs = relationship("PerformanceLog", back_populates="owner", cascade="all, delete-orphan")
+    timetables = relationship("Timetable", back_populates="owner", cascade="all, delete-orphan")
 
     @property
     def active_units_list(self):
@@ -55,16 +57,32 @@ class QuizHistory(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="quiz_history")
 
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), default="New Consultation")
+    description = Column(Text, nullable=True)
+    timestamp = Column(Float)
+    is_archived = Column(Boolean, default=False)
+
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="chat_sessions")
+    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id = Column(Integer, primary_key=True, index=True)
     role = Column(String(20)) # "user" or "model"
-    content = Column(Text) # Using Text instead of String for long chat messages
+    content = Column(Text)
     timestamp = Column(String(100))
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="chat_messages")
+
+    session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=True)
+    session = relationship("ChatSession", back_populates="messages")
 
 class PerformanceLog(Base):
     __tablename__ = "performance_logs"
@@ -76,3 +94,14 @@ class PerformanceLog(Base):
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="performance_logs")
+
+class Timetable(Base):
+    __tablename__ = "timetables"
+
+    id = Column(Integer, primary_key=True, index=True)
+    weekly_plan_json = Column(JSON)
+    ai_brief = Column(Text)
+    timestamp = Column(Float) # Time of generation
+
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="timetables")

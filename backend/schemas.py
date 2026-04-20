@@ -1,5 +1,5 @@
 # IDENTITY: backend/schemas.py
-# VERSION: 1.7.0
+# VERSION: 1.9.0
 # ⚙️ Pydantic Models for Data Validation
 
 from pydantic import BaseModel
@@ -102,14 +102,39 @@ class StudentSummary(BaseModel):
     total_quizzes: int
     semester_status: str
     active_units: List[str]
+    is_at_risk: bool = False
+    risk_reason: Optional[str] = None
 
 class TeacherDashboardResponse(BaseModel):
-    students: List[StudentSummary]
-    total_active_portfolios: int
-    risk_alerts: List[str]
+    action_required_queue: List[StudentSummary]
+    total_active_students: int
+    class_health_score: float
 
 class ClassReportResponse(BaseModel):
     report: str
+
+# --- PARENT PORTAL SCHEMAS ---
+
+class ParentDashboardResponse(BaseModel):
+    student_name: str
+    academic_status: str
+    current_study_path: List[str]
+    ai_progress_review: str
+    teacher_remarks: Optional[str] = None
+    recent_grades: List[QuizHistoryResponse]
+
+# --- TIMETABLE SCHEMAS ---
+
+class TimetableSlot(BaseModel):
+    day: str
+    time: str
+    activity: str
+    unit: Optional[str] = None
+    type: str  # "Study", "Break", "Assessment", "Revision"
+
+class TimetableResponse(BaseModel):
+    weekly_plan: List[TimetableSlot]
+    ai_brief: str
 
 # --- AI Models ---
 class ChatMessage(BaseModel):

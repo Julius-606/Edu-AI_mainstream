@@ -37,17 +37,45 @@ data class StudentSummary(
     @SerializedName("average_pnl") val averagePnl: Double,
     @SerializedName("total_quizzes") val totalQuizzes: Int,
     @SerializedName("semester_status") val semesterStatus: String,
-    @SerializedName("active_units") val activeUnits: List<String>
+    @SerializedName("active_units") val activeUnits: List<String>,
+    @SerializedName("is_at_risk") val isAtRisk: Boolean = false,
+    @SerializedName("risk_reason") val riskReason: String? = null
 )
 
 data class TeacherDashboardResponse(
-    @SerializedName("students") val students: List<StudentSummary>,
-    @SerializedName("total_active_portfolios") val totalActivePortfolios: Int,
-    @SerializedName("risk_alerts") val riskAlerts: List<String>
+    @SerializedName("action_required_queue") val actionRequiredQueue: List<StudentSummary>,
+    @SerializedName("total_active_students") val totalActiveStudents: Int,
+    @SerializedName("class_health_score") val classHealthScore: Double
 )
 
 data class ClassReportResponse(
     @SerializedName("report") val report: String
+)
+
+// --- PARENT PORTAL MODELS ---
+
+data class ParentDashboardResponse(
+    @SerializedName("student_name") val studentName: String,
+    @SerializedName("academic_status") val academicStatus: String,
+    @SerializedName("current_study_path") val currentStudyPath: List<String>,
+    @SerializedName("ai_progress_review") val aiProgressReview: String,
+    @SerializedName("teacher_remarks") val teacherRemarks: String?,
+    @SerializedName("recent_grades") val recentGrades: List<ApiQuizHistory>
+)
+
+// --- TIMETABLE MODELS ---
+
+data class ApiTimetableSlot(
+    @SerializedName("day") val day: String,
+    @SerializedName("time") val time: String,
+    @SerializedName("activity") val activity: String,
+    @SerializedName("unit") val unit: String?,
+    @SerializedName("type") val type: String
+)
+
+data class ApiTimetableResponse(
+    @SerializedName("weekly_plan") val weeklyPlan: List<ApiTimetableSlot>,
+    @SerializedName("ai_brief") val aiBrief: String
 )
 
 // --- AI Models ---

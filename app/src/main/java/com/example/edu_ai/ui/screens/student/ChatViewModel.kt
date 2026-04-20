@@ -22,6 +22,7 @@ data class ChatUiState(
     val isTyping: Boolean = false,
     val error: String? = null,
     val currentSessionTitle: String = "New Session",
+    val currentSessionDescription: String? = null,
     val activeSessionId: Int? = null,
     val archivedSessions: List<ChatSessionEntity> = emptyList()
 )
@@ -52,6 +53,7 @@ class ChatViewModel(
             isTyping = typing,
             error = err,
             currentSessionTitle = session?.title ?: "New Session",
+            currentSessionDescription = session?.description,
             activeSessionId = session?.id,
             archivedSessions = archived
         )
@@ -119,14 +121,14 @@ class ChatViewModel(
                     )
                 )
 
-                // 5. Dynamic Titling (Enhanced logic from dashboard.py)
+                // 5. Dynamic Titling and Description
                 val userMessages = uiState.value.messages.filter { it.role == "user" }
                 val userMessageCount = userMessages.size
                 
                 if (userMessageCount == 1) {
-                    generateInitialTitle(text, currentSession)
+                    generateInitialMetadata(text, currentSession)
                 } else if (userMessageCount > 1 && userMessageCount % 3 == 0) {
-                    updateExistingTitle(currentSession)
+                    updateMetadata(currentSession)
                 }
 
             } catch (e: Exception) {
@@ -137,13 +139,22 @@ class ChatViewModel(
         }
     }
 
-    private suspend fun generateInitialTitle(firstMessage: String, session: ChatSessionEntity) {
+    private suspend fun generateInitialMetadata(firstMessage: String, session: ChatSessionEntity) {
         try {
-            val titlePrompt = "Summarize this medical query into a concise 2-5 word topic title. Query: $firstMessage\nReturn ONLY the title string, no quotes or markdown."
-            val newTitle = aiService.getChatResponse(titlePrompt, user, emptyList())
-            val cleanedTitle = newTitle.replace("\"", "").replace("'", "").trim()
-            if (cleanedTitle.isNotBlank() && !cleanedTitle.contains("Consultation failed")) {
-                val updatedSession = session.copy(title = cleanedTitle)
+            val metadataPrompt = "Analyze this medical query: '$firstMessage'.\n" +
+                    "Return exactly two lines:\n" +
+                    "Line 1: A concise 2-5 word topic title.\n" +
+                    "Line 2: A brief 1-sentence description of the query's goal.\n" +
+                    "Return ONLY these two lines, no labels, no quotes."
+            
+            val metadataResponse = aiService.getChatResponse(metadataPrompt, user, emptyList())
+            val lines = metadataResponse.lines().filter { it.isNotBlank() }
+            
+            if (lines.size >= 2) {
+                val title = lines[0].replace("\"", "").replace("'", "").trim()
+                val description = lines[1].trim()
+                
+                val updatedSession = session.copy(title = title, description = description)
                 dao.updateChatSession(updatedSession)
                 _activeSession.value = updatedSession
             }
@@ -155,18 +166,29 @@ class ChatViewModel(
         }
     }
 
-    private suspend fun updateExistingTitle(session: ChatSessionEntity) {
+    private suspend fun updateMetadata(session: ChatSessionEntity) {
         try {
             val recentMessages = uiState.value.messages.takeLast(6).joinToString("\n") { "${it.role}: ${it.content}" }
-            val updatePrompt = "Current Chat Title: '${session.title}'.\nRecent chat context:\n$recentMessages\nHas the focus significantly shifted or expanded to a new specific medical topic? If yes, append it using ' / ' (e.g., 'Anatomy / Pathophysiology'). If not, return the exact Current Chat Title. Return ONLY the title string, no quotes, no markdown."
+            val updatePrompt = "Current Title: '${session.title}'\nCurrent Description: '${session.description}'\n\n" +
+                    "Recent chat context:\n$recentMessages\n\n" +
+                    "If the focus has shifted or expanded, provide a new Title and Description. " +
+                    "Return exactly two lines:\n" +
+                    "Line 1: The Title (updated if needed)\n" +
+                    "Line 2: The Description (updated if needed)\n" +
+                    "Return ONLY these two lines, no labels, no quotes."
             
-            val updatedTitle = aiService.getChatResponse(updatePrompt, user, emptyList())
-            val cleanedTitle = updatedTitle.replace("\"", "").replace("'", "").trim()
+            val updatedMetadata = aiService.getChatResponse(updatePrompt, user, emptyList())
+            val lines = updatedMetadata.lines().filter { it.isNotBlank() }
             
-            if (cleanedTitle.isNotBlank() && cleanedTitle != session.title && !cleanedTitle.contains("Consultation failed")) {
-                val updatedSession = session.copy(title = cleanedTitle)
-                dao.updateChatSession(updatedSession)
-                _activeSession.value = updatedSession
+            if (lines.size >= 2) {
+                val title = lines[0].replace("\"", "").replace("'", "").trim()
+                val description = lines[1].trim()
+                
+                if (title != session.title || description != session.description) {
+                    val updatedSession = session.copy(title = title, description = description)
+                    dao.updateChatSession(updatedSession)
+                    _activeSession.value = updatedSession
+                }
             }
         } catch (e: Exception) {
             // Ignore update failures

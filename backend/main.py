@@ -1,8 +1,9 @@
 # IDENTITY: backend/main.py
-# VERSION: 2.2.0
+# VERSION: 2.6.0
 # ⚙️ GEAR 2: The API Routes (Executing the Trades)
 
 import os
+import time
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -24,7 +25,7 @@ except ImportError:
 # Create database tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Edu_AI Prop Firm Backend", version="2.2.0")
+app = FastAPI(title="Edu_AI Learning System", version="2.6.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,19 +37,15 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "Bullish 📈", "message": "Edu_AI Backend v2.2.0 is Online."}
+    return {"status": "Active 📚", "message": "Edu_AI Backend v2.6.0 is Online."}
 
 # Helper to find user by ID (int) or Username (string)
 def find_user(user_id_or_name: str, db: Session):
     user = None
-    # If the input is a numeric string, try searching by primary key (ID)
     if str(user_id_or_name).isdigit():
         user = db.query(models.User).filter(models.User.id == int(user_id_or_name)).first()
-
-    # If not found by ID or if the input was non-numeric, search by username
     if not user:
         user = db.query(models.User).filter(models.User.username == str(user_id_or_name)).first()
-
     return user
 
 # --- USER MANAGEMENT ENDPOINTS ---
@@ -88,11 +85,9 @@ def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
 def get_user(user_id: str, db: Session = Depends(get_db)):
     user = find_user(user_id, db)
     if not user:
-        # Check if this looks like a login attempt for a teacher
-        # For Dev: Auto-create teacher if username contains 'teacher' or 'admin'
         role = "Student"
-        if "teacher" in user_id.lower() or "admin" in user_id.lower():
-            role = "Teacher"
+        if "teacher" in user_id.lower(): role = "Teacher"
+        if "parent" in user_id.lower(): role = "Parent"
 
         user = models.User(
             username=user_id,
@@ -148,10 +143,10 @@ def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Dep
 
 @app.get("/api/teacher/dashboard", response_model=schemas.TeacherDashboardResponse, tags=["Teacher Portal"])
 def get_teacher_dashboard(db: Session = Depends(get_db)):
-    students = db.query(models.User).filter(models.User.role == "Student").all()
+    all_students = db.query(models.User).filter(models.User.role == "Student").all()
 
-    # If no students exist, create some mock students for the teacher to see
-    if not students:
+    # Ensure some mock data exists if db is empty
+    if not all_students:
         mock_students = [
             ("Neema Ongaga", "Year 4 - Redemption Arc"),
             ("Grace Naliaka", "Clinical Rotations"),
@@ -164,57 +159,89 @@ def get_teacher_dashboard(db: Session = Depends(get_db)):
             db.add(s)
             db.commit()
             db.refresh(s)
-            # Add some mock units
             db.add(models.Unit(name="Biochemistry II", owner_id=s.id))
-            db.add(models.Unit(name="General Surgery", owner_id=s.id))
             db.commit()
-        students = db.query(models.User).filter(models.User.role == "Student").all()
+        all_students = db.query(models.User).filter(models.User.role == "Student").all()
 
-    student_summaries = []
-    risk_alerts = []
+    action_queue = []
+    total_score = 0
+    count = 0
 
-    for student in students:
+    for student in all_students:
         quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == student.id).all()
         total_quizzes = len(quizzes)
         avg_pnl = sum([q.pnl for q in quizzes]) / total_quizzes if total_quizzes > 0 else 0.0
 
-        # Risk Management logic: If avg_pnl < 60, flag as risk
-        if avg_pnl < 60 and total_quizzes > 0:
-            risk_alerts.append(f"🚨 Risk: {student.username} is hitting stop-loss with {round(avg_pnl, 2)}% performance.")
+        total_score += avg_pnl
+        count += 1
 
-        student_summaries.append(schemas.StudentSummary(
-            id=student.id,
-            username=student.username,
-            average_pnl=round(avg_pnl, 2),
-            total_quizzes=total_quizzes,
-            semester_status=student.semester_status,
-            active_units=student.active_units_list
-        ))
+        is_at_risk = False
+        risk_reason = None
+
+        # Logic for "Action Required" queue
+        if avg_pnl < 65 and total_quizzes > 0:
+            is_at_risk = True
+            risk_reason = f"Performance drop: {round(avg_pnl, 1)}% avg score. Intervention recommended."
+        elif total_quizzes == 0:
+            is_at_risk = True
+            risk_reason = "No assessment data recorded. Learning path stalled."
+
+        if is_at_risk:
+            action_queue.append(schemas.StudentSummary(
+                id=student.id,
+                username=student.username,
+                average_pnl=round(avg_pnl, 2),
+                total_quizzes=total_quizzes,
+                semester_status=student.semester_status,
+                active_units=student.active_units_list,
+                is_at_risk=True,
+                risk_reason=risk_reason
+            ))
+
+    class_health = total_score / count if count > 0 else 100.0
 
     return schemas.TeacherDashboardResponse(
-        students=student_summaries,
-        total_active_portfolios=len(students),
-        risk_alerts=risk_alerts
+        action_required_queue=action_queue,
+        total_active_students=len(all_students),
+        class_health_score=round(class_health, 2)
     )
 
-@app.post("/api/teacher/class-report", response_model=schemas.ClassReportResponse, tags=["Teacher Portal"])
-def generate_class_report(db: Session = Depends(get_db)):
-    students = db.query(models.User).filter(models.User.role == "Student").all()
+@app.post("/api/teacher/send-report/{student_id}", tags=["Teacher Portal"])
+def send_student_report(student_id: int, db: Session = Depends(get_db)):
+    student = db.query(models.User).filter(models.User.id == student_id).first()
+    if not student: raise HTTPException(status_code=404, detail="Student not found")
 
-    report_context = "Class Performance Overview:\n"
-    for s in students:
-        quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == s.id).all()
-        avg_pnl = sum([q.pnl for q in quizzes]) / len(quizzes) if quizzes else 0
-        report_context += f"- {s.username}: {round(avg_pnl, 2)}% avg score across {len(quizzes)} quizzes. Units: {', '.join(s.active_units_list)}\n"
+    quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == student.id).all()
+    context = f"Student: {student.username}\nStatus: {student.semester_status}\nUnits: {', '.join(student.active_units_list)}\n"
+    context += "Grades: " + ", ".join([f"{q.unit_name}: {q.pnl}%" for q in quizzes])
 
-    system_instruction = "You are an AI Class Supervisor. Generate a professional summary report for the teacher."
-    prompt = f"Based on the following class data, generate a high-level performance report with insights and intervention suggestions:\n\n{report_context}"
+    prompt = f"Create a concise, encouraging progress report for a parent based on this data. Translate technical rubrics into accessible feedback:\n{context}"
+    ai_summary = ai_engine.ask(prompt, system_instruction="You are a pedagogical report assistant.")
 
-    report_text = ai_engine.ask(prompt=prompt, system_instruction=system_instruction)
-    if not report_text:
-        report_text = "Standard report: Class is performing within expected parameters. Monitor students with < 60% scores."
+    # Store this as a 'teacher remark' for the parent portal
+    # For now, we'll just return it. In a full system, you'd save this to a 'Reports' table.
+    return {"status": "Success", "message": f"Report sent to parent of {student.username}", "ai_summary": ai_summary}
 
-    return schemas.ClassReportResponse(report=report_text)
+# --- PARENT PORTAL ENDPOINTS ---
+
+@app.get("/api/parent/dashboard/{student_id}", response_model=schemas.ParentDashboardResponse, tags=["Parent Portal"])
+def get_parent_dashboard(student_id: str, db: Session = Depends(get_db)):
+    student = find_user(student_id, db)
+    if not student: raise HTTPException(status_code=404, detail="Student record not found")
+
+    quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == student.id).order_by(models.QuizHistory.id.desc()).limit(5).all()
+
+    review_prompt = f"Review progress for parent: {student.username}, Units: {', '.join(student.active_units_list)}, Avg: {sum([q.pnl for q in quizzes])/len(quizzes) if quizzes else 0}%"
+    ai_review = ai_engine.ask(review_prompt, system_instruction="Act as a supportive AI Education Consultant.")
+
+    return schemas.ParentDashboardResponse(
+        student_name=student.username,
+        academic_status=student.semester_status,
+        current_study_path=student.active_units_list,
+        ai_progress_review=ai_review or "Compiling progress data...",
+        teacher_remarks="Student is showing consistent engagement with AI modules.",
+        recent_grades=[schemas.QuizHistoryResponse(unit_name=q.unit_name, pnl=q.pnl, timestamp=q.timestamp) for q in quizzes]
+    )
 
 # --- DASHBOARD & ACTIVITY ---
 
@@ -223,13 +250,12 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     user = find_user(user_id, db)
 
     if not user:
-        # Auto-create user for testing if not exists
         user = models.User(
             username=user_id,
             role="Student",
             sensory_mode="Standard",
             ai_persona="Socratic Tutor",
-            semester_status="Brace for the clinicals"
+            semester_status="Active"
         )
         db.add(user)
         db.commit()
@@ -266,6 +292,68 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         total_quizzes=total_quizzes,
         quiz_history=[schemas.QuizHistoryResponse(unit_name=q.unit_name, pnl=q.pnl, timestamp=q.timestamp) for q in quizzes],
         chat_history=[schemas.ChatMessageResponse(role=c.role, content=c.content, timestamp=c.timestamp or "") for c in chat_messages]
+    )
+
+@app.get("/api/user/{user_id}/timetable", response_model=schemas.TimetableResponse, tags=["Activity & Planning"])
+def get_ai_timetable(user_id: str, db: Session = Depends(get_db)):
+    user = find_user(user_id, db)
+    if not user: raise HTTPException(status_code=404, detail="User not found")
+
+    # Check for existing timetable generated in the last 7 days
+    one_week_ago = time.time() - (7 * 24 * 60 * 60)
+    existing_timetable = db.query(models.Timetable).filter(
+        models.Timetable.owner_id == user.id,
+        models.Timetable.timestamp > one_week_ago
+    ).order_by(models.Timetable.timestamp.desc()).first()
+
+    if existing_timetable:
+        return schemas.TimetableResponse(
+            weekly_plan=existing_timetable.weekly_plan_json,
+            ai_brief=existing_timetable.ai_brief
+        )
+
+    # If no recent timetable, generate a new one with continuity
+    last_timetable = db.query(models.Timetable).filter(
+        models.Timetable.owner_id == user.id
+    ).order_by(models.Timetable.timestamp.desc()).first()
+
+    previous_plan = last_timetable.weekly_plan_json if last_timetable else None
+
+    quiz_history = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
+    active_units = db.query(models.Unit).filter(models.Unit.owner_id == user.id, models.Unit.is_active == True).all()
+
+    # NEW LOGIC: Look at the past ten chat session titles instead of raw messages
+    recent_sessions = db.query(models.ChatSession).filter(
+        models.ChatSession.owner_id == user.id
+    ).order_by(models.ChatSession.id.desc()).limit(10).all()
+    chat_titles = [s.title for s in recent_sessions]
+
+    user_info = {
+        "username": user.username,
+        "semester_status": user.semester_status
+    }
+    unit_names = [u.name for u in active_units]
+
+    new_timetable_data = ai_engine.generate_timetable(
+        user_info, quiz_history, unit_names, chat_titles, previous_plan
+    )
+
+    if not new_timetable_data:
+        raise HTTPException(status_code=500, detail="The AI is still drafting your plan. Try again in a moment.")
+
+    # Save to database
+    new_db_timetable = models.Timetable(
+        owner_id=user.id,
+        weekly_plan_json=new_timetable_data["weekly_plan"],
+        ai_brief=new_timetable_data["ai_brief"],
+        timestamp=time.time()
+    )
+    db.add(new_db_timetable)
+    db.commit()
+
+    return schemas.TimetableResponse(
+        weekly_plan=new_timetable_data["weekly_plan"],
+        ai_brief=new_timetable_data["ai_brief"]
     )
 
 # --- AI ENDPOINTS ---
@@ -337,7 +425,7 @@ def record_quiz(history: schemas.QuizRecordRequest, db: Session = Depends(get_db
     )
     db.add(new_record)
     db.commit()
-    return {"status": "Success", "message": "Trade recorded."}
+    return {"status": "Success", "message": "Result recorded."}
 
 @app.get("/api/user/{user_id}/recommendations", response_model=schemas.RecommendationResponse)
 def get_recommendations(user_id: str, db: Session = Depends(get_db)):

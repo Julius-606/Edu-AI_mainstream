@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
@@ -46,12 +47,12 @@ fun ModuleScreen(
         studentViewModel.refreshDashboard(userId)
     }
     
-    val tabs = listOf("Chat", "Vault", "Chaos Quiz", "Progress", "Zenith")
+    val tabs = listOf("Chat", "Schedule", "Vault", "Chaos Quiz", "Zenith")
     val icons = listOf(
         Icons.AutoMirrored.Filled.Chat,
+        Icons.Default.CalendarMonth,
         Icons.Default.History,
         Icons.Default.LocalFireDepartment,
-        Icons.AutoMirrored.Filled.TrendingUp,
         Icons.Default.AccountCircle
     )
 
@@ -98,8 +99,16 @@ fun ModuleScreen(
                 }
             } else {
                 when (selectedTab) {
-                    0 -> ChatTabWrapper(uiState.user, onNavigateToHistory = { selectedTab = 1 })
+                    0 -> ChatTabWrapper(uiState.user, onNavigateToHistory = { selectedTab = 2 })
                     1 -> {
+                        if (uiState.user != null) {
+                            val timetableViewModel: TimetableViewModel = viewModel(
+                                factory = TimetableViewModel.provideFactory(uiState.user!!)
+                            )
+                            TimetableTab(viewModel = timetableViewModel)
+                        }
+                    }
+                    2 -> {
                         if (uiState.user != null) {
                              val chatViewModel: ChatViewModel = viewModel(
                                 factory = ChatViewModel.provideFactory(uiState.user!!)
@@ -110,7 +119,7 @@ fun ModuleScreen(
                              )
                         }
                     }
-                    2 -> {
+                    3 -> {
                         if (uiState.user != null) {
                             val quizViewModel: QuizViewModel = viewModel(
                                 factory = QuizViewModel.provideFactory(uiState.user!!)
@@ -120,14 +129,6 @@ fun ModuleScreen(
                                 units = uiState.units,
                                 viewModel = quizViewModel
                             )
-                        }
-                    }
-                    3 -> {
-                        if (uiState.user != null) {
-                            val progressViewModel: ProgressViewModel = viewModel(
-                                factory = ProgressViewModel.provideFactory(uiState.user!!)
-                            )
-                            ProgressTab(viewModel = progressViewModel)
                         }
                     }
                     4 -> {
@@ -235,6 +236,16 @@ fun SessionItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                session.description?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
                 Text(
                     text = "Archived on $date",
                     style = MaterialTheme.typography.labelSmall,

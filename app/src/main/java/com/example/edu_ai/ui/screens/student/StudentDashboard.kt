@@ -35,10 +35,10 @@ fun StudentDashboard(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("👩‍🎓 Student Terminal") },
+                title = { Text("👩‍🎓 Student Dashboard") },
                 actions = {
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.ExitToApp, contentDescription = "Liquidate Account")
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -67,12 +67,12 @@ fun StudentDashboard(
 
                 item {
                     Text(
-                        text = "Welcome back, ${uiState.user?.username ?: "Future Doc"}!",
+                        text = "Welcome back, ${uiState.user?.username ?: "Student"}!",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Status: ${uiState.user?.semesterStatus ?: "Year 4 - Redemption Arc 🔥"}",
+                        text = "Status: ${uiState.user?.semesterStatus ?: "Active"}",
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -80,9 +80,9 @@ fun StudentDashboard(
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Current PnL (Win Rate)", fontWeight = FontWeight.Bold)
-                            Text("📈 AI Persona: ${uiState.user?.aiPersona ?: "N/A"}", fontSize = 18.sp)
-                            Text("Sensory Mode: ${uiState.user?.sensoryMode ?: "N/A"}", color = MaterialTheme.colorScheme.secondary)
+                            Text("Learning Insights", fontWeight = FontWeight.Bold)
+                            Text("🧠 AI Companion: ${uiState.user?.aiPersona ?: "N/A"}", fontSize = 18.sp)
+                            Text("Study Mode: ${uiState.user?.sensoryMode ?: "N/A"}", color = MaterialTheme.colorScheme.secondary)
                         }
                     }
                 }
@@ -93,12 +93,12 @@ fun StudentDashboard(
                         modifier = Modifier.fillMaxWidth().height(60.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
                     ) {
-                        Text("LAUNCH MODULE 🧠", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("START LEARNING 📚", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
                 item {
-                    Text("Active Contracts (Units)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text("Active Units", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
 
                 items(uiState.units) { unit ->

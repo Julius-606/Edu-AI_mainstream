@@ -1,6 +1,7 @@
 package com.example.edu_ai.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -15,6 +16,8 @@ import com.example.edu_ai.ui.screens.student.StudentDashboard
 import com.example.edu_ai.ui.screens.teacher.TeacherDashboard
 import com.example.edu_ai.ui.screens.teacher.TeacherViewModel
 import com.example.edu_ai.ui.screens.teacher.TeacherViewModelFactory
+import com.example.edu_ai.ui.screens.parent.ParentDashboard // We will create this
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppNavigation() {
@@ -22,20 +25,20 @@ fun AppNavigation() {
     val context = LocalContext.current
     val app = context.applicationContext as EduAIApplication
     val repository = app.repository
+    val scope = rememberCoroutineScope()
 
     NavHost(navController = navController, startDestination = "login") {
         
         composable("login") {
             LoginScreen(
                 onLoginSuccess = { role, userId ->
-                    if (role == "Teacher") {
-                        navController.navigate("teacher_dashboard") {
-                            popUpTo("login") { inclusive = true }
-                        }
-                    } else {
-                        navController.navigate("student_dashboard/$userId") {
-                            popUpTo("login") { inclusive = true }
-                        }
+                    val destination = when (role) {
+                        "Teacher" -> "teacher_dashboard"
+                        "Parent" -> "parent_dashboard/$userId"
+                        else -> "student_dashboard/$userId"
+                    }
+                    navController.navigate(destination) {
+                        popUpTo("login") { inclusive = true }
                     }
                 }
             )
@@ -45,12 +48,15 @@ fun AppNavigation() {
             route = "student_dashboard/{userId}",
             arguments = listOf(navArgument("userId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val userId = backStackEntry.arguments?.getString("userId") ?: "STUDENT_001"
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
             StudentDashboard(
                 userId = userId,
                 onLogout = {
-                    navController.navigate("login") {
-                        popUpTo("student_dashboard/$userId") { inclusive = true }
+                    scope.launch {
+                        repository.logout()
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
                     }
                 },
                 onLaunchModule = {
@@ -63,7 +69,7 @@ fun AppNavigation() {
             route = "module_screen/{userId}",
             arguments = listOf(navArgument("userId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val userId = backStackEntry.arguments?.getString("userId") ?: "STUDENT_001"
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
             ModuleScreen(
                 userId = userId,
                 onBack = {
@@ -79,8 +85,30 @@ fun AppNavigation() {
             TeacherDashboard(
                 viewModel = teacherViewModel,
                 onLogout = {
-                    navController.navigate("login") {
-                        popUpTo("teacher_dashboard") { inclusive = true }
+                    scope.launch {
+                        repository.logout()
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                }
+            )
+        }
+
+        composable(
+            route = "parent_dashboard/{studentId}",
+            arguments = listOf(navArgument("studentId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val studentId = backStackEntry.arguments?.getString("studentId") ?: ""
+            ParentDashboard(
+                studentId = studentId,
+                repository = repository,
+                onLogout = {
+                    scope.launch {
+                        repository.logout()
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
                     }
                 }
             )

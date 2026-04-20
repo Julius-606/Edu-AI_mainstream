@@ -4,7 +4,5 @@
     <mapping directory="$PROJECT_DIR$/.." vcs="Git" />
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/backend" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/web_app(older_versions)/Edu_AI_Brain" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/web_app(older_versions)/The_Differential" vcs="Git" />
   </component>
 </project>

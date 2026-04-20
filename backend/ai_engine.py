@@ -106,6 +106,11 @@ class AiEngine:
         prompt = f"""
         Generate a {num_questions}-question multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
         Level: {student_level}.
+
+        CRITICAL INSTRUCTION: For each question, the 'explanation' field must be comprehensive.
+        It should not only explain why the correct answer is right but also specifically address common misconceptions
+        related to the wrong options (why they are incorrect in this context).
+
         Make the questions fun, engaging, and a little bit creative while remaining educational.
         Return ONLY valid JSON.
         Format:
@@ -116,7 +121,7 @@ class AiEngine:
               "question_text": "...",
               "options": ["A", "B", "C", "D"],
               "correct_option_index": 0,
-              "explanation": "..."
+              "explanation": "CORRECT RATIONALE: ... WRONG OPTION ANALYSIS: ..."
             }}
           ]
         }}
@@ -150,6 +155,62 @@ class AiEngine:
                     self._rotate_key()
                     time.sleep(0.5)
                     continue
+        return None
+
+    def generate_timetable(self, user_info, quiz_history, active_units, recent_chat_titles, previous_timetable=None):
+        if not GEMINI_API_KEYS: return None
+
+        performance_summary = ""
+        for q in quiz_history:
+            performance_summary += f"- {q.unit_name}: {q.pnl}% score\n"
+
+        chat_context = ", ".join(recent_chat_titles)
+
+        timetable_continuity = ""
+        if previous_timetable:
+            timetable_continuity = f"Previous Timetable Context (Ensure continuity and avoid unnecessary repetition unless needed for revision):\n{json.dumps(previous_timetable)}\n"
+
+        prompt = f"""
+        Generate a dynamic weekly study timetable for {user_info['username']}.
+        Current Level: {user_info['semester_status']}
+        Active Units: {', '.join(active_units)}
+
+        Performance Context:
+        {performance_summary if performance_summary else "No assessments taken yet."}
+
+        Recent Consultation Topics (What the student has been up to):
+        {chat_context if chat_context else "No recent consultations."}
+
+        {timetable_continuity}
+
+        The timetable should prioritize units with lower quiz scores or topics discussed in recent consultations.
+        It must include:
+        - Study sessions (intensive focus)
+        - Revision (spaced repetition)
+        - Assessment (quiz prep)
+        - Breaks (essential for cognitive rest)
+
+        Return ONLY a JSON object in this format:
+        {{
+          "weekly_plan": [
+            {{ "day": "Monday", "time": "09:00 - 10:30", "activity": "Intensive Study: [Unit]", "unit": "[Unit]", "type": "Study" }},
+            ...
+          ],
+          "ai_brief": "A 1-2 sentence rationale for this specific layout based on their current needs and how it follows/improves upon the previous week's plan."
+        }}
+        """
+
+        for variant in self.model_variants:
+            try:
+                model = genai.GenerativeModel(model_name=variant)
+                response = model.generate_content(prompt)
+                if response and response.text:
+                    raw_text = response.text.strip()
+                    if "```json" in raw_text:
+                        raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+                    return json.loads(raw_text)
+            except:
+                continue
         return None
 
     def get_recommendations(self, user_info, quiz_history, active_units):

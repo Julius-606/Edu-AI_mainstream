@@ -30,6 +30,9 @@ interface EduAIApi {
     @GET("api/user/{user_id}/recommendations")
     suspend fun getRecommendations(@Path("user_id") userId: String): RecommendationResponse
 
+    @GET("api/user/{user_id}/timetable")
+    suspend fun getTimetable(@Path("user_id") userId: String): ApiTimetableResponse
+
     // --- Teacher Portal Endpoints ---
 
     @GET("api/teacher/dashboard")
@@ -43,4 +46,12 @@ interface EduAIApi {
         @Path("user_id") userId: String,
         @Body updates: Map<String, Any?>
     ): Map<String, Any?>
+
+    @POST("api/teacher/send-report/{student_id}")
+    suspend fun sendProgressReport(@Path("student_id") studentId: String): Map<String, Any?>
+
+    // --- Parent Portal Endpoints ---
+
+    @GET("api/parent/dashboard/{student_id}")
+    suspend fun getParentDashboard(@Path("student_id") studentId: String): ParentDashboardResponse
 }
