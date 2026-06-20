@@ -33,6 +33,9 @@ interface EduAIApi {
     @GET("api/user/{user_id}/timetable")
     suspend fun getTimetable(@Path("user_id") userId: String): ApiTimetableResponse
 
+    @POST("api/auth/login")
+    suspend fun login(@Body request: com.example.edu_ai.schemas.LoginRequest): com.example.edu_ai.schemas.TokenResponse
+
     // --- Teacher Portal Endpoints ---
 
     @GET("api/teacher/dashboard")

@@ -1,22 +1,33 @@
 package com.example.edu_ai.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.edu_ai.BuildConfig
+import com.example.edu_ai.data.remote.RetrofitClient
+import com.example.edu_ai.schemas.LoginRequest
+import com.example.edu_ai.utils.PreferenceManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
-    var username by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var selectedRole by remember { mutableStateOf("Student") }
-    var expanded by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -26,20 +37,23 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "EduAI Learning Portal",
+            text = "Trace Learning Portal",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
-        Text(text = "Sign in to access your workspace", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = "Sign in to access your workspace",
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Username Field
+        // Email Field
         OutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
-            label = { Text("User ID (Username)") },
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email Address") },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -56,46 +70,48 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Role Selector (Dropdown)
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded }
-        ) {
-            OutlinedTextField(
-                value = selectedRole,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Account Type") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier.menuAnchor().fillMaxWidth()
-            )
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("👩‍🎓 Student Portal") },
-                    onClick = { selectedRole = "Student"; expanded = false }
-                )
-                DropdownMenuItem(
-                    text = { Text("👨‍🏫 Teacher Portal") },
-                    onClick = { selectedRole = "Teacher"; expanded = false }
-                )
-            }
+        if (errorMessage != null) {
+            Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
+            Spacer(modifier = Modifier.height(16.dp))
         }
-
-        Spacer(modifier = Modifier.height(32.dp))
 
         // Login Button
         Button(
             onClick = { 
-                if (username.isNotBlank()) {
-                    onLoginSuccess(selectedRole, username)
+                if (email.isNotBlank() && password.isNotBlank()) {
+                    isLoading = true
+                    errorMessage = null
+                    scope.launch {
+                        try {
+                            val response = RetrofitClient.instance.login(LoginRequest(email, password))
+                            PreferenceManager.saveToken(context, response.accessToken)
+                            onLoginSuccess(response.role, response.userId)
+                        } catch (e: Exception) {
+                            errorMessage = "Login failed: ${e.message}"
+                        } finally {
+                            isLoading = false
+                        }
+                    }
                 }
             },
+            enabled = !isLoading,
             modifier = Modifier.fillMaxWidth().height(50.dp)
         ) {
-            Text("LOGIN", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
+            } else {
+                Text("LOGIN", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        TextButton(onClick = { 
+            val signupUrl = BuildConfig.BACKEND_BASE_URL + "signup"
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(signupUrl))
+            context.startActivity(intent)
+        }) {
+            Text("Don't have an account? Sign Up in Browser")
         }
     }
 }

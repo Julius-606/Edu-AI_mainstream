@@ -65,6 +65,36 @@ def migrate():
                 dict(row)
             )
 
+        # New: Migrate Modules
+        print("📦 Migrating Modules...")
+        try:
+            sqlite_cursor.execute("SELECT * FROM modules")
+            modules = sqlite_cursor.fetchall()
+            for row in modules:
+                pg_session.execute(
+                    text("INSERT INTO modules (id, name, unit_id) "
+                         "VALUES (:id, :name, :unit_id) "
+                         "ON CONFLICT (id) DO NOTHING"),
+                    dict(row)
+                )
+        except Exception as e:
+            print(f"⚠️ Could not migrate modules: {e}")
+
+        # New: Migrate Subtopics
+        print("📍 Migrating Subtopics...")
+        try:
+            sqlite_cursor.execute("SELECT * FROM subtopics")
+            subtopics = sqlite_cursor.fetchall()
+            for row in subtopics:
+                pg_session.execute(
+                    text("INSERT INTO subtopics (id, name, is_completed, module_id) "
+                         "VALUES (:id, :name, :is_completed, :module_id) "
+                         "ON CONFLICT (id) DO NOTHING"),
+                    dict(row)
+                )
+        except Exception as e:
+            print(f"⚠️ Could not migrate subtopics: {e}")
+
         # 3. Migrate Quiz History
         print("📊 Migrating Quiz History...")
         sqlite_cursor.execute("SELECT * FROM quiz_history")
@@ -94,9 +124,12 @@ def migrate():
 
         # Update sequences in Postgres (Important for ID generation)
         print("🔄 Updating ID sequences...")
-        tables = ["users", "units", "quiz_history", "chat_messages"]
+        tables = ["users", "units", "modules", "subtopics", "quiz_history", "chat_messages"]
         for table in tables:
-            pg_session.execute(text(f"SELECT setval('{table}_id_seq', (SELECT MAX(id) FROM {table}))"))
+            try:
+                pg_session.execute(text(f"SELECT setval('{table}_id_seq', (SELECT MAX(id) FROM {table}))"))
+            except Exception as e:
+                print(f"⚠️ Could not update sequence for {table}: {e}")
         pg_session.commit()
 
     except Exception as e:

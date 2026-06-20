@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.edu_ai.data.remote.ai.ChatMessage
+import com.example.edu_ai.ui.components.FormattedText
 import kotlinx.coroutines.delay
 import java.util.regex.Pattern
 
@@ -226,10 +227,9 @@ fun ChatBubble(message: ChatMessage) {
             tonalElevation = if (isUser) 0.dp else 1.dp
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Text(
+                FormattedText(
                     text = message.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    lineHeight = 20.sp
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
                 )
                 
                 // Detect YouTube Links

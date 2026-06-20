@@ -13,6 +13,7 @@ class EduAIApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        RetrofitClient.init(this)
         database = Room.databaseBuilder(
             applicationContext,
             EduAIDatabase::class.java,

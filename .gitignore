@@ -16,6 +16,7 @@ bot_memory_*.json
 *.json
 credentials.json
 config.json
+google-services.json
 
 *.env
 #📉 Logs

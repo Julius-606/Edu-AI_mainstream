@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.edu_ai.EduAIApplication
 import com.example.edu_ai.data.local.EduAIDao
 import com.example.edu_ai.data.local.QuizHistoryEntity
+import com.example.edu_ai.data.local.UnitWithModules
 import com.example.edu_ai.data.local.UserEntity
 import com.example.edu_ai.data.remote.ai.AiService
 import com.example.edu_ai.data.remote.ai.AiServiceFactory
@@ -31,6 +32,7 @@ data class QuizUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val selectedUnit: String? = null,
+    val unitsWithModules: List<UnitWithModules> = emptyList(),
     val isReviewMode: Boolean = false,
     val quizHistory: List<QuizHistoryEntity> = emptyList()
 )
@@ -46,6 +48,7 @@ class QuizViewModel(
 
     init {
         loadQuizHistory()
+        loadUnitsWithModules()
     }
 
     private fun loadQuizHistory() {
@@ -53,6 +56,14 @@ class QuizViewModel(
             // Filter history by the current user's ID
             dao.getQuizHistory(user.id).collect { history ->
                 _uiState.update { it.copy(quizHistory = history) }
+            }
+        }
+    }
+
+    private fun loadUnitsWithModules() {
+        viewModelScope.launch {
+            dao.getAllUnitsWithModules().collect { units ->
+                _uiState.update { it.copy(unitsWithModules = units) }
             }
         }
     }

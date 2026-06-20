@@ -18,9 +18,24 @@ class UnitUpdate(BaseModel):
     is_active: Optional[bool] = None
     category: Optional[str] = None
 
+class SubtopicResponse(BaseModel):
+    id: int
+    name: str
+    is_completed: bool
+    class Config:
+        from_attributes = True
+
+class ModuleResponse(BaseModel):
+    id: int
+    name: str
+    subtopics: List[SubtopicResponse]
+    class Config:
+        from_attributes = True
+
 class UnitResponse(UnitBase):
     id: int
     owner_id: int
+    modules: List[ModuleResponse] = []
     class Config:
         from_attributes = True
 
@@ -58,10 +73,12 @@ class ChaosResponse(BaseModel):
 
 class UserCreate(BaseModel):
     username: str
+    email: str
+    password: str
     role: str = "Student"
     sensory_mode: str = "Standard"
     difficulty: str = "Medium (Standard)"
-    ai_persona: str = "Standard Edu_AI"
+    ai_persona: str = "Standard Trace"
     semester_status: str = "Year 4 - Redemption Arc"
     interests: List[str] = []
     active_units: List[str] = []
@@ -169,6 +186,17 @@ class QuizRecordRequest(BaseModel):
     total: int
     user_id: str
     timestamp: Any
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: str
+    username: str
+    role: str
 
 class RecommendationResponse(BaseModel):
     recommendation: str

@@ -13,13 +13,13 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Edu_AI"
+        android:theme="@style/Theme.Trace"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.Edu_AI">
+            android:theme="@style/Theme.Trace">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

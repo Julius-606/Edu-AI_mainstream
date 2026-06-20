@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.edu_ai.data.remote.ParentDashboardResponse
 import com.example.edu_ai.repository.EduAIRepository
+import com.example.edu_ai.ui.components.FormattedText
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,7 +79,7 @@ fun ParentDashboard(
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text("🤖 AI Zenith Review", fontWeight = FontWeight.Bold)
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    Text(text = data.aiProgressReview)
+                                    FormattedText(text = data.aiProgressReview)
                                 }
                             }
                         }
@@ -91,7 +92,7 @@ fun ParentDashboard(
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text("👨‍🏫 Educator's Remarks", fontWeight = FontWeight.Bold)
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    Text(text = data.teacherRemarks ?: "No remarks yet for this period.")
+                                    FormattedText(text = data.teacherRemarks ?: "No remarks yet for this period.")
                                 }
                             }
                         }

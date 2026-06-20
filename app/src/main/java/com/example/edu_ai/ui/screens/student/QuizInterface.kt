@@ -2,6 +2,7 @@ package com.example.edu_ai.ui.screens.student
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,8 +27,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import com.example.edu_ai.data.local.ModuleWithSubtopics
 import com.example.edu_ai.data.local.QuizHistoryEntity
 import com.example.edu_ai.data.local.UnitEntity
+import com.example.edu_ai.data.local.UnitWithModules
+import com.example.edu_ai.ui.components.FormattedText
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -41,7 +47,7 @@ fun QuizTabWrapper(
 
     if (uiState.quiz == null) {
         UnitSelectionScreen(
-            units = units,
+            unitsWithModules = uiState.unitsWithModules,
             history = uiState.quizHistory,
             selectedUnit = uiState.selectedUnit,
             onUnitClicked = { viewModel.selectUnit(it) },
@@ -68,7 +74,7 @@ fun QuizTabWrapper(
 
 @Composable
 fun UnitSelectionScreen(
-    units: List<UnitEntity>,
+    unitsWithModules: List<UnitWithModules>,
     history: List<QuizHistoryEntity>,
     selectedUnit: String?,
     onUnitClicked: (String) -> Unit,
@@ -112,7 +118,8 @@ fun UnitSelectionScreen(
                     }
                 }
 
-                items(units) { unit ->
+                items(unitsWithModules) { unitWithModules ->
+                    val unit = unitWithModules.unit
                     val isSelected = selectedUnit == unit.unitName
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -126,6 +133,14 @@ fun UnitSelectionScreen(
                             
                             AnimatedVisibility(visible = isSelected) {
                                 Column {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    unitWithModules.modules.forEach { moduleWithSubtopics ->
+                                        ModuleAccordion(
+                                            moduleWithSubtopics = moduleWithSubtopics,
+                                            onSubtopicClicked = { onStartQuiz(unit.unitName, it) }
+                                        )
+                                    }
+                                    
                                     Spacer(modifier = Modifier.height(12.dp))
                                     OutlinedTextField(
                                         value = focusArea,
@@ -140,7 +155,7 @@ fun UnitSelectionScreen(
                                         onClick = { onStartQuiz(unit.unitName, focusArea.ifBlank { null }) },
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text("GENERATE QUIZ 🧠")
+                                        Text("GENERATE FULL UNIT QUIZ 🧠")
                                     }
                                 }
                             }
@@ -198,6 +213,60 @@ fun UnitSelectionScreen(
 }
 
 @Composable
+fun ModuleAccordion(
+    moduleWithSubtopics: ModuleWithSubtopics,
+    onSubtopicClicked: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                moduleWithSubtopics.module.name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        if (expanded) {
+            moduleWithSubtopics.subtopics.forEach { subtopic ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSubtopicClicked(subtopic.name) }
+                        .padding(start = 28.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (subtopic.isCompleted) Icons.Default.CheckCircle else Icons.Default.School,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (subtopic.isCompleted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        subtopic.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun QuizQuestionScreen(
     viewModel: QuizViewModel,
     uiState: QuizUiState
@@ -224,7 +293,7 @@ fun QuizQuestionScreen(
             )
             Text("Question ${currentIdx + 1} of ${quiz.questions.size}", style = MaterialTheme.typography.labelMedium)
 
-            Text(text = currentQuestion.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            FormattedText(text = currentQuestion.text, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
 
             currentQuestion.options.forEachIndexed { index, option ->
                 val isThisOptionSelected = selectedIdx == index
@@ -262,7 +331,7 @@ fun QuizQuestionScreen(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text("Explanation", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text(currentQuestion.explanation, fontSize = 14.sp)
+                        FormattedText(text = currentQuestion.explanation, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }

@@ -14,10 +14,12 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(100), unique=True, index=True)
+    email = Column(String(100), unique=True, index=True, nullable=True)
+    hashed_password = Column(String(200), nullable=True)
     role = Column(String(50), default="Student")
     sensory_mode = Column(String(50), default="Standard")
     difficulty = Column(String(50), default="Medium (Standard)")
-    ai_persona = Column(String(100), default="Standard Edu_AI")
+    ai_persona = Column(String(100), default="Standard Trace")
     semester_status = Column(String(100), default="Year 4 - Redemption Arc")
     interests = Column(JSON, default=list)
 
@@ -43,6 +45,29 @@ class Unit(Base):
     
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="units")
+
+    # Relationships to lower levels
+    modules = relationship("Module", back_populates="unit", cascade="all, delete-orphan")
+
+class Module(Base):
+    __tablename__ = "modules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), index=True)
+
+    unit_id = Column(Integer, ForeignKey("units.id"))
+    unit = relationship("Unit", back_populates="modules")
+    subtopics = relationship("Subtopic", back_populates="module", cascade="all, delete-orphan")
+
+class Subtopic(Base):
+    __tablename__ = "subtopics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), index=True)
+    is_completed = Column(Boolean, default=False)
+
+    module_id = Column(Integer, ForeignKey("modules.id"))
+    module = relationship("Module", back_populates="subtopics")
 
 class QuizHistory(Base):
     __tablename__ = "quiz_history"

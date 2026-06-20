@@ -12,12 +12,14 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.edu_ai.data.local.ChatSessionEntity
 import com.example.edu_ai.data.local.UserEntity
+import com.example.edu_ai.ui.components.FormattedText
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -47,10 +50,10 @@ fun ModuleScreen(
         studentViewModel.refreshDashboard(userId)
     }
     
-    val tabs = listOf("Chat", "Schedule", "Vault", "Chaos Quiz", "Zenith")
+    val tabs = listOf("Chat", "Notes", "Vault", "Quiz", "Zenith")
     val icons = listOf(
         Icons.AutoMirrored.Filled.Chat,
-        Icons.Default.CalendarMonth,
+        Icons.Default.StickyNote2,
         Icons.Default.History,
         Icons.Default.LocalFireDepartment,
         Icons.Default.AccountCircle
@@ -102,10 +105,10 @@ fun ModuleScreen(
                     0 -> ChatTabWrapper(uiState.user, onNavigateToHistory = { selectedTab = 2 })
                     1 -> {
                         if (uiState.user != null) {
-                            val timetableViewModel: TimetableViewModel = viewModel(
-                                factory = TimetableViewModel.provideFactory(uiState.user!!)
+                            val notesViewModel: NotesViewModel = viewModel(
+                                factory = NotesViewModel.provideFactory(uiState.user!!)
                             )
-                            TimetableTab(viewModel = timetableViewModel)
+                            NotesTab(viewModel = notesViewModel)
                         }
                     }
                     2 -> {
@@ -136,7 +139,14 @@ fun ModuleScreen(
                             val progressViewModel: ProgressViewModel = viewModel(
                                 factory = ProgressViewModel.provideFactory(uiState.user!!)
                             )
-                            ZenithTab(user = uiState.user!!, viewModel = progressViewModel)
+                            val timetableViewModel: TimetableViewModel = viewModel(
+                                factory = TimetableViewModel.provideFactory(uiState.user!!)
+                            )
+                            ZenithTab(
+                                user = uiState.user!!, 
+                                progressViewModel = progressViewModel,
+                                timetableViewModel = timetableViewModel
+                            )
                         }
                     }
                 }
@@ -237,10 +247,9 @@ fun SessionItem(
                     overflow = TextOverflow.Ellipsis
                 )
                 session.description?.let {
-                    Text(
+                    FormattedText(
                         text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary,
+                        style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.secondary),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(vertical = 4.dp)
@@ -264,65 +273,17 @@ fun SessionItem(
 }
 
 @Composable
-fun ProgressTab(viewModel: ProgressViewModel) {
-    val uiState by viewModel.uiState.collectAsState()
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            Text("Learning Analytics", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Text("Monitoring your progressive growth", color = MaterialTheme.colorScheme.primary)
-        }
-
-        item {
-            Text("Recent Portfolio Performance", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        }
-
-        if (uiState.quizHistory.isEmpty()) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    Text("No quiz data yet. Start an assessment to see results!", color = Color.Gray)
-                }
-            }
-        }
-
-        items(uiState.quizHistory) { history ->
-            val date = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(history.timestamp))
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { /* Logic to open specific quiz for review */ }
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(history.unitName, fontWeight = FontWeight.Bold)
-                        Text(date, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                    }
-                    Text(
-                        "${history.pnlScore.toInt()}%",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (history.pnlScore >= 70) Color(0xFF4CAF50) else Color(0xFFF44336)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ZenithTab(user: UserEntity, viewModel: ProgressViewModel) {
-    val recommendation by viewModel.recommendation.collectAsState()
-    val uiState by viewModel.uiState.collectAsState()
+fun ZenithTab(
+    user: UserEntity, 
+    progressViewModel: ProgressViewModel,
+    timetableViewModel: TimetableViewModel
+) {
+    val recommendation by progressViewModel.recommendation.collectAsState()
+    val progressUiState by progressViewModel.uiState.collectAsState()
+    val timetableUiState by timetableViewModel.uiState.collectAsState()
 
     LaunchedEffect(Unit) {
-        viewModel.refreshRecommendations()
+        progressViewModel.refreshRecommendations()
     }
 
     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -347,24 +308,50 @@ fun ZenithTab(user: UserEntity, viewModel: ProgressViewModel) {
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    if (uiState.isLoading) {
+                    if (progressUiState.isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp))
                     } else {
-                        Text(
+                        FormattedText(
                             text = recommendation,
-                            style = MaterialTheme.typography.bodyLarge,
-                            lineHeight = 24.sp
+                            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp)
                         )
                     }
                     
                     Spacer(modifier = Modifier.height(20.dp))
                     
                     Button(
-                        onClick = { viewModel.refreshRecommendations() },
+                        onClick = { progressViewModel.refreshRecommendations() },
                         modifier = Modifier.align(Alignment.End)
                     ) {
                         Text("REFRESH STRATEGY")
                     }
+                }
+            }
+        }
+
+        item {
+            Text("Dynamic Schedule 🗓️", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("AI-optimized study plan", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+        }
+
+        if (timetableUiState.isLoading) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+        } else {
+            item {
+                AiInsightCard(timetableUiState.aiBrief)
+            }
+
+            val groupedByDay = timetableUiState.weeklyPlan.groupBy { it.day }
+            groupedByDay.forEach { (day, slots) ->
+                item {
+                    DayHeader(day)
+                }
+                items(slots) { slot ->
+                    TimetableSlotItem(slot)
                 }
             }
         }
@@ -396,6 +383,129 @@ fun ZenithTab(user: UserEntity, viewModel: ProgressViewModel) {
         }
         
         item { Spacer(modifier = Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+fun NotesTab(viewModel: NotesViewModel) {
+    val notes by viewModel.notes.collectAsState()
+    
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text(
+            text = "Clinical Notes 📝",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = "AI-generated summaries of your consultations.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        if (notes.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.StickyNote2,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.outlineVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("No notes generated yet.", color = MaterialTheme.colorScheme.outline)
+                    Text("Start a chat to see AI summaries.", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(notes) { note ->
+                    NoteItem(
+                        note = note, 
+                        onUpdate = { viewModel.updateNote(it) }, 
+                        onDelete = { viewModel.deleteNote(note.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NoteItem(note: com.example.edu_ai.data.local.NoteEntity, onUpdate: (com.example.edu_ai.data.local.NoteEntity) -> Unit, onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    var isEditing by remember { mutableStateOf(false) }
+    var editedContent by remember { mutableStateOf(note.content) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }, 
+                horizontalArrangement = Arrangement.SpaceBetween, 
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = note.title, 
+                    fontWeight = FontWeight.Bold, 
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Row {
+                    IconButton(onClick = { 
+                        isEditing = !isEditing 
+                        if (isEditing) expanded = true
+                    }) {
+                        Icon(
+                            if (isEditing) Icons.Default.Close else Icons.Default.Edit, 
+                            contentDescription = "Edit"
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f))
+                    }
+                }
+            }
+            
+            androidx.compose.animation.AnimatedVisibility(visible = expanded) {
+                Column {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    if (isEditing) {
+                        OutlinedTextField(
+                            value = editedContent,
+                            onValueChange = { editedContent = it },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 150.dp),
+                            label = { Text("Edit Clinical Notes") },
+                            shape = MaterialTheme.shapes.medium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { 
+                                onUpdate(note.copy(content = editedContent))
+                                isEditing = false
+                            },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Save Changes")
+                        }
+                    } else {
+                        FormattedText(text = note.content)
+                    }
+                    
+                    val date = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(note.lastUpdated))
+                    Text(
+                        text = "Last updated: $date",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+        }
     }
 }
 

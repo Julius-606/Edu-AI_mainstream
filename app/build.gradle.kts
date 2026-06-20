@@ -11,6 +11,8 @@ android {
 
     val backendBaseUrl = (project.findProperty("backendBaseUrl") as? String)
         ?: "http://10.0.2.2:8000/"
+    
+    val internalApiKey = (project.findProperty("INTERNAL_API_KEY") as? String) ?: "DEVELOPMENT_KEY"
 
     defaultConfig {
         applicationId = "com.example.edu_ai"
@@ -20,6 +22,7 @@ android {
         versionName = "1.0"
 
         buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
+        buildConfigField("String", "INTERNAL_API_KEY", "\"$internalApiKey\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -59,6 +62,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.google.generativeai)
+    implementation(libs.androidx.security.crypto)
 
     // Retrofit
     implementation(libs.retrofit)

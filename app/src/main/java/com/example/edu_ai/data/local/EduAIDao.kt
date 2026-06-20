@@ -27,8 +27,29 @@ interface EduAIDao {
     @Query("SELECT * FROM units")
     fun getAllUnits(): Flow<List<UnitEntity>>
 
+    @Transaction
+    @Query("SELECT * FROM units")
+    fun getAllUnitsWithModules(): Flow<List<UnitWithModules>>
+
     @Query("DELETE FROM units")
     suspend fun deleteAllUnits()
+
+    // Modules
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertModules(modules: List<ModuleEntity>)
+
+    @Query("SELECT * FROM modules WHERE unitId = :unitId")
+    fun getModulesForUnit(unitId: Long): Flow<List<ModuleEntity>>
+
+    // Subtopics
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSubtopics(subtopics: List<SubtopicEntity>)
+
+    @Query("SELECT * FROM subtopics WHERE moduleId = :moduleId")
+    fun getSubtopicsForModule(moduleId: Long): Flow<List<SubtopicEntity>>
+
+    @Query("UPDATE subtopics SET isCompleted = :isCompleted WHERE subtopicId = :subtopicId")
+    suspend fun updateSubtopicStatus(subtopicId: Long, isCompleted: Boolean)
 
     // Quiz History
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -84,4 +105,26 @@ interface EduAIDao {
 
     @Query("DELETE FROM timetables WHERE userId = :userId")
     suspend fun deleteTimetable(userId: String)
+
+    @Query("DELETE FROM timetables")
+    suspend fun clearAllTimetables()
+
+    // Notes
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNote(note: NoteEntity)
+
+    @Update
+    suspend fun updateNote(note: NoteEntity)
+
+    @Query("SELECT * FROM notes WHERE userId = :userId ORDER BY lastUpdated DESC")
+    fun getAllNotes(userId: String): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes WHERE sessionId = :sessionId LIMIT 1")
+    suspend fun getNoteBySession(sessionId: Int): NoteEntity?
+
+    @Query("DELETE FROM notes WHERE id = :noteId")
+    suspend fun deleteNote(noteId: Int)
+
+    @Query("DELETE FROM notes")
+    suspend fun clearAllNotes()
 }

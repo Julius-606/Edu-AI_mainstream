@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Edu_AI"
+rootProject.name = "Trace"
 include(":app")

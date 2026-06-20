@@ -1,1 +1,1 @@
-"""Backend package for Edu_AI."""
+"""Backend package for Trace."""

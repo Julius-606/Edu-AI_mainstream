@@ -9,6 +9,7 @@ import com.example.edu_ai.EduAIApplication
 import com.example.edu_ai.data.local.ChatMessageEntity
 import com.example.edu_ai.data.local.ChatSessionEntity
 import com.example.edu_ai.data.local.EduAIDao
+import com.example.edu_ai.data.local.NoteEntity
 import com.example.edu_ai.data.local.UserEntity
 import com.example.edu_ai.data.remote.ai.AiService
 import com.example.edu_ai.data.remote.ai.AiServiceFactory
@@ -127,8 +128,11 @@ class ChatViewModel(
                 
                 if (userMessageCount == 1) {
                     generateInitialMetadata(text, currentSession)
+                    updateBackgroundNotes(currentSession.id, "user: $text\nmodel: $response")
                 } else if (userMessageCount > 1 && userMessageCount % 3 == 0) {
                     updateMetadata(currentSession)
+                    val chatContext = uiState.value.messages.takeLast(6).joinToString("\n") { "${it.role}: ${it.content}" }
+                    updateBackgroundNotes(currentSession.id, chatContext)
                 }
 
             } catch (e: Exception) {
@@ -136,6 +140,40 @@ class ChatViewModel(
             } finally {
                 _isTyping.value = false
             }
+        }
+    }
+
+    private suspend fun updateBackgroundNotes(sessionId: Int, chatContext: String) {
+        try {
+            val notePrompt = "Based on the clinical/academic discussion below, generate concise summary notes.\n" +
+                    "INSTRUCTIONS:\n" +
+                    "- Tone: Academic and professional.\n" +
+                    "- Content: Focus ONLY on key points, core concepts, and brief clinical/academic explanations.\n" +
+                    "- Style: Use a structured format with clear headings and bullet points. Avoid conversational filler.\n" +
+                    "Discussion Context:\n$chatContext\n\n" +
+                    "Return ONLY the structured notes."
+            
+            val updatedContent = aiService.getChatResponse(notePrompt, user, emptyList())
+            
+            val existingNote = dao.getNoteBySession(sessionId)
+            val sessionTitle = uiState.value.currentSessionTitle
+            
+            if (existingNote != null) {
+                dao.updateNote(existingNote.copy(
+                    title = "Notes: $sessionTitle",
+                    content = updatedContent,
+                    lastUpdated = System.currentTimeMillis()
+                ))
+            } else {
+                dao.insertNote(NoteEntity(
+                    userId = user.id,
+                    sessionId = sessionId,
+                    title = "Notes: $sessionTitle",
+                    content = updatedContent
+                ))
+            }
+        } catch (e: Exception) {
+            // Silently fail note updates
         }
     }
 

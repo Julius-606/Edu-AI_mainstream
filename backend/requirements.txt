@@ -5,3 +5,8 @@ pydantic==2.6.1
 google-generativeai>=0.7.2
 python-dotenv==1.0.1
 psycopg2-binary==2.9.9
+
+passlib[bcrypt]
+python-jose[cryptography]
+jinja2
+python-multipart

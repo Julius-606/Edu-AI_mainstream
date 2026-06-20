@@ -1,6 +1,7 @@
 package com.example.edu_ai.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -16,7 +17,8 @@ import com.example.edu_ai.ui.screens.student.StudentDashboard
 import com.example.edu_ai.ui.screens.teacher.TeacherDashboard
 import com.example.edu_ai.ui.screens.teacher.TeacherViewModel
 import com.example.edu_ai.ui.screens.teacher.TeacherViewModelFactory
-import com.example.edu_ai.ui.screens.parent.ParentDashboard // We will create this
+import com.example.edu_ai.ui.screens.parent.ParentDashboard
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
 @Composable
@@ -25,7 +27,22 @@ fun AppNavigation() {
     val context = LocalContext.current
     val app = context.applicationContext as EduAIApplication
     val repository = app.repository
+    val dao = app.database.dao()
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        val user = dao.getUser().firstOrNull()
+        if (user != null) {
+            val destination = when (user.role) {
+                "Teacher" -> "teacher_dashboard"
+                "Parent" -> "parent_dashboard/${user.id}"
+                else -> "student_dashboard/${user.id}"
+            }
+            navController.navigate(destination) {
+                popUpTo("login") { inclusive = true }
+            }
+        }
+    }
 
     NavHost(navController = navController, startDestination = "login") {
         
@@ -53,7 +70,7 @@ fun AppNavigation() {
                 userId = userId,
                 onLogout = {
                     scope.launch {
-                        repository.logout()
+                        repository.logout(context)
                         navController.navigate("login") {
                             popUpTo(0) { inclusive = true }
                         }
@@ -86,7 +103,7 @@ fun AppNavigation() {
                 viewModel = teacherViewModel,
                 onLogout = {
                     scope.launch {
-                        repository.logout()
+                        repository.logout(context)
                         navController.navigate("login") {
                             popUpTo(0) { inclusive = true }
                         }
@@ -105,7 +122,7 @@ fun AppNavigation() {
                 repository = repository,
                 onLogout = {
                     scope.launch {
-                        repository.logout()
+                        repository.logout(context)
                         navController.navigate("login") {
                             popUpTo(0) { inclusive = true }
                         }

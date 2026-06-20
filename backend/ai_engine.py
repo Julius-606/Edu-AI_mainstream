@@ -104,24 +104,25 @@ class AiEngine:
         task_name = f"Quiz: {unit_name}"
         focus_clause = f" specifically focusing on '{topic}'" if topic else ""
         prompt = f"""
-        Generate a {num_questions}-question multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
+        Generate a {num_questions}-question rigorous academic multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
         Level: {student_level}.
 
-        CRITICAL INSTRUCTION: For each question, the 'explanation' field must be comprehensive.
-        It should not only explain why the correct answer is right but also specifically address common misconceptions
-        related to the wrong options (why they are incorrect in this context).
+        CRITICAL INSTRUCTIONS:
+        1. Tone: Professional, academic, and clinical. Avoid overly casual language.
+        2. Content: Focus on high-yield medical concepts, pathophysiology, and diagnostic criteria relevant to the topic.
+        3. Explanations: For each question, the 'explanation' field must provide a deep clinical rationale.
+           It should explain the physiological basis for the correct answer and clarify why the distractors are incorrect or less appropriate.
 
-        Make the questions fun, engaging, and a little bit creative while remaining educational.
-        Return ONLY valid JSON.
         Format:
+        Return ONLY valid JSON.
         {{
-          "quiz_title": "{unit_name} Fun Assessment",
+          "quiz_title": "{unit_name} Advanced Assessment",
           "questions": [
             {{
               "question_text": "...",
               "options": ["A", "B", "C", "D"],
               "correct_option_index": 0,
-              "explanation": "CORRECT RATIONALE: ... WRONG OPTION ANALYSIS: ..."
+              "explanation": "CLINICAL RATIONALE: ... DIFFERENTIAL ANALYSIS: ..."
             }}
           ]
         }}

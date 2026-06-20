@@ -6,6 +6,8 @@ import com.example.edu_ai.data.remote.EduAIApi
 import com.example.edu_ai.data.remote.TeacherDashboardResponse
 import com.example.edu_ai.data.remote.ClassReportResponse
 import com.example.edu_ai.data.remote.ApiTimetableResponse
+import com.example.edu_ai.utils.PreferenceManager
+import android.content.Context
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -16,20 +18,23 @@ class EduAIRepository(
 ) {
     private val gson = Gson()
 
-    suspend fun logout() {
+    suspend fun logout(context: Context) {
+        PreferenceManager.clearToken(context)
         dao.clearUsers()
         dao.deleteAllUnits()
         dao.clearAllChatSessions()
         dao.clearAllChatHistory()
         dao.clearAllQuizHistory()
-        // Note: We might want to clear timetables too
+        dao.clearAllTimetables()
+        dao.clearAllNotes()
     }
 
     fun getDashboardData(userId: String): Flow<UserEntity?> = flow {
         try {
             val response = api.getDashboard(userId)
-            dao.clearUsers()
-            dao.deleteAllUnits()
+            // Instead of clearing everything, we sync. 
+            // We can clear units for THIS user if we want a fresh list of active units.
+            dao.deleteAllUnits() 
 
             val userEntity = UserEntity(
                 id = userId,
@@ -46,6 +51,9 @@ class EduAIRepository(
             } ?: emptyList()
             dao.insertUnits(unitEntities)
 
+            // Sync quiz history (REPLACE will handle duplicates if we had IDs, 
+            // but since we generate local IDs, we might get duplicates if we are not careful.
+            // For now, let's just insert. Ideally we'd have unique IDs from backend.)
             response.quizHistory?.forEach { q ->
                 dao.insertQuizHistory(
                     QuizHistoryEntity(
@@ -63,6 +71,7 @@ class EduAIRepository(
             if (cachedUser != null) {
                 emit(cachedUser)
             } else {
+                // Fallback for dev/offline first time
                 val devUser = UserEntity(
                     id = userId,
                     username = userId,

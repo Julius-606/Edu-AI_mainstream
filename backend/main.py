@@ -4,8 +4,10 @@
 
 import os
 import time
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Header, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
@@ -15,17 +17,57 @@ try:
     from database import Base, engine, get_db
     import models as models
     import schemas as schemas
+    import auth as auth
     from ai_engine import ai_engine
 except ImportError:
     from database import Base, engine, get_db
     from . import models as models
     from . import schemas as schemas
+    from . import auth as auth
     from .ai_engine import ai_engine
 
 # Create database tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Edu_AI Learning System", version="2.6.0")
+templates = Jinja2Templates(directory="templates")
+
+INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "DEVELOPMENT_KEY")
+
+app = FastAPI(
+    title="Trace Learning System",
+    version="2.6.0"
+)
+
+# Global API Key Security (except for root, signup, and docs)
+@app.middleware("http")
+async def api_key_middleware(request, call_next):
+    if request.url.path in ["/", "/docs", "/openapi.json", "/signup", "/favicon.ico"]:
+        return await call_next(request)
+
+    x_internal_api_key = request.headers.get("X-Internal-Api-Key")
+    if x_internal_api_key != INTERNAL_API_KEY:
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Unauthorized access: Invalid API Key"}
+        )
+
+    return await call_next(request)
+
+# JWT Dependency
+async def get_current_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authentication credentials were not provided")
+
+    token = authorization.split(" ")[1]
+    payload = auth.decode_access_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = payload.get("sub")
+    user = db.query(models.User).filter(models.User.id == int(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,11 +77,77 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 def read_root():
-    return {"status": "Active 📚", "message": "Edu_AI Backend v2.6.0 is Online."}
+    return """
+    <html>
+        <head><title>Edu-AI API</title></head>
+        <body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
+            <h1 style="color: #4F46E5;">Edu-AI Backend v2.6.0</h1>
+            <p>The Trace Learning System is Online and Secure.</p>
+        </body>
+    </html>
+    """
+
+# --- AUTH ENDPOINTS ---
+
+@app.get("/signup", response_class=HTMLResponse)
+async def signup_page(request: Request):
+    return templates.TemplateResponse("signup.html", {"request": request})
+
+@app.post("/signup", response_class=HTMLResponse)
+async def handle_signup(
+    request: Request,
+    username: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    role: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    # Check if user exists
+    existing_user = db.query(models.User).filter((models.User.email == email) | (models.User.username == username)).first()
+    if existing_user:
+        return HTMLResponse("<h2>Error: Email or Username already exists. Please go back.</h2>", status_code=400)
+
+    new_user = models.User(
+        username=username,
+        email=email,
+        hashed_password=auth.get_password_hash(password),
+        role=role
+    )
+    db.add(new_user)
+    db.commit()
+
+    return """
+    <body style="font-family: sans-serif; text-align: center; padding-top: 100px;">
+        <h1 style="color: #059669;">Account Created Successfully!</h1>
+        <p>You can now return to the Edu-AI app and log in.</p>
+    </body>
+    """
+
+@app.post("/api/auth/login", response_model=schemas.TokenResponse)
+async def login(request: schemas.LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == request.email).first()
+    if not user or not auth.verify_password(request.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    access_token = auth.create_access_token(data={"sub": str(user.id)})
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_id": str(user.id),
+        "username": user.username,
+        "role": user.role
+    }
 
 # Helper to find user by ID (int) or Username (string)
+def find_user(user_id_or_name: str, db: Session):
+    user = None
+    if str(user_id_or_name).isdigit():
+        user = db.query(models.User).filter(models.User.id == int(user_id_or_name)).first()
+    if not user:
+        user = db.query(models.User).filter(models.User.username == str(user_id_or_name)).first()
+    return user
 def find_user(user_id_or_name: str, db: Session):
     user = None
     if str(user_id_or_name).isdigit():
@@ -51,7 +159,7 @@ def find_user(user_id_or_name: str, db: Session):
 # --- USER MANAGEMENT ENDPOINTS ---
 
 @app.post("/api/users", response_model=schemas.UserResponseSchema, tags=["User Management"])
-def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
+def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     db_user = db.query(models.User).filter(models.User.username == user_data.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -82,7 +190,7 @@ def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
     return response
 
 @app.get("/api/users/{user_id}", response_model=schemas.UserResponseSchema, tags=["User Management"])
-def get_user(user_id: str, db: Session = Depends(get_db)):
+def get_user(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(user_id, db)
     if not user:
         role = "Student"
@@ -93,7 +201,7 @@ def get_user(user_id: str, db: Session = Depends(get_db)):
             username=user_id,
             role=role,
             sensory_mode="Standard",
-            ai_persona="Standard Edu_AI",
+            ai_persona="Standard Trace",
             semester_status="Active"
         )
         db.add(user)
@@ -105,7 +213,7 @@ def get_user(user_id: str, db: Session = Depends(get_db)):
     return response
 
 @app.put("/api/users/{user_id}", response_model=schemas.UserResponseSchema, tags=["User Management"])
-def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Depends(get_db)):
+def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -246,7 +354,7 @@ def get_parent_dashboard(student_id: str, db: Session = Depends(get_db)):
 # --- DASHBOARD & ACTIVITY ---
 
 @app.get("/api/user/{user_id}/dashboard", response_model=schemas.DashboardResponse)
-def get_dashboard(user_id: str, db: Session = Depends(get_db)):
+def get_dashboard(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(user_id, db)
 
     if not user:
@@ -295,7 +403,7 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     )
 
 @app.get("/api/user/{user_id}/timetable", response_model=schemas.TimetableResponse, tags=["Activity & Planning"])
-def get_ai_timetable(user_id: str, db: Session = Depends(get_db)):
+def get_ai_timetable(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(user_id, db)
     if not user: raise HTTPException(status_code=404, detail="User not found")
 
@@ -359,7 +467,7 @@ def get_ai_timetable(user_id: str, db: Session = Depends(get_db)):
 # --- AI ENDPOINTS ---
 
 @app.post("/api/ai/chat", response_model=schemas.ChatResponse)
-def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
+def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(str(request.user_id), db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -368,9 +476,11 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
     db.add(user_msg)
     db.commit()
 
-    system_instruction = f"You are {user.ai_persona} (an AI Study Companion). " \
+    system_instruction = f"You are {user.ai_persona} (an AI Academic Consultant). " \
                          f"The student is at level: {user.semester_status}. " \
-                         f"Be encouraging, concise, and educational."
+                         f"Adopt a professional, academic, and clinical tone. " \
+                         f"Prioritize educational depth over interactivity. Provide concise but highly informative " \
+                         f"explanations of medical and academic concepts."
     
     history_text = ""
     for msg in request.history:
@@ -392,7 +502,8 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
 def generate_quiz(
     request: schemas.QuizRequest,
     topic: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     user = find_user(str(request.user_id), db)
     if not user:
@@ -410,7 +521,7 @@ def generate_quiz(
     return quiz_data
 
 @app.post("/api/quiz/record")
-def record_quiz(history: schemas.QuizRecordRequest, db: Session = Depends(get_db)):
+def record_quiz(history: schemas.QuizRecordRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(str(history.user_id), db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -427,8 +538,71 @@ def record_quiz(history: schemas.QuizRecordRequest, db: Session = Depends(get_db
     db.commit()
     return {"status": "Success", "message": "Result recorded."}
 
+# --- SYLLABUS & STRUCTURED LEARNING ENDPOINTS ---
+
+@app.get("/api/v1/syllabuses", tags=["Structured Learning"])
+def get_all_syllabuses(db: Session = Depends(get_db)):
+    return db.query(models.Unit).all()
+
+@app.get("/api/v1/syllabuses/{unit_id}/tree", response_model=schemas.UnitResponse, tags=["Structured Learning"])
+def get_syllabus_tree(unit_id: int, db: Session = Depends(get_db)):
+    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="Syllabus/Unit not found")
+    return unit
+
+@app.patch("/api/v1/progress/subtopic/{subtopic_id}", tags=["Structured Learning"])
+def update_subtopic_progress(subtopic_id: int, is_completed: bool, db: Session = Depends(get_db)):
+    subtopic = db.query(models.Subtopic).filter(models.Subtopic.id == subtopic_id).first()
+    if not subtopic:
+        raise HTTPException(status_code=404, detail="Subtopic not found")
+
+    subtopic.is_completed = is_completed
+    db.commit()
+    db.refresh(subtopic)
+
+    return {"status": "success", "subtopic_id": subtopic_id, "is_completed": is_completed}
+
+@app.post("/api/v1/syllabuses/upload", tags=["Structured Learning"])
+def upload_syllabus(payload: dict, user_id: str, db: Session = Depends(get_db)):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    created_units = []
+    for unit_data in payload.get("units", []):
+        new_unit = models.Unit(
+            name=unit_data.get("unit_title"),
+            owner_id=user.id,
+            category=payload.get("syllabus_title", "General")
+        )
+        db.add(new_unit)
+        db.commit()
+        db.refresh(new_unit)
+
+        for topic_data in unit_data.get("topics", []):
+            new_module = models.Module(
+                name=topic_data.get("topic_title"),
+                unit_id=new_unit.id
+            )
+            db.add(new_module)
+            db.commit()
+            db.refresh(new_module)
+
+            for subtopic_name in topic_data.get("subtopics", []):
+                new_subtopic = models.Subtopic(
+                    name=subtopic_name,
+                    module_id=new_module.id
+                )
+                db.add(new_subtopic)
+
+        db.commit()
+        created_units.append(new_unit.id)
+
+    return {"status": "success", "created_unit_ids": created_units}
+
 @app.get("/api/user/{user_id}/recommendations", response_model=schemas.RecommendationResponse)
-def get_recommendations(user_id: str, db: Session = Depends(get_db)):
+def get_recommendations(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

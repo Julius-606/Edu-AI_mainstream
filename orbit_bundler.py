@@ -14,7 +14,7 @@ from datetime import datetime
 # ==========================================
 
 # --- CONFIGURATION ---
-OUTPUT_FILENAME = "Edu-AI.txt"
+OUTPUT_FILENAME = "Trace.txt"
 PROJECT_DIRECTORIES = ["backend", "android", "Pocket_Orbit", "workstation", "infrastructure", "."]
 
 ALLOWED_EXTENSIONS = {
