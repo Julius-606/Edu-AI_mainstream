@@ -5,6 +5,10 @@
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from dotenv import load_dotenv
+
+# Load .env file if it exists
+load_dotenv()
 
 # Use DATABASE_URL from environment (Neon), fallback to local SQLite for development
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./edu_ai_vault.db")

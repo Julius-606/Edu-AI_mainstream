@@ -1,4 +1,5 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import time
 import logging
 import re
@@ -36,22 +37,22 @@ class AiEngine:
     def __init__(self):
         self.key_index = 0
         # Recommended sure-bet models
-        self.model_variants = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]
+        self.model_variants = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]
         self.logs = [] # Internal store for recent activities
 
         if GEMINI_API_KEYS:
-            self._configure_genai()
+            self._create_client()
         else:
             logger.error("❌ No Gemini API keys found in environment variables.")
 
-    def _configure_genai(self):
+    def _create_client(self):
         key = GEMINI_API_KEYS[self.key_index % len(GEMINI_API_KEYS)]
-        genai.configure(api_key=key)
+        self.client = genai.Client(api_key=key)
 
     def _rotate_key(self):
         if not GEMINI_API_KEYS: return
         self.key_index = (self.key_index + 1) % len(GEMINI_API_KEYS)
-        self._configure_genai()
+        self._create_client()
 
     def _log_performance(self, model, key_idx, duration, status, task):
         log_entry = {
@@ -74,11 +75,15 @@ class AiEngine:
                 start_time = time.time()
                 current_key_idx = self.key_index % len(GEMINI_API_KEYS)
                 try:
-                    model = genai.GenerativeModel(
-                        model_name=variant,
-                        system_instruction=system_instruction
+                    config = None
+                    if system_instruction:
+                        config = types.GenerateContentConfig(system_instruction=system_instruction)
+
+                    response = self.client.models.generate_content(
+                        model=variant,
+                        contents=prompt,
+                        config=config
                     )
-                    response = model.generate_content(prompt)
 
                     if response and response.text:
                         duration = time.time() - start_time
@@ -94,6 +99,7 @@ class AiEngine:
                         time.sleep(0.5)
                         continue
                     else:
+                        logger.error(f"Error in ask: {e}")
                         break
         return None
 
@@ -133,20 +139,18 @@ class AiEngine:
                 start_time = time.time()
                 current_key_idx = self.key_index % len(GEMINI_API_KEYS)
                 try:
-                    model = genai.GenerativeModel(model_name=variant)
-                    generation_config = None
-                    if "1.5" in variant:
-                        generation_config = {"response_mime_type": "application/json"}
+                    config = types.GenerateContentConfig(
+                        response_mime_type="application/json"
+                    )
 
-                    response = model.generate_content(prompt, generation_config=generation_config)
+                    response = self.client.models.generate_content(
+                        model=variant,
+                        contents=prompt,
+                        config=config
+                    )
 
                     if response and response.text:
                         raw_text = response.text.strip()
-                        if raw_text.startswith("```json"):
-                            raw_text = raw_text.replace("```json", "", 1).rsplit("```", 1)[0].strip()
-                        elif raw_text.startswith("```"):
-                            raw_text = raw_text.replace("```", "", 1).rsplit("```", 1)[0].strip()
-
                         duration = time.time() - start_time
                         self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
                         return json.loads(raw_text)
@@ -203,13 +207,16 @@ class AiEngine:
 
         for variant in self.model_variants:
             try:
-                model = genai.GenerativeModel(model_name=variant)
-                response = model.generate_content(prompt)
+                config = types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+                response = self.client.models.generate_content(
+                    model=variant,
+                    contents=prompt,
+                    config=config
+                )
                 if response and response.text:
-                    raw_text = response.text.strip()
-                    if "```json" in raw_text:
-                        raw_text = raw_text.split("```json")[1].split("```")[0].strip()
-                    return json.loads(raw_text)
+                    return json.loads(response.text.strip())
             except:
                 continue
         return None
