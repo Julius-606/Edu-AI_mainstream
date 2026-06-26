@@ -41,7 +41,7 @@ app = FastAPI(
 # Global API Key Security (except for root, signup, and docs)
 @app.middleware("http")
 async def api_key_middleware(request, call_next):
-    if request.url.path in ["/", "/docs", "/openapi.json", "/signup", "/favicon.ico"]:
+    if request.url.path in ["/", "/docs", "/openapi.json", "/signup", "/api/auth/login", "/favicon.ico"]:
         return await call_next(request)
 
     x_internal_api_key = request.headers.get("X-Internal-Api-Key")
@@ -141,13 +141,6 @@ async def login(request: schemas.LoginRequest, db: Session = Depends(get_db)):
     }
 
 # Helper to find user by ID (int) or Username (string)
-def find_user(user_id_or_name: str, db: Session):
-    user = None
-    if str(user_id_or_name).isdigit():
-        user = db.query(models.User).filter(models.User.id == int(user_id_or_name)).first()
-    if not user:
-        user = db.query(models.User).filter(models.User.username == str(user_id_or_name)).first()
-    return user
 def find_user(user_id_or_name: str, db: Session):
     user = None
     if str(user_id_or_name).isdigit():
