@@ -41,17 +41,27 @@ app = FastAPI(
 # Global API Key Security (except for root, signup, and docs)
 @app.middleware("http")
 async def api_key_middleware(request, call_next):
+    # Skip for public/whitelisted endpoints
     if request.url.path in ["/", "/docs", "/openapi.json", "/signup", "/api/auth/login", "/favicon.ico"]:
         return await call_next(request)
 
+    # 1. Check for Internal API Key (Legacy/Internal support)
     x_internal_api_key = request.headers.get("X-Internal-Api-Key")
-    if x_internal_api_key != INTERNAL_API_KEY:
-        return JSONResponse(
-            status_code=403,
-            content={"detail": "Unauthorized access: Invalid API Key"}
-        )
+    if x_internal_api_key == INTERNAL_API_KEY:
+        return await call_next(request)
 
-    return await call_next(request)
+    # 2. Check for valid Bearer Token (JWT)
+    authorization = request.headers.get("Authorization")
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        if auth.decode_access_token(token):
+            return await call_next(request)
+
+    # If neither valid API Key nor valid Token is present
+    return JSONResponse(
+        status_code=403,
+        content={"detail": "Unauthorized access: Invalid API Key or Missing Token"}
+    )
 
 # JWT Dependency
 async def get_current_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
