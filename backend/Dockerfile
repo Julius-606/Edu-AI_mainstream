@@ -20,6 +20,5 @@ COPY . .
 ENV PORT=7860
 EXPOSE 7860
 
-# Run uvicorn. Since we are in the root of the backend files,
-# main:app refers to main.py in the current directory.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Run uvicorn. Using modular structure
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]

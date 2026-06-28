@@ -1,7 +1,7 @@
 ================================================================================
 SYSTEM INSTRUCTIONS FOR PROJECT ORBIT (THE JARVIS PROTOCOL)
 ================================================================================
-DATE: 2026-06-19 06:56:24
+DATE: 2026-06-22 18:32:54
 STATUS: VERSION 3.1 (STABILITY UPGRADE)
 
 INSTRUCTIONS FOR THE AI ASSISTANT:
@@ -21,6 +21,7 @@ INSTRUCTIONS FOR THE AI ASSISTANT:
 FILE MANIFEST (TABLE OF CONTENTS)
 ================================================================================
 - backend\ai_engine.py [v1.0.0]
+- backend\auth.py [v1.0.0]
 - backend\database.py [v1.2.0]
 - backend\Dockerfile [v1.0.0]
 - backend\ingestion_engine.py [v1.0.0]
@@ -29,7 +30,9 @@ FILE MANIFEST (TABLE OF CONTENTS)
 - backend\models.py [v1.6.0]
 - backend\README.md [v1.0.0]
 - backend\requirements.txt [v1.0.0]
+- backend\reset_database.py [v1.0.0]
 - backend\schemas.py [v1.9.0]
+- backend\verify_fix.py [v1.0.0]
 - backend\__init__.py [v1.0.0]
 - build.gradle.kts [v1.0.0]
 - Edu-AI.txt [v1.0.0]
@@ -65,6 +68,7 @@ FILE MANIFEST (TABLE OF CONTENTS)
 - app\src\main\java\com\example\edu_ai\data\remote\ai\GeminiKeyManager.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\data\remote\ai\QuizModels.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\repository\EduAIRepository.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\schemas\AuthSchemas.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\ui\components\MarkdownText.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\ui\navigation\AppNavigation.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\ui\screens\LoginScreen.kt [v1.0.0]
@@ -89,6 +93,7 @@ FILE MANIFEST (TABLE OF CONTENTS)
 - app\src\main\java\com\example\edu_ai\ui\theme\screens\LoginScreen.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\ui\theme\screens\StudentDashboard.kt [v1.0.0]
 - app\src\main\java\com\example\edu_ai\ui\theme\screens\TeacherDashboard.kt [v1.0.0]
+- app\src\main\java\com\example\edu_ai\utils\PreferenceManager.kt [v1.0.0]
 - app\src\main\res\drawable\ic_launcher_background.xml [v1.0.0]
 - app\src\main\res\drawable\ic_launcher_foreground.xml [v1.0.0]
 - app\src\main\res\mipmap-anydpi-v26\ic_launcher.xml [v1.0.0]
@@ -110,7 +115,8 @@ FILE: backend\ai_engine.py
 VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import time
 import logging
 import re
@@ -148,22 +154,22 @@ class AiEngine:
     def __init__(self):
         self.key_index = 0
         # Recommended sure-bet models
-        self.model_variants = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]
+        self.model_variants = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]
         self.logs = [] # Internal store for recent activities
 
         if GEMINI_API_KEYS:
-            self._configure_genai()
+            self._create_client()
         else:
             logger.error("❌ No Gemini API keys found in environment variables.")
 
-    def _configure_genai(self):
+    def _create_client(self):
         key = GEMINI_API_KEYS[self.key_index % len(GEMINI_API_KEYS)]
-        genai.configure(api_key=key)
+        self.client = genai.Client(api_key=key)
 
     def _rotate_key(self):
         if not GEMINI_API_KEYS: return
         self.key_index = (self.key_index + 1) % len(GEMINI_API_KEYS)
-        self._configure_genai()
+        self._create_client()
 
     def _log_performance(self, model, key_idx, duration, status, task):
         log_entry = {
@@ -186,11 +192,15 @@ class AiEngine:
                 start_time = time.time()
                 current_key_idx = self.key_index % len(GEMINI_API_KEYS)
                 try:
-                    model = genai.GenerativeModel(
-                        model_name=variant,
-                        system_instruction=system_instruction
+                    config = None
+                    if system_instruction:
+                        config = types.GenerateContentConfig(system_instruction=system_instruction)
+
+                    response = self.client.models.generate_content(
+                        model=variant,
+                        contents=prompt,
+                        config=config
                     )
-                    response = model.generate_content(prompt)
 
                     if response and response.text:
                         duration = time.time() - start_time
@@ -206,6 +216,7 @@ class AiEngine:
                         time.sleep(0.5)
                         continue
                     else:
+                        logger.error(f"Error in ask: {e}")
                         break
         return None
 
@@ -245,20 +256,18 @@ class AiEngine:
                 start_time = time.time()
                 current_key_idx = self.key_index % len(GEMINI_API_KEYS)
                 try:
-                    model = genai.GenerativeModel(model_name=variant)
-                    generation_config = None
-                    if "1.5" in variant:
-                        generation_config = {"response_mime_type": "application/json"}
+                    config = types.GenerateContentConfig(
+                        response_mime_type="application/json"
+                    )
 
-                    response = model.generate_content(prompt, generation_config=generation_config)
+                    response = self.client.models.generate_content(
+                        model=variant,
+                        contents=prompt,
+                        config=config
+                    )
 
                     if response and response.text:
                         raw_text = response.text.strip()
-                        if raw_text.startswith("```json"):
-                            raw_text = raw_text.replace("```json", "", 1).rsplit("```", 1)[0].strip()
-                        elif raw_text.startswith("```"):
-                            raw_text = raw_text.replace("```", "", 1).rsplit("```", 1)[0].strip()
-
                         duration = time.time() - start_time
                         self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
                         return json.loads(raw_text)
@@ -315,13 +324,16 @@ class AiEngine:
 
         for variant in self.model_variants:
             try:
-                model = genai.GenerativeModel(model_name=variant)
-                response = model.generate_content(prompt)
+                config = types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+                response = self.client.models.generate_content(
+                    model=variant,
+                    contents=prompt,
+                    config=config
+                )
                 if response and response.text:
-                    raw_text = response.text.strip()
-                    if "```json" in raw_text:
-                        raw_text = raw_text.split("```json")[1].split("```")[0].strip()
-                    return json.loads(raw_text)
+                    return json.loads(response.text.strip())
             except:
                 continue
         return None
@@ -352,6 +364,63 @@ ai_engine = AiEngine()
 
  <<<--- END_FILE_BLOCK: backend\ai_engine.py
 
+>>>--- START_FILE_BLOCK: backend\auth.py
+################################################################################
+FILE: backend\auth.py
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+import os
+from datetime import datetime, timedelta
+from typing import Optional
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+# Silencing passlib's bcrypt version warning
+try:
+    import bcrypt
+    if not hasattr(bcrypt, "__about__"):
+        class BcryptAbout:
+            __version__ = getattr(bcrypt, "__version__", "unknown")
+        bcrypt.__about__ = BcryptAbout()
+except ImportError:
+    pass
+
+# Configuration
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your-super-secret-key-change-this-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
+
+# Use bcrypt_sha256 for new hashes so passwords longer than bcrypt's 72-byte
+# limit still work, while keeping bcrypt available to verify existing hashes.
+pwd_context = CryptContext(schemes=["bcrypt_sha256", "bcrypt"], deprecated="auto")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password[:72], hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password[:72])
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def decode_access_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
+
+ <<<--- END_FILE_BLOCK: backend\auth.py
+
 >>>--- START_FILE_BLOCK: backend\database.py
 ################################################################################
 FILE: backend\database.py
@@ -365,6 +434,10 @@ VERSION: 1.2.0 | SYSTEM: N/A
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from dotenv import load_dotenv
+
+# Load .env file if it exists
+load_dotenv()
 
 # Use DATABASE_URL from environment (Neon), fallback to local SQLite for development
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./edu_ai_vault.db")
@@ -373,13 +446,27 @@ SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./edu_ai_vault.db
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# Ensure SSL is used for Neon if not explicitly specified
+if "postgresql" in SQLALCHEMY_DATABASE_URL and "sslmode" not in SQLALCHEMY_DATABASE_URL:
+    if "?" in SQLALCHEMY_DATABASE_URL:
+        SQLALCHEMY_DATABASE_URL += "&sslmode=require"
+    else:
+        SQLALCHEMY_DATABASE_URL += "?sslmode=require"
+
 # connect_args={"check_same_thread": False} is ONLY required for SQLite
 engine_args = {}
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
     engine_args["connect_args"] = {"check_same_thread": False}
 
 # Setting up the engine
-engine = create_engine(SQLALCHEMY_DATABASE_URL, **engine_args)
+# pool_pre_ping=True is CRITICAL for Neon/Serverless DBs to handle idle timeouts
+# pool_recycle ensures connections are refreshed every 5 minutes
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    **engine_args
+)
 
 # SessionLocal is the actual database session we use to query and save data
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -525,8 +612,10 @@ VERSION: 2.6.0 | SYSTEM: N/A
 
 import os
 import time
-from fastapi import Depends, FastAPI, HTTPException, Query, Header
+from fastapi import Depends, FastAPI, HTTPException, Query, Header, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
@@ -536,42 +625,57 @@ try:
     from database import Base, engine, get_db
     import models as models
     import schemas as schemas
+    import auth as auth
     from ai_engine import ai_engine
 except ImportError:
     from database import Base, engine, get_db
     from . import models as models
     from . import schemas as schemas
+    from . import auth as auth
     from .ai_engine import ai_engine
 
 # Create database tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "DEVELOPMENT_KEY")
+templates = Jinja2Templates(directory="templates")
 
-async def verify_api_key(x_internal_api_key: str = Header(None)):
-    if x_internal_api_key != INTERNAL_API_KEY:
-        raise HTTPException(status_code=403, detail="Unauthorized access: Invalid API Key")
+INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "DEVELOPMENT_KEY")
 
 app = FastAPI(
     title="Trace Learning System",
     version="2.6.0"
 )
 
-# Global API Key Security (except for root /)
+# Global API Key Security (except for root, signup, and docs)
 @app.middleware("http")
 async def api_key_middleware(request, call_next):
-    if request.url.path in ["/", "/docs", "/openapi.json"]:
+    if request.url.path in ["/", "/docs", "/openapi.json", "/signup", "/favicon.ico"]:
         return await call_next(request)
 
     x_internal_api_key = request.headers.get("X-Internal-Api-Key")
     if x_internal_api_key != INTERNAL_API_KEY:
-        from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=403,
             content={"detail": "Unauthorized access: Invalid API Key"}
         )
 
     return await call_next(request)
+
+# JWT Dependency
+async def get_current_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authentication credentials were not provided")
+
+    token = authorization.split(" ")[1]
+    payload = auth.decode_access_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = payload.get("sub")
+    user = db.query(models.User).filter(models.User.id == int(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
 
 app.add_middleware(
     CORSMiddleware,
@@ -581,11 +685,77 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 def read_root():
-    return {"status": "Active 📚", "message": "Trace Backend v2.6.0 is Online."}
+    return """
+    <html>
+        <head><title>Edu-AI API</title></head>
+        <body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
+            <h1 style="color: #4F46E5;">Edu-AI Backend v2.6.0</h1>
+            <p>The Trace Learning System is Online and Secure.</p>
+        </body>
+    </html>
+    """
+
+# --- AUTH ENDPOINTS ---
+
+@app.get("/signup", response_class=HTMLResponse)
+async def signup_page(request: Request):
+    return templates.TemplateResponse("signup.html", {"request": request})
+
+@app.post("/signup", response_class=HTMLResponse)
+async def handle_signup(
+    request: Request,
+    username: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    role: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    # Check if user exists
+    existing_user = db.query(models.User).filter((models.User.email == email) | (models.User.username == username)).first()
+    if existing_user:
+        return HTMLResponse("<h2>Error: Email or Username already exists. Please go back.</h2>", status_code=400)
+
+    new_user = models.User(
+        username=username,
+        email=email,
+        hashed_password=auth.get_password_hash(password),
+        role=role
+    )
+    db.add(new_user)
+    db.commit()
+
+    return """
+    <body style="font-family: sans-serif; text-align: center; padding-top: 100px;">
+        <h1 style="color: #059669;">Account Created Successfully!</h1>
+        <p>You can now return to the Edu-AI app and log in.</p>
+    </body>
+    """
+
+@app.post("/api/auth/login", response_model=schemas.TokenResponse)
+async def login(request: schemas.LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == request.email).first()
+    if not user or not auth.verify_password(request.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    access_token = auth.create_access_token(data={"sub": str(user.id)})
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_id": str(user.id),
+        "username": user.username,
+        "role": user.role
+    }
 
 # Helper to find user by ID (int) or Username (string)
+def find_user(user_id_or_name: str, db: Session):
+    user = None
+    if str(user_id_or_name).isdigit():
+        user = db.query(models.User).filter(models.User.id == int(user_id_or_name)).first()
+    if not user:
+        user = db.query(models.User).filter(models.User.username == str(user_id_or_name)).first()
+    return user
 def find_user(user_id_or_name: str, db: Session):
     user = None
     if str(user_id_or_name).isdigit():
@@ -597,7 +767,7 @@ def find_user(user_id_or_name: str, db: Session):
 # --- USER MANAGEMENT ENDPOINTS ---
 
 @app.post("/api/users", response_model=schemas.UserResponseSchema, tags=["User Management"])
-def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
+def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     db_user = db.query(models.User).filter(models.User.username == user_data.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -628,7 +798,7 @@ def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
     return response
 
 @app.get("/api/users/{user_id}", response_model=schemas.UserResponseSchema, tags=["User Management"])
-def get_user(user_id: str, db: Session = Depends(get_db)):
+def get_user(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(user_id, db)
     if not user:
         role = "Student"
@@ -651,7 +821,7 @@ def get_user(user_id: str, db: Session = Depends(get_db)):
     return response
 
 @app.put("/api/users/{user_id}", response_model=schemas.UserResponseSchema, tags=["User Management"])
-def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Depends(get_db)):
+def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -792,7 +962,7 @@ def get_parent_dashboard(student_id: str, db: Session = Depends(get_db)):
 # --- DASHBOARD & ACTIVITY ---
 
 @app.get("/api/user/{user_id}/dashboard", response_model=schemas.DashboardResponse)
-def get_dashboard(user_id: str, db: Session = Depends(get_db)):
+def get_dashboard(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(user_id, db)
 
     if not user:
@@ -841,7 +1011,7 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     )
 
 @app.get("/api/user/{user_id}/timetable", response_model=schemas.TimetableResponse, tags=["Activity & Planning"])
-def get_ai_timetable(user_id: str, db: Session = Depends(get_db)):
+def get_ai_timetable(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(user_id, db)
     if not user: raise HTTPException(status_code=404, detail="User not found")
 
@@ -905,7 +1075,7 @@ def get_ai_timetable(user_id: str, db: Session = Depends(get_db)):
 # --- AI ENDPOINTS ---
 
 @app.post("/api/ai/chat", response_model=schemas.ChatResponse)
-def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
+def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(str(request.user_id), db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -940,7 +1110,8 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
 def generate_quiz(
     request: schemas.QuizRequest,
     topic: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     user = find_user(str(request.user_id), db)
     if not user:
@@ -958,7 +1129,7 @@ def generate_quiz(
     return quiz_data
 
 @app.post("/api/quiz/record")
-def record_quiz(history: schemas.QuizRecordRequest, db: Session = Depends(get_db)):
+def record_quiz(history: schemas.QuizRecordRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(str(history.user_id), db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1039,7 +1210,7 @@ def upload_syllabus(payload: dict, user_id: str, db: Session = Depends(get_db)):
     return {"status": "success", "created_unit_ids": created_units}
 
 @app.get("/api/user/{user_id}/recommendations", response_model=schemas.RecommendationResponse)
-def get_recommendations(user_id: str, db: Session = Depends(get_db)):
+def get_recommendations(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1243,6 +1414,8 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(100), unique=True, index=True)
+    email = Column(String(100), unique=True, index=True, nullable=True)
+    hashed_password = Column(String(200), nullable=True)
     role = Column(String(50), default="Student")
     sensory_mode = Column(String(50), default="Standard")
     difficulty = Column(String(50), default="Medium (Standard)")
@@ -1479,16 +1652,83 @@ FILE: backend\requirements.txt
 VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
+# --- Core API ---
 fastapi==0.109.2
 uvicorn==0.27.1
+pydantic
+python-multipart==0.0.9
+
+# --- Database ---
 sqlalchemy==2.0.25
-pydantic==2.6.1
-google-generativeai>=0.7.2
+psycopg2-binary
 python-dotenv==1.0.1
-psycopg2-binary==2.9.9
+
+# --- Security & Auth ---
+passlib[bcrypt]==1.7.4
+bcrypt==3.2.2
+python-jose[cryptography]==3.3.0
+
+# --- AI & Templating ---
+google-genai
+google-generativeai>=0.7.2
+jinja2==3.1.3
 
 
  <<<--- END_FILE_BLOCK: backend\requirements.txt
+
+>>>--- START_FILE_BLOCK: backend\reset_database.py
+################################################################################
+FILE: backend\reset_database.py
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+import os
+import sys
+from sqlalchemy import text
+
+# Add current directory to path if needed
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    from database import engine, Base
+    import models
+except ImportError:
+    # Fallback for different execution contexts
+    from .database import engine, Base
+    from . import models
+
+import argparse
+
+def reset_database(force=False):
+    print("⚠️  DATABASE RESET TOOL (Neon/PostgreSQL) ⚠️")
+    print(f"Connecting to: {engine.url.render_as_string(hide_password=True)}")
+    
+    if not force:
+        confirm = input("Are you sure you want to WIPE all data? This cannot be undone! (yes/no): ")
+        if confirm.lower() != 'yes':
+            print("❌ Aborted.")
+            return
+
+    try:
+        print("🚀 Dropping all tables...")
+        Base.metadata.drop_all(bind=engine)
+        print("✅ Tables dropped.")
+
+        print("🏗️  Recreating tables from models...")
+        Base.metadata.create_all(bind=engine)
+        print("✅ Schema recreated successfully.")
+        
+    except Exception as e:
+        print(f"❌ Error during reset: {e}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--force", action="store_true", help="Skip confirmation")
+    args = parser.parse_args()
+    reset_database(force=args.force)
+
+
+ <<<--- END_FILE_BLOCK: backend\reset_database.py
 
 >>>--- START_FILE_BLOCK: backend\schemas.py
 ################################################################################
@@ -1571,6 +1811,8 @@ class ChaosResponse(BaseModel):
 
 class UserCreate(BaseModel):
     username: str
+    email: str
+    password: str
     role: str = "Student"
     sensory_mode: str = "Standard"
     difficulty: str = "Medium (Standard)"
@@ -1683,11 +1925,66 @@ class QuizRecordRequest(BaseModel):
     user_id: str
     timestamp: Any
 
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: str
+    username: str
+    role: str
+
 class RecommendationResponse(BaseModel):
     recommendation: str
 
 
  <<<--- END_FILE_BLOCK: backend\schemas.py
+
+>>>--- START_FILE_BLOCK: backend\verify_fix.py
+################################################################################
+FILE: backend\verify_fix.py
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+import sys
+import os
+
+# Add current directory to path to import local modules
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    import auth
+    print("Successfully imported auth module.")
+
+    # Test long password
+    long_password = "a" * 100
+    print(f"Testing with password of length {len(long_password)}...")
+
+    hashed = auth.get_password_hash(long_password)
+    print("Successfully hashed long password.")
+
+    is_valid = auth.verify_password(long_password, hashed)
+    print(f"Password verification: {is_valid}")
+
+    if is_valid:
+        print("✅ VERIFICATION SUCCESSFUL: Long password handled correctly.")
+    else:
+        print("❌ VERIFICATION FAILED: Password verification failed.")
+
+except Exception as e:
+    print(f"❌ VERIFICATION FAILED with error: {e}")
+
+try:
+    import ai_engine
+    print("Successfully imported ai_engine module.")
+    print("✅ VERIFICATION SUCCESSFUL: AI engine migrated to google-genai.")
+except Exception as e:
+    print(f"❌ VERIFICATION FAILED with error in AI engine: {e}")
+
+
+ <<<--- END_FILE_BLOCK: backend\verify_fix.py
 
 >>>--- START_FILE_BLOCK: backend\__init__.py
 ################################################################################
@@ -6568,49 +6865,58 @@ FILE: .artifacts\20260618-202943-981229e0-367e-4937-8f69-b0adbb4830aa\implementa
 VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
-# Implementation Plan - Security Features (API Key & Firebase Auth)
+# Implementation Plan - Custom Authentication Migration
 
-This plan outlines the steps to secure the Edu-AI gateway with an API key and implement user authentication using Firebase.
+This plan replaces Firebase Authentication with a custom, backend-driven solution. It includes a web-based signup flow and a JWT-based login system.
 
 ## Proposed Changes
+
+### Backend (FastAPI)
+
+#### [models.py](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/models.py)
+- Add `email` (unique) and `hashed_password` to the `User` model.
+
+#### [NEW] [auth.py](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/auth.py)
+- Implement password hashing using `passlib`.
+- Implement JWT token generation and verification using `python-jose`.
+
+#### [main.py](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/main.py)
+- Add `/api/auth/login` endpoint.
+- Add `/signup` endpoint that serves a basic HTML form.
+- Update middleware to optionally verify the `Authorization: Bearer <token>` header.
+
+#### [NEW] [templates/signup.html](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/templates/signup.html)
+- A simple HTML page for user registration.
+
+---
 
 ### Android App (Frontend)
 
 #### [build.gradle.kts](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/build.gradle.kts)
-- Add `buildConfigField` for `INTERNAL_API_KEY`.
-- Add Firebase BOM and Firebase Auth dependencies.
-- Apply the Google Services plugin.
+- Remove Firebase plugins and dependencies.
+- Add `androidx.security:security-crypto` for secure token storage.
 
 #### [RetrofitClient.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/data/remote/RetrofitClient.kt)
-- Add an `Interceptor` to the `OkHttpClient` to inject the `X-Internal-Api-Key` header into every request.
+- Update interceptor to include `Authorization: Bearer <token>` if a token is stored.
 
 #### [LoginScreen.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/ui/screens/LoginScreen.kt)
-- Integrate `FirebaseAuth`.
-- Add "Sign Up" functionality alongside "Login".
-- Update the login logic to authenticate against Firebase.
-
-#### [AppNavigation.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/ui/navigation/AppNavigation.kt)
-- Ensure the `onLoginSuccess` callback passes the Firebase UID as the `userId`.
+- Remove Firebase logic.
+- Implement login call to the custom backend.
+- Use `Intent(Intent.ACTION_VIEW)` to launch the browser for the signup URL.
 
 ---
-
-### Backend (FastAPI)
-
-#### [main.py](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/main.py)
-- Implement a security dependency to check for the `X-Internal-Api-Key` header.
-- (Optional) Research and add a placeholder for Firebase Token verification.
 
 ## Verification Plan
 
 ### Automated Tests
-- I will check the code for syntax errors using `analyze_file`.
-- I will verify that the backend starts and the new dependency is correctly applied.
+- Syntax check using `analyze_file`.
+- Verify backend endpoints (login, signup page) using `curl` or internal tests if possible.
 
 ### Manual Verification
-- The user will need to perform manual verification after completing the Firebase Console setup:
-    1. Register a new user via the app.
-    2. Attempt to login with valid/invalid credentials.
-    3. Verify that requests fail if the API key is not present (e.g., via Postman).
+1. Launch app -> Click Sign Up -> Browser opens to signup page.
+2. Complete signup in browser.
+3. Return to app -> Login with credentials.
+4. Verify data loads correctly (proving JWT is working).
 
 
  <<<--- END_FILE_BLOCK: .artifacts\20260618-202943-981229e0-367e-4937-8f69-b0adbb4830aa\implementation_plan.artifact.md
@@ -6623,17 +6929,22 @@ VERSION: 1.0.0 | SYSTEM: N/A
 
 # Task Management
 
-- [x] Implement Security Features
-    - [x] Step A: API Key Header Implementation
-        - [x] Update `app/build.gradle.kts` for API Key
-        - [x] Update `RetrofitClient.kt` with Interceptor
-        - [x] Update `backend/main.py` to verify API Key
-    - [x] Step B: Firebase Authentication Implementation
-        - [x] Add Firebase dependencies to `app/build.gradle.kts`
-        - [x] Implement Firebase Auth in `LoginScreen.kt`
-        - [x] Update Navigation and Repository to use Firebase UID
-        - [x] (Optional but recommended) Backend Firebase Token Verification logic
-- [x] Provide "Finish the Job" instructions for the user (Firebase Console setup, etc.)
+- [/] Migrate from Firebase to Custom Authentication
+    - [/] Step 1: Cleanup and Backend Foundation
+        - [ ] Remove Firebase dependencies from `app/build.gradle.kts` and `libs.versions.toml`
+        - [ ] Add `passlib` and `python-jose` to backend requirements
+        - [ ] Update `backend/models.py` with `email` and `hashed_password`
+        - [ ] Create `backend/auth.py` for JWT and Hashing logic
+    - [ ] Step 2: Backend Implementation
+        - [ ] Implement `POST /api/auth/login` in `backend/main.py`
+        - [ ] Create a simple `signup.html` and a `GET /signup` route
+        - [ ] Update backend middleware to verify JWT
+    - [ ] Step 3: Android App Implementation
+        - [ ] Update `RetrofitClient.kt` to handle JWT
+        - [ ] Update `LoginScreen.kt` to use custom login and launch browser for signup
+        - [ ] Implement local token storage (EncryptedSharedPreferences)
+        - [ ] Update `EduAIRepository.kt` and `AppNavigation.kt` for the new flow
+- [ ] Provide final setup instructions (JWT Secret Key, etc.)
 
 
  <<<--- END_FILE_BLOCK: .artifacts\20260618-202943-981229e0-367e-4937-8f69-b0adbb4830aa\task.artifact.md
@@ -6644,53 +6955,46 @@ FILE: .artifacts\20260618-202943-981229e0-367e-4937-8f69-b0adbb4830aa\walkthroug
 VERSION: 1.0.0 | SYSTEM: N/A
 ################################################################################
 
-# Security Features Implementation Walkthrough
+# Custom Authentication Migration Walkthrough
 
-I have implemented the "fence" (API Key) and the "front gate" (Firebase Auth) for your Edu-AI system.
+I have replaced Firebase with a fully custom, backend-driven authentication system. This gives you full control over user data and security.
 
-## Changes Made
+## 🏗️ The New Architecture
 
-### 1. API Key Header (The Fence)
-*   **[build.gradle.kts](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/build.gradle.kts)**: Added `INTERNAL_API_KEY` to `BuildConfig`. It defaults to `"DEVELOPMENT_KEY"` if not specified in your properties.
-*   **[RetrofitClient.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/data/remote/RetrofitClient.kt)**: Added an `Interceptor` that automatically attaches the `X-Internal-Api-Key` header to every request.
-*   **[main.py (Backend)](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/main.py)**: Added a dependency that checks for the `X-Internal-Api-Key` header. If it doesn't match the server's key, the request is rejected with a `403 Forbidden` error.
+### 1. Backend (The Vault)
+*   **Secure Storage**: Passwords are now hashed using **Bcrypt** before being stored in your database. Even if your database is leaked, the passwords remain unreadable.
+*   **JWT Tokens**: When a user logs in, the backend issues a **JSON Web Token (JWT)**. This token is used to authorize all future requests.
+*   **Web Signup**: I created a clean, responsive signup page at `/signup` using Tailwind CSS. This allows you to update the signup process instantly without pushing a new app update.
 
-### 2. Firebase Authentication (The Gate)
-*   **[LoginScreen.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/ui/screens/LoginScreen.kt)**:
-    *   Integrated `FirebaseAuth`.
-    *   Updated the UI to support both **Login** and **Sign Up**.
-    *   Replaced the mock login with real `signInWithEmailAndPassword` and `createUserWithEmailAndPassword`.
-*   **[EduAIRepository.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/repository/EduAIRepository.kt)**: Updated the `logout()` method to sign out from Firebase.
+### 2. Android App (The Keyring)
+*   **Encrypted Storage**: The app uses `EncryptedSharedPreferences` to store the JWT. This uses hardware-backed encryption to keep the token safe from other apps on the device.
+*   **Auto-Authorization**: Every request sent to the backend now carries two "keys":
+    1.  `X-Internal-Api-Key`: Proves the request is from your app.
+    2.  `Authorization: Bearer <token>`: Proves who the user is.
+*   **Browser-to-App Flow**: The "Sign Up" button launches the user's browser to the secure backend page. Once finished, they return to the app to log in.
 
 ---
 
-## 🚀 How to Finish the Job
+## 🚀 Final Steps to Go Live
 
-To make the app build and run again, you need to complete these manual steps in the Firebase Console and your local environment.
+### Step 1: Update Backend Environment
+Install the new security libraries on your server (Huggingface/VPS):
+```bash
+pip install passlib[bcrypt] python-jose[cryptography] jinja2 python-multipart
+```
 
-### Step 1: Firebase Console Setup
-1.  Go to [console.firebase.google.com](https://console.firebase.google.com/).
-2.  Create a new project (e.g., "Edu-AI").
-3.  Add an **Android App** to the project.
-    *   Package Name: `com.example.edu_ai`
-4.  Download the **`google-services.json`** file.
-5.  **Place it in your project**: `app/google-services.json`.
-6.  In the Firebase Console, go to **Build > Authentication** and **Enable Email/Password** sign-in method.
-
-### Step 2: Set your Secret API Key
-1.  Open your **`local.properties`** file (in the project root).
-2.  Add this line (replace with your own secret string):
-    ```properties
-    INTERNAL_API_KEY=your_very_secret_key_here
-    ```
-3.  **On your Backend (Huggingface/VPS)**: Set an environment variable named `INTERNAL_API_KEY` with the **same** secret string.
+### Step 2: Set Your Secret Keys
+Set these environment variables on your server:
+1.  `INTERNAL_API_KEY`: The same key you have in `local.properties`.
+2.  `JWT_SECRET_KEY`: A long, random string (e.g., `openssl rand -hex 32`). **Keep this very secret.**
 
 ### Step 3: Run the App
-1.  Sync Gradle (Click the elephant icon 🐘 in Android Studio).
-2.  Run the app! You should now be able to register a real account and log in.
+1.  **Sync Gradle**: Click the elephant icon 🐘 in Android Studio to pull in the `androidx.security` library.
+2.  **Launch**: The app should build immediately (no `google-services.json` required!).
+3.  **Test**: Click "Sign Up", create an account in the browser, then return to the app to log in.
 
-> [!IMPORTANT]
-> Your backend will now reject all requests that don't have the correct API Key. Make sure the key in `local.properties` matches the one on your server!
+> [!TIP]
+> Since we've updated the database schema, you may need to clear your local app data (Settings > Apps > Edu-AI > Clear Data) to ensure the new `userId` logic works smoothly.
 
 
  <<<--- END_FILE_BLOCK: .artifacts\20260618-202943-981229e0-367e-4937-8f69-b0adbb4830aa\walkthrough.artifact.md
@@ -6776,7 +7080,6 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.devtools.ksp)
-    alias(libs.plugins.google.services)
 }
 
 android {
@@ -6836,10 +7139,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.google.generativeai)
-
-    // Firebase
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth.ktx)
+    implementation(libs.androidx.security.crypto)
 
     // Retrofit
     implementation(libs.retrofit)
@@ -6959,6 +7259,7 @@ class EduAIApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        RetrofitClient.init(this)
         database = Room.databaseBuilder(
             applicationContext,
             EduAIDatabase::class.java,
@@ -7662,6 +7963,9 @@ interface EduAIApi {
     @GET("api/user/{user_id}/timetable")
     suspend fun getTimetable(@Path("user_id") userId: String): ApiTimetableResponse
 
+    @POST("api/auth/login")
+    suspend fun login(@Body request: com.example.edu_ai.schemas.LoginRequest): com.example.edu_ai.schemas.TokenResponse
+
     // --- Teacher Portal Endpoints ---
 
     @GET("api/teacher/dashboard")
@@ -7697,23 +8001,36 @@ VERSION: 1.0.0 | SYSTEM: N/A
 // IDENTITY: data/remote/RetrofitClient.kt
 package com.example.edu_ai.data.remote
 
+import android.content.Context
 import com.example.edu_ai.BuildConfig
+import com.example.edu_ai.utils.PreferenceManager
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    // The BASE_URL is now dynamically injected from build.gradle.kts / gradle.properties
     private const val BASE_URL = BuildConfig.BACKEND_BASE_URL
     private const val INTERNAL_API_KEY = BuildConfig.INTERNAL_API_KEY
 
+    private var context: Context? = null
+
+    fun init(context: Context) {
+        this.context = context.applicationContext
+    }
+
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor { chain ->
-            val request = chain.request().newBuilder()
+            val requestBuilder = chain.request().newBuilder()
                 .addHeader("X-Internal-Api-Key", INTERNAL_API_KEY)
-                .build()
-            chain.proceed(request)
+            
+            context?.let { ctx ->
+                PreferenceManager.getToken(ctx)?.let { token ->
+                    requestBuilder.addHeader("Authorization", "Bearer $token")
+                }
+            }
+            
+            chain.proceed(requestBuilder.build())
         }
         .connectTimeout(120, TimeUnit.SECONDS) // Increased for multi-key processing
         .readTimeout(120, TimeUnit.SECONDS)    // Increased for multi-key processing
@@ -7967,7 +8284,8 @@ import com.example.edu_ai.data.remote.EduAIApi
 import com.example.edu_ai.data.remote.TeacherDashboardResponse
 import com.example.edu_ai.data.remote.ClassReportResponse
 import com.example.edu_ai.data.remote.ApiTimetableResponse
-import com.google.firebase.auth.FirebaseAuth
+import com.example.edu_ai.utils.PreferenceManager
+import android.content.Context
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -7978,8 +8296,8 @@ class EduAIRepository(
 ) {
     private val gson = Gson()
 
-    suspend fun logout() {
-        FirebaseAuth.getInstance().signOut()
+    suspend fun logout(context: Context) {
+        PreferenceManager.clearToken(context)
         dao.clearUsers()
         dao.deleteAllUnits()
         dao.clearAllChatSessions()
@@ -8104,6 +8422,32 @@ class EduAIRepository(
 
 
  <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\repository\EduAIRepository.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\schemas\AuthSchemas.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\schemas\AuthSchemas.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.schemas
+
+import com.google.gson.annotations.SerializedName
+
+data class LoginRequest(
+    @SerializedName("email") val email: String,
+    @SerializedName("password") val password: String
+)
+
+data class TokenResponse(
+    @SerializedName("access_token") val accessToken: String,
+    @SerializedName("token_type") val tokenType: String,
+    @SerializedName("user_id") val userId: String,
+    @SerializedName("username") val username: String,
+    @SerializedName("role") val role: String
+)
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\schemas\AuthSchemas.kt
 
 >>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\components\MarkdownText.kt
 ################################################################################
@@ -8294,7 +8638,7 @@ fun AppNavigation() {
                 userId = userId,
                 onLogout = {
                     scope.launch {
-                        repository.logout()
+                        repository.logout(context)
                         navController.navigate("login") {
                             popUpTo(0) { inclusive = true }
                         }
@@ -8327,7 +8671,7 @@ fun AppNavigation() {
                 viewModel = teacherViewModel,
                 onLogout = {
                     scope.launch {
-                        repository.logout()
+                        repository.logout(context)
                         navController.navigate("login") {
                             popUpTo(0) { inclusive = true }
                         }
@@ -8346,7 +8690,7 @@ fun AppNavigation() {
                 repository = repository,
                 onLogout = {
                     scope.launch {
-                        repository.logout()
+                        repository.logout(context)
                         navController.navigate("login") {
                             popUpTo(0) { inclusive = true }
                         }
@@ -8368,29 +8712,34 @@ VERSION: 1.0.0 | SYSTEM: N/A
 
 package com.example.edu_ai.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.auth.FirebaseAuth
+import com.example.edu_ai.BuildConfig
+import com.example.edu_ai.data.remote.RetrofitClient
+import com.example.edu_ai.schemas.LoginRequest
+import com.example.edu_ai.utils.PreferenceManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var selectedRole by remember { mutableStateOf("Student") }
-    var expanded by remember { mutableStateOf(false) }
-    var isSignUp by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
 
-    val auth = remember { FirebaseAuth.getInstance() }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -8400,13 +8749,13 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = if (isSignUp) "Create Account" else "Trace Learning Portal",
+            text = "Trace Learning Portal",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
         Text(
-            text = if (isSignUp) "Join the Edu-AI community" else "Sign in to access your workspace",
+            text = "Sign in to access your workspace",
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         
@@ -8433,74 +8782,27 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (!isSignUp) {
-            // Role Selector (Only for Login, usually determined by profile on sign up)
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = !expanded }
-            ) {
-                OutlinedTextField(
-                    value = selectedRole,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Account Type") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier.menuAnchor().fillMaxWidth()
-                )
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("👩‍🎓 Student Portal") },
-                        onClick = { selectedRole = "Student"; expanded = false }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("👨‍🏫 Teacher Portal") },
-                        onClick = { selectedRole = "Teacher"; expanded = false }
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(32.dp))
-        }
-
         if (errorMessage != null) {
             Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Login/SignUp Button
+        // Login Button
         Button(
             onClick = { 
                 if (email.isNotBlank() && password.isNotBlank()) {
                     isLoading = true
                     errorMessage = null
-                    if (isSignUp) {
-                        auth.createUserWithEmailAndPassword(email, password)
-                            .addOnCompleteListener { task ->
-                                isLoading = false
-                                if (task.isSuccessful) {
-                                    val user = task.result?.user
-                                    if (user != null) {
-                                        onLoginSuccess("Student", user.uid)
-                                    }
-                                } else {
-                                    errorMessage = task.exception?.message ?: "Sign up failed"
-                                }
-                            }
-                    } else {
-                        auth.signInWithEmailAndPassword(email, password)
-                            .addOnCompleteListener { task ->
-                                isLoading = false
-                                if (task.isSuccessful) {
-                                    val user = task.result?.user
-                                    if (user != null) {
-                                        onLoginSuccess(selectedRole, user.uid)
-                                    }
-                                } else {
-                                    errorMessage = task.exception?.message ?: "Login failed"
-                                }
-                            }
+                    scope.launch {
+                        try {
+                            val response = RetrofitClient.instance.login(LoginRequest(email, password))
+                            PreferenceManager.saveToken(context, response.accessToken)
+                            onLoginSuccess(response.role, response.userId)
+                        } catch (e: Exception) {
+                            errorMessage = "Login failed: ${e.message}"
+                        } finally {
+                            isLoading = false
+                        }
                     }
                 }
             },
@@ -8510,14 +8812,18 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
             } else {
-                Text(if (isSignUp) "SIGN UP" else "LOGIN", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("LOGIN", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        TextButton(onClick = { isSignUp = !isSignUp }) {
-            Text(if (isSignUp) "Already have an account? Login" else "Don't have an account? Sign Up")
+        TextButton(onClick = { 
+            val signupUrl = BuildConfig.BACKEND_BASE_URL + "signup"
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(signupUrl))
+            context.startActivity(intent)
+        }) {
+            Text("Don't have an account? Sign Up in Browser")
         }
     }
 }
@@ -11772,6 +12078,46 @@ fun TeacherDashboard(onLogout: () -> Unit) {
 }
 
  <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\ui\theme\screens\TeacherDashboard.kt
+
+>>>--- START_FILE_BLOCK: app\src\main\java\com\example\edu_ai\utils\PreferenceManager.kt
+################################################################################
+FILE: app\src\main\java\com\example\edu_ai\utils\PreferenceManager.kt
+VERSION: 1.0.0 | SYSTEM: N/A
+################################################################################
+
+package com.example.edu_ai.utils
+
+import android.content.Context
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+
+object PreferenceManager {
+    private const val PREF_NAME = "edu_ai_secure_prefs"
+    private const val KEY_AUTH_TOKEN = "auth_token"
+
+    private fun getSharedPrefs(context: Context) = EncryptedSharedPreferences.create(
+        context,
+        PREF_NAME,
+        MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
+
+    fun saveToken(context: Context, token: String) {
+        getSharedPrefs(context).edit().putString(KEY_AUTH_TOKEN, token).apply()
+    }
+
+    fun getToken(context: Context): String? {
+        return getSharedPrefs(context).getString(KEY_AUTH_TOKEN, null)
+    }
+
+    fun clearToken(context: Context) {
+        getSharedPrefs(context).edit().remove(KEY_AUTH_TOKEN).apply()
+    }
+}
+
+
+ <<<--- END_FILE_BLOCK: app\src\main\java\com\example\edu_ai\utils\PreferenceManager.kt
 
 >>>--- START_FILE_BLOCK: app\src\main\res\drawable\ic_launcher_background.xml
 ################################################################################
