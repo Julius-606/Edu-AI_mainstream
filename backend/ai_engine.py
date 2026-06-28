@@ -33,17 +33,29 @@ while True:
     GEMINI_API_KEYS.append(key)
     i += 1
 
+# Fallback keys if none found (Safety Net)
+if not GEMINI_API_KEYS:
+    GEMINI_API_KEYS = [
+        "AIzaSyDmvjVkFmt0RoTMNER8fYoIKfy7Pkw1sfo",
+        "AIzaSyDgvt1qfR_IG-UN__WcOPj1hv5s1IVUWHY"
+    ]
+
 class AiEngine:
     def __init__(self):
         self.key_index = 0
         # Recommended sure-bet models
-        self.model_variants = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]
+        self.model_variants = [
+            "gemini-2.0-flash",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-1.5-flash"
+        ]
         self.logs = [] # Internal store for recent activities
 
         if GEMINI_API_KEYS:
             self._create_client()
         else:
-            logger.error("❌ No Gemini API keys found in environment variables.")
+            logger.error("❌ No Gemini API keys found.")
 
     def _create_client(self):
         key = GEMINI_API_KEYS[self.key_index % len(GEMINI_API_KEYS)]
@@ -53,6 +65,7 @@ class AiEngine:
         if not GEMINI_API_KEYS: return
         self.key_index = (self.key_index + 1) % len(GEMINI_API_KEYS)
         self._create_client()
+        logger.info(f"🔄 Swapped to API Key Index: {self.key_index % len(GEMINI_API_KEYS)}")
 
     def _log_performance(self, model, key_idx, duration, status, task):
         log_entry = {
@@ -71,6 +84,7 @@ class AiEngine:
 
         task_name = "Chat/General"
         for variant in self.model_variants:
+            # Try each key for each model variant
             for _ in range(len(GEMINI_API_KEYS)):
                 start_time = time.time()
                 current_key_idx = self.key_index % len(GEMINI_API_KEYS)
@@ -94,13 +108,15 @@ class AiEngine:
                     err_msg = str(e).lower()
                     self._log_performance(variant, current_key_idx, duration, "FAILED", task_name)
 
-                    if any(x in err_msg for x in ["429", "quota", "limit", "401", "403", "expired", "permission", "invalid"]):
-                        self._rotate_key()
-                        time.sleep(0.5)
-                        continue
-                    else:
-                        logger.error(f"Error in ask: {e}")
+                    # If it's a 404, this specific model name is bad for this API, move to next variant
+                    if "404" in err_msg:
+                        logger.warning(f"⚠️ Model {variant} not found. Trying next variant...")
                         break
+
+                    # For quota or auth issues, rotate key and retry SAME variant
+                    self._rotate_key()
+                    time.sleep(1) # Small backoff
+                    continue
         return None
 
     def generate_quiz(self, unit_name, student_level, topic=None):
@@ -151,14 +167,23 @@ class AiEngine:
 
                     if response and response.text:
                         raw_text = response.text.strip()
+                        # Clean markdown if present
+                        if "```json" in raw_text:
+                            raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+
                         duration = time.time() - start_time
                         self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
                         return json.loads(raw_text)
                 except Exception as e:
                     duration = time.time() - start_time
+                    err_msg = str(e).lower()
                     self._log_performance(variant, current_key_idx, duration, "FAILED", task_name)
+
+                    if "404" in err_msg:
+                        break
+
                     self._rotate_key()
-                    time.sleep(0.5)
+                    time.sleep(1)
                     continue
         return None
 
@@ -205,20 +230,16 @@ class AiEngine:
         }}
         """
 
-        for variant in self.model_variants:
+        # Using ask as a wrapper for better rotation/variant handling
+        response = self.ask(prompt)
+        if response:
             try:
-                config = types.GenerateContentConfig(
-                    response_mime_type="application/json"
-                )
-                response = self.client.models.generate_content(
-                    model=variant,
-                    contents=prompt,
-                    config=config
-                )
-                if response and response.text:
-                    return json.loads(response.text.strip())
+                raw_text = response.strip()
+                if "```json" in raw_text:
+                    raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+                return json.loads(raw_text)
             except:
-                continue
+                logger.error("Failed to parse timetable JSON")
         return None
 
     def get_recommendations(self, user_info, quiz_history, active_units):
