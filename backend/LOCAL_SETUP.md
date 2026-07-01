@@ -7,15 +7,24 @@ This guide helps you run and test the Trace Learning Backend on your local machi
 - **.env file**: Ensure your `backend/.env` has the `GEMINI_API_KEYS` (I have already updated this for you).
 
 ## 2. Starting the Server
-Open a terminal in the `backend` folder and run:
-```bash
-# Activate virtual environment
-.venv\Scripts\activate
+You can now easily switch between the new **Modular** version and the **Legacy** version.
 
-# Run the server
-python main.py
+### Option A: Run Modular Version (Recommended)
+```bash
+python run_modular.py
 ```
+
+### Option B: Run Legacy Version (Old Flat Structure)
+```bash
+python run_legacy.py
+```
+
 The server will start at `http://127.0.0.1:8000`.
+
+## 3. Developer Keys
+- **Internal API Key**: Found in `local.properties` (Root directory) and `.env`. 
+  - Value: `64923e4d8f1a2c5b9e0f3d7a6c5b9eX0f3d7a6c5b9e0f3d7a`
+- **Gemini API Keys**: Found in `backend/.env`. These are used for AI features.
 
 ## 3. Running Mock Tests
 While the server is running, open **another terminal** and run the mock test script. This script mimics all the calls the mobile app makes (Login, Dashboard, AI Chat, Quiz, etc.).
