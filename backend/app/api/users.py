@@ -18,6 +18,11 @@ def find_user(user_id_or_name: str, db: Session):
         user = db.query(models.User).filter(models.User.username == str(user_id_or_name)).first()
     return user
 
+def user_response(user: models.User) -> schemas.UserResponseSchema:
+    response = schemas.UserResponseSchema.model_validate(user)
+    response.active_units = user.active_units_list
+    return response
+
 @router.get("/{user_id}", response_model=schemas.UserResponseSchema)
 def get_user(user_id: str, db: Session = Depends(get_db)):
     user = find_user(user_id, db)
@@ -29,6 +34,8 @@ def get_user(user_id: str, db: Session = Depends(get_db)):
         db.add(user)
         db.commit()
         db.refresh(user)
+
+    return user_response(user)
 
 @router.get("/{user_id}/dashboard", response_model=schemas.DashboardResponse)
 def get_dashboard(user_id: str, db: Session = Depends(get_db)):
@@ -121,70 +128,5 @@ def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Dep
 
     db.commit()
     db.refresh(user)
-@router.get("/{user_id}/dashboard", response_model=schemas.DashboardResponse)
-def get_dashboard(user_id: str, db: Session = Depends(get_db)):
-    user = find_user(user_id, db)
-    if not user:
-        user = models.User(username=user_id, role="Student")
-        db.add(user)
-        db.commit()
-        db.refresh(user)
 
-    active_units = db.query(models.Unit).filter(models.Unit.owner_id == user.id, models.Unit.is_active == True).all()
-    if not active_units:
-        defaults = ["Biochemistry II", "General Surgery", "Internal Medicine"]
-        for name in defaults:
-            db.add(models.Unit(name=name, owner_id=user.id))
-        db.commit()
-        active_units = db.query(models.Unit).filter(models.Unit.owner_id == user.id, models.Unit.is_active == True).all()
-
-    unit_names = [u.name for u in active_units]
-    quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
-    total_quizzes = len(quizzes)
-    average_pnl = sum([q.pnl for q in quizzes]) / total_quizzes if total_quizzes > 0 else 0.0
-    chat_messages = db.query(models.ChatMessage).filter(models.ChatMessage.owner_id == user.id).order_by(models.ChatMessage.id.asc()).all()
-
-    return schemas.DashboardResponse(
-        username=user.username,
-        role=user.role,
-        sensory_mode=user.sensory_mode,
-        semester_status=user.semester_status,
-        difficulty=user.difficulty,
-        ai_persona=user.ai_persona,
-        active_units=unit_names,
-        average_pnl=round(average_pnl, 2),
-        total_quizzes=total_quizzes,
-        quiz_history=[schemas.QuizHistoryResponse(unit_name=q.unit_name, pnl=q.pnl, timestamp=q.timestamp) for q in quizzes],
-        chat_history=[schemas.ChatMessageResponse(role=c.role, content=c.content, timestamp=c.timestamp or "") for c in chat_messages]
-    )
-
-@router.get("/{user_id}/timetable", response_model=schemas.TimetableResponse)
-def get_ai_timetable(user_id: str, db: Session = Depends(get_db)):
-    user = find_user(user_id, db)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    one_week_ago = time.time() - (7 * 24 * 60 * 60)
-    existing_timetable = db.query(models.Timetable).filter(models.Timetable.owner_id == user.id, models.Timetable.timestamp > one_week_ago).order_by(models.Timetable.timestamp.desc()).first()
-
-    if existing_timetable:
-        return schemas.TimetableResponse(weekly_plan=existing_timetable.weekly_plan_json, ai_brief=existing_timetable.ai_brief)
-
-    last_timetable = db.query(models.Timetable).filter(models.Timetable.owner_id == user.id).order_by(models.Timetable.timestamp.desc()).first()
-    previous_plan = last_timetable.weekly_plan_json if last_timetable else None
-    quiz_history = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
-    active_units = [u.name for u in user.units if u.is_active]
-    recent_sessions = db.query(models.ChatSession).filter(models.ChatSession.owner_id == user.id).order_by(models.ChatSession.id.desc()).limit(10).all()
-    chat_titles = [s.title for s in recent_sessions]
-
-    user_info = {"username": user.username, "semester_status": user.semester_status}
-    new_timetable_data = ai_service.generate_timetable(user_info, quiz_history, active_units, chat_titles, previous_plan)
-
-    if not new_timetable_data:
-        raise HTTPException(status_code=500, detail="The AI is still drafting your plan. Try again in a moment.")
-
-    new_db_timetable = models.Timetable(owner_id=user.id, weekly_plan_json=new_timetable_data["weekly_plan"], ai_brief=new_timetable_data["ai_brief"], timestamp=time.time())
-    db.add(new_db_timetable)
-    db.commit()
-
-    return schemas.TimetableResponse(weekly_plan=new_timetable_data["weekly_plan"], ai_brief=new_timetable_data["ai_brief"])
+    return user_response(user)

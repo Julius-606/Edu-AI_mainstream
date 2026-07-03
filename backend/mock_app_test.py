@@ -1,11 +1,18 @@
 import requests
 import json
 import time
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # --- CONFIGURATION ---
 BASE_URL = "http://127.0.0.1:8000"
-INTERNAL_API_KEY = "DEVELOPMENT_KEY"
-TEST_EMAIL = "test@example.com"
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "DEVELOPMENT_KEY")
+TEST_RUN_ID = time.time_ns()
+TEST_USERNAME = f"LocalTester{TEST_RUN_ID}"
+TEST_EMAIL = f"test+{TEST_RUN_ID}@example.com"
 TEST_PASSWORD = "password123"
 HEADERS = {
     "X-Internal-Api-Key": INTERNAL_API_KEY,
@@ -28,23 +35,23 @@ def log_response(name, response):
         print(response.text[:200])
 
 def run_tests():
-    print("🚀 Starting Modular Mock App Call Suite...")
+    print("Starting Modular Mock App Call Suite...")
 
     # 1. Signup
     print("\n1. Testing Signup...")
     signup_data = {
-        "username": "LocalTester",
+        "username": TEST_USERNAME,
         "email": TEST_EMAIL,
         "password": TEST_PASSWORD,
         "role": "Student"
     }
     r = requests.post(f"{BASE_URL}/api/auth/signup-form", data=signup_data)
     if r.status_code == 200:
-        print("✅ Signup Success")
+        print("Signup Success")
     elif r.status_code == 400:
-        print("ℹ️ Signup: User already exists (continuing...)")
+        print("Signup: User already exists (continuing...)")
     else:
-        print(f"❌ Signup Failed: {r.status_code}")
+        print(f"Signup Failed: {r.status_code}")
 
     # 2. Login
     print("\n2. Testing Login...")
@@ -55,7 +62,7 @@ def run_tests():
         token = token_data["access_token"]
         user_id = token_data["user_id"]
         HEADERS["Authorization"] = f"Bearer {token}"
-        print(f"✅ Login Success! User ID: {user_id}")
+        print(f"Login Success! User ID: {user_id}")
     else:
         log_response("Login Error", r)
         return
@@ -109,12 +116,12 @@ def run_tests():
     r = requests.get(f"{BASE_URL}/api/parent/dashboard/{user_id}", headers=HEADERS)
     log_response("Parent Dashboard", r)
 
-    print("\n🏁 Mock Testing Complete.")
+    print("\nMock Testing Complete.")
 
 if __name__ == "__main__":
     try:
         requests.get(BASE_URL, timeout=2)
         run_tests()
     except requests.exceptions.ConnectionError:
-        print(f"❌ Error: Backend server not found at {BASE_URL}")
+        print(f"Error: Backend server not found at {BASE_URL}")
         print("Please run 'python -m app.main' in a separate terminal first!")

@@ -35,10 +35,11 @@ class AiService:
     def __init__(self):
         self.key_index = 0
         self.model_variants = [
-            "gemini-2.0-flash",
+            "gemini-flash-latest",
             "gemini-2.5-flash",
+            "gemini-flash-lite-latest",
+            "gemini-2.5-flash-lite",
             "gemini-2.0-flash-lite",
-            "gemini-1.5-flash"
         ]
         self.logs = []
 

@@ -44,6 +44,8 @@ To run this project, you must configure the following secrets/environment variab
 | Variable | Description |
 | :--- | :--- |
 | `DATABASE_URL` | Neon.tech PostgreSQL connection string. |
+| `INTERNAL_API_KEY` | Shared backend/app API key sent as `X-Internal-Api-Key`. Must match the Android build property. |
+| `JWT_SECRET_KEY` | Secret used to sign login tokens. Keep this stable across deploys or existing sessions will be logged out. |
 | `GEMINI_API_KEY_1` | Primary Google Gemini API Key. |
 | `GEMINI_API_KEY_2` | Secondary Key (for rotation/failover). |
 | `GEMINI_API_KEY_N` | Additional keys as needed. |

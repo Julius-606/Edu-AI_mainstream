@@ -10,7 +10,7 @@ import retrofit2.http.Query
 
 interface EduAIApi {
 
-    @GET("api/user/{user_id}/dashboard")
+    @GET("api/users/{user_id}/dashboard")
     suspend fun getDashboard(@Path("user_id") userId: String): DashboardResponse
 
     // --- AI Endpoints ---
@@ -27,10 +27,10 @@ interface EduAIApi {
     @POST("api/quiz/record")
     suspend fun recordQuiz(@Body request: QuizRecordRequest): Map<String, String>
 
-    @GET("api/user/{user_id}/recommendations")
+    @GET("api/ai/recommendations/{user_id}")
     suspend fun getRecommendations(@Path("user_id") userId: String): RecommendationResponse
 
-    @GET("api/user/{user_id}/timetable")
+    @GET("api/users/{user_id}/timetable")
     suspend fun getTimetable(@Path("user_id") userId: String): ApiTimetableResponse
 
     @POST("api/auth/login")

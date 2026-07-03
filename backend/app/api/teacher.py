@@ -71,6 +71,24 @@ def get_teacher_dashboard(db: Session = Depends(get_db)):
         class_health_score=round(class_health, 2)
     )
 
+@router.post("/class-report", response_model=schemas.ClassReportResponse)
+def generate_class_report(db: Session = Depends(get_db)):
+    dashboard = get_teacher_dashboard(db)
+    at_risk_students = dashboard.action_required_queue[:10]
+    student_lines = [
+        f"{student.username}: {student.risk_reason or 'No risk reason recorded'}"
+        for student in at_risk_students
+    ]
+    prompt = (
+        "Create a concise teacher-facing class report. Include class health, "
+        "top intervention priorities, and recommended next actions.\n"
+        f"Total active students: {dashboard.total_active_students}\n"
+        f"Class health score: {dashboard.class_health_score}%\n"
+        f"Action queue:\n" + "\n".join(student_lines)
+    )
+    report = ai_service.ask(prompt, system_instruction="You are an academic analytics assistant.")
+    return schemas.ClassReportResponse(report=report or "Class report is temporarily unavailable.")
+
 @router.post("/send-report/{student_id}")
 def send_student_report(student_id: int, db: Session = Depends(get_db)):
     student = db.query(models.User).filter(models.User.id == student_id).first()
