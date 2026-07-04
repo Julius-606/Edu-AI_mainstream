@@ -57,7 +57,21 @@ class Module(Base):
 
     unit_id = Column(Integer, ForeignKey("units.id"))
     unit = relationship("Unit", back_populates="modules")
-    subtopics = relationship("Subtopic", back_populates="module", cascade="all, delete-orphan")
+
+    # NEW: Module -> Topic
+    topics = relationship("Topic", back_populates="module", cascade="all, delete-orphan")
+
+class Topic(Base):
+    __tablename__ = "topics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), index=True)
+
+    module_id = Column(Integer, ForeignKey("modules.id"))
+    module = relationship("Module", back_populates="topics")
+
+    # Topic -> Subtopic
+    subtopics = relationship("Subtopic", back_populates="topic", cascade="all, delete-orphan")
 
 class Subtopic(Base):
     __tablename__ = "subtopics"
@@ -66,8 +80,33 @@ class Subtopic(Base):
     name = Column(String(200), index=True)
     is_completed = Column(Boolean, default=False)
 
-    module_id = Column(Integer, ForeignKey("modules.id"))
-    module = relationship("Module", back_populates="subtopics")
+    topic_id = Column(Integer, ForeignKey("topics.id"))
+    topic = relationship("Topic", back_populates="subtopics")
+
+    # Subtopic -> LearningObjective
+    learning_objectives = relationship("LearningObjective", back_populates="subtopic", cascade="all, delete-orphan")
+
+class LearningObjective(Base):
+    __tablename__ = "learning_objectives"
+
+    id = Column(Integer, primary_key=True, index=True)
+    description = Column(Text)
+    is_completed = Column(Boolean, default=False)
+
+    subtopic_id = Column(Integer, ForeignKey("subtopics.id"))
+    subtopic = relationship("Subtopic", back_populates="learning_objectives")
+
+class UserSyllabusProgress(Base):
+    __tablename__ = "user_syllabus_progress"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    node_id = Column(Integer) # Can be Unit, Module, Topic, or Subtopic ID
+    node_type = Column(String(50)) # "unit", "module", "topic", "subtopic"
+    status = Column(String(50), default="Locked") # "Locked", "Unlocked", "In_Progress", "Completed"
+    last_studied_at = Column(Float, nullable=True)
+
+    user = relationship("User")
 
 class QuizHistory(Base):
     __tablename__ = "quiz_history"

@@ -1,0 +1,25 @@
+# Task Management
+
+- [x] Research and Planning
+    - [x] Explore backend code (main.py, models.py, database.py)
+    - [x] Explore frontend code (RetrofitClient, StudentDashboard, ModuleScreen)
+    - [x] Design new database schema for hierarchical syllabus
+    - [x] Design frontend UI for concentric rings and dynamic background
+- [x] Backend Implementation (Phase 3.1, 3.2, 3.3)
+    - [x] Setup Tests Folder
+        - [x] Create `backend/tests/` directory
+        - [x] Create `backend/tests/README.md`
+    - [x] Evolve Database Schema (models.py)
+    - [x] Implement Ingestion Engine parser (ingestion_engine.py)
+    - [x] Update/Add API Endpoints (main.py)
+    - [x] Update AI Engine to use new structure (ai_engine.py)
+- [x] Frontend Implementation (Phase 3.4 & UI Requests)
+    - [x] Implement Base URL Fallback in RetrofitClient
+    - [x] Create Dynamic Background component
+    - [x] Create Concentric Rings Progress component
+    - [x] Redesign Student Dashboard
+    - [x] Update ModuleScreen (Remove redundant tabs)
+- [x] Verification
+    - [x] Verify Backend API/Parsing
+    - [x] Verify Frontend UI Structure
+    - [x] Create Walkthrough

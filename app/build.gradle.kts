@@ -10,8 +10,10 @@ android {
     compileSdk = 35
 
     val backendBaseUrl = (project.findProperty("backendBaseUrl") as? String)
+        ?: "https://huggingface.co/spaces/Agent606/Edu-AI/"
+    val fallbackBackendBaseUrl = (project.findProperty("fallbackBackendBaseUrl") as? String)
         ?: "http://10.0.2.2:8000/"
-    
+
     val internalApiKey = (project.findProperty("INTERNAL_API_KEY") as? String) ?: "DEVELOPMENT_KEY"
 
     defaultConfig {
@@ -22,6 +24,7 @@ android {
         versionName = "1.0"
 
         buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
+        buildConfigField("String", "FALLBACK_BACKEND_BASE_URL", "\"$fallbackBackendBaseUrl\"")
         buildConfigField("String", "INTERNAL_API_KEY", "\"$internalApiKey\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

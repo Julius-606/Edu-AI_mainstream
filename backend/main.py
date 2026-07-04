@@ -391,6 +391,55 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db), current_user: mod
 
     chat_messages = db.query(models.ChatMessage).filter(models.ChatMessage.owner_id == user.id).order_by(models.ChatMessage.id.asc()).all()
 
+    # Calculate hierarchical progress for each unit
+    hierarchical_progress = []
+    for unit in active_units:
+        # Simple percentage calculation: (completed subtopics / total subtopics)
+        all_subtopics = db.query(models.Subtopic).join(models.Topic).join(models.Module).filter(models.Module.unit_id == unit.id).all()
+        completed_subtopics = [s for s in all_subtopics if s.is_completed]
+        unit_progress = (len(completed_subtopics) / len(all_subtopics) * 100) if all_subtopics else 0.0
+
+        # Find "current" progress pointers (last studied or first incomplete)
+        # For simplicity, we'll pick the first incomplete module/topic/subtopic
+        current_module = next((m for m in unit.modules if any(not s.is_completed for t in m.topics for s in t.subtopics)), unit.modules[0] if unit.modules else None)
+
+        mod_id = current_module.id if current_module else None
+        mod_prog = 0.0
+        top_id = None
+        top_prog = 0.0
+        sub_id = None
+        sub_prog = 0.0
+
+        if current_module:
+            m_subtopics = [s for t in current_module.topics for s in t.subtopics]
+            m_completed = [s for s in m_subtopics if s.is_completed]
+            mod_prog = (len(m_completed) / len(m_subtopics) * 100) if m_subtopics else 0.0
+
+            current_topic = next((t for t in current_module.topics if any(not s.is_completed for s in t.subtopics)), current_module.topics[0] if current_module.topics else None)
+            if current_topic:
+                top_id = current_topic.id
+                t_subtopics = current_topic.subtopics
+                t_completed = [s for s in t_subtopics if s.is_completed]
+                top_prog = (len(t_completed) / len(t_subtopics) * 100) if t_subtopics else 0.0
+
+                current_subtopic = next((s for s in current_topic.subtopics if not s.is_completed), current_topic.subtopics[0] if current_topic.subtopics else None)
+                if current_subtopic:
+                    sub_id = current_subtopic.id
+                    objs = current_subtopic.learning_objectives
+                    o_completed = [o for o in objs if o.is_completed]
+                    sub_prog = (len(o_completed) / len(objs) * 100) if objs else 0.0
+
+        hierarchical_progress.append(schemas.HierarchicalProgress(
+            unit_id=unit.id,
+            unit_progress=round(unit_progress, 2),
+            current_module_id=mod_id,
+            module_progress=round(mod_prog, 2),
+            current_topic_id=top_id,
+            topic_progress=round(top_prog, 2),
+            current_subtopic_id=sub_id,
+            subtopic_progress=round(sub_prog, 2)
+        ))
+
     return schemas.DashboardResponse(
         username=user.username,
         role=user.role,
@@ -402,7 +451,8 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db), current_user: mod
         average_pnl=round(average_pnl, 2),
         total_quizzes=total_quizzes,
         quiz_history=[schemas.QuizHistoryResponse(unit_name=q.unit_name, pnl=q.pnl, timestamp=q.timestamp) for q in quizzes],
-        chat_history=[schemas.ChatMessageResponse(role=c.role, content=c.content, timestamp=c.timestamp or "") for c in chat_messages]
+        chat_history=[schemas.ChatMessageResponse(role=c.role, content=c.content, timestamp=c.timestamp or "") for c in chat_messages],
+        hierarchical_progress=hierarchical_progress
     )
 
 @app.get("/api/user/{user_id}/timetable", response_model=schemas.TimetableResponse, tags=["Activity & Planning"])
@@ -561,10 +611,33 @@ def update_subtopic_progress(subtopic_id: int, is_completed: bool, db: Session =
         raise HTTPException(status_code=404, detail="Subtopic not found")
 
     subtopic.is_completed = is_completed
+
+    # Auto-complete learning objectives if subtopic is completed
+    if is_completed:
+        db.query(models.LearningObjective).filter(models.LearningObjective.subtopic_id == subtopic_id).update({"is_completed": True})
+
     db.commit()
     db.refresh(subtopic)
 
     return {"status": "success", "subtopic_id": subtopic_id, "is_completed": is_completed}
+
+@app.patch("/api/v1/progress/objective/{objective_id}", tags=["Structured Learning"])
+def update_objective_progress(objective_id: int, is_completed: bool, db: Session = Depends(get_db)):
+    objective = db.query(models.LearningObjective).filter(models.LearningObjective.id == objective_id).first()
+    if not objective:
+        raise HTTPException(status_code=404, detail="Learning Objective not found")
+
+    objective.is_completed = is_completed
+    db.commit()
+
+    # Check if all objectives in subtopic are completed
+    subtopic = objective.subtopic
+    all_done = all([obj.is_completed for obj in subtopic.learning_objectives])
+    if all_done != subtopic.is_completed:
+        subtopic.is_completed = all_done
+        db.commit()
+
+    return {"status": "success", "objective_id": objective_id, "is_completed": is_completed}
 
 @app.post("/api/v1/syllabuses/upload", tags=["Structured Learning"])
 def upload_syllabus(payload: dict, user_id: str, db: Session = Depends(get_db)):
@@ -583,21 +656,39 @@ def upload_syllabus(payload: dict, user_id: str, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(new_unit)
 
-        for topic_data in unit_data.get("topics", []):
+        for module_data in unit_data.get("modules", []):
             new_module = models.Module(
-                name=topic_data.get("topic_title"),
+                name=module_data.get("module_title"),
                 unit_id=new_unit.id
             )
             db.add(new_module)
             db.commit()
             db.refresh(new_module)
 
-            for subtopic_name in topic_data.get("subtopics", []):
-                new_subtopic = models.Subtopic(
-                    name=subtopic_name,
+            for topic_data in module_data.get("topics", []):
+                new_topic = models.Topic(
+                    name=topic_data.get("topic_title"),
                     module_id=new_module.id
                 )
-                db.add(new_subtopic)
+                db.add(new_topic)
+                db.commit()
+                db.refresh(new_topic)
+
+                for subtopic_data in topic_data.get("subtopics", []):
+                    new_subtopic = models.Subtopic(
+                        name=subtopic_data.get("subtopic_title"),
+                        topic_id=new_topic.id
+                    )
+                    db.add(new_subtopic)
+                    db.commit()
+                    db.refresh(new_subtopic)
+
+                    for objective_desc in subtopic_data.get("learning_objectives", []):
+                        new_obj = models.LearningObjective(
+                            description=objective_desc,
+                            subtopic_id=new_subtopic.id
+                        )
+                        db.add(new_obj)
 
         db.commit()
         created_units.append(new_unit.id)

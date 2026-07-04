@@ -18,17 +18,32 @@ class UnitUpdate(BaseModel):
     is_active: Optional[bool] = None
     category: Optional[str] = None
 
+class LearningObjectiveResponse(BaseModel):
+    id: int
+    description: str
+    is_completed: bool
+    class Config:
+        from_attributes = True
+
 class SubtopicResponse(BaseModel):
     id: int
     name: str
     is_completed: bool
+    learning_objectives: List[LearningObjectiveResponse] = []
+    class Config:
+        from_attributes = True
+
+class TopicResponse(BaseModel):
+    id: int
+    name: str
+    subtopics: List[SubtopicResponse] = []
     class Config:
         from_attributes = True
 
 class ModuleResponse(BaseModel):
     id: int
     name: str
-    subtopics: List[SubtopicResponse]
+    topics: List[TopicResponse] = []
     class Config:
         from_attributes = True
 
@@ -36,18 +51,19 @@ class UnitResponse(UnitBase):
     id: int
     owner_id: int
     modules: List[ModuleResponse] = []
+    progress_percentage: float = 0.0
     class Config:
         from_attributes = True
 
-class QuizHistoryResponse(BaseModel):
-    unit_name: str
-    pnl: float
-    timestamp: str
-
-class ChatMessageResponse(BaseModel):
-    role: str
-    content: str
-    timestamp: str
+class HierarchicalProgress(BaseModel):
+    unit_id: int
+    unit_progress: float
+    current_module_id: Optional[int] = None
+    module_progress: float = 0.0
+    current_topic_id: Optional[int] = None
+    topic_progress: float = 0.0
+    current_subtopic_id: Optional[int] = None
+    subtopic_progress: float = 0.0
 
 class DashboardResponse(BaseModel):
     username: str
@@ -61,6 +77,7 @@ class DashboardResponse(BaseModel):
     total_quizzes: int
     quiz_history: List[QuizHistoryResponse]
     chat_history: List[ChatMessageResponse]
+    hierarchical_progress: List[HierarchicalProgress] = []
 
 class ChaosRequest(BaseModel):
     unit: str

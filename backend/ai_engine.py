@@ -119,14 +119,20 @@ class AiEngine:
                     continue
         return None
 
-    def generate_quiz(self, unit_name, student_level, topic=None):
+    def generate_quiz(self, unit_name, student_level, topic=None, subtopic=None):
         if not GEMINI_API_KEYS: return None
 
         num_questions = random.randint(7, 12)
         task_name = f"Quiz: {unit_name}"
-        focus_clause = f" specifically focusing on '{topic}'" if topic else ""
+
+        focus_context = ""
+        if subtopic:
+            focus_context = f" specifically focusing on the subtopic '{subtopic}' within '{topic}'"
+        elif topic:
+            focus_context = f" specifically focusing on the topic '{topic}'"
+
         prompt = f"""
-        Generate a {num_questions}-question rigorous academic multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
+        Generate a {num_questions}-question rigorous academic multiple choice quiz for the unit: '{unit_name}'{focus_context}.
         Level: {student_level}.
 
         CRITICAL INSTRUCTIONS:
@@ -242,23 +248,30 @@ class AiEngine:
                 logger.error("Failed to parse timetable JSON")
         return None
 
-    def get_recommendations(self, user_info, quiz_history, active_units):
+    def get_recommendations(self, user_info, quiz_history, active_units, current_progress=None):
         if not GEMINI_API_KEYS: return "AI Guidance unavailable."
 
         history_summary = ""
         for q in quiz_history:
             history_summary += f"- {q.unit_name}: {q.pnl}% score\n"
 
+        progress_context = ""
+        if current_progress:
+            progress_context = f"Current Progress Data:\n{json.dumps(current_progress)}\n"
+
         prompt = f"""
         Student: {user_info['username']}
         Persona: {user_info['ai_persona']}
         Level: {user_info['semester_status']}
         Active Units: {', '.join(active_units)}
+
+        {progress_context}
+
         Recent Performance:
         {history_summary if history_summary else "No assessments taken yet."}
 
-        Based on the above, provide a concise (max 3 sentences) study strategy or recommendation.
-        Act as the assigned AI Persona. Focus on specific units or areas of improvement.
+        Based on the above hierarchy and performance, provide a concise (max 3 sentences) study strategy.
+        Act as the assigned AI Persona. Identify exactly which Module or Topic they should focus on next.
         """
 
         return self.ask(prompt)

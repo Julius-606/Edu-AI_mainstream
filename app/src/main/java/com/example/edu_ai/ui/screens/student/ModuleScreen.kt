@@ -50,13 +50,12 @@ fun ModuleScreen(
         studentViewModel.refreshDashboard(userId)
     }
     
-    val tabs = listOf("Chat", "Notes", "Vault", "Quiz", "Zenith")
+    val tabs = listOf("Chat", "Notes", "Vault", "Quiz")
     val icons = listOf(
         Icons.AutoMirrored.Filled.Chat,
         Icons.Default.StickyNote2,
         Icons.Default.History,
-        Icons.Default.LocalFireDepartment,
-        Icons.Default.AccountCircle
+        Icons.Default.LocalFireDepartment
     )
 
     Scaffold(
@@ -131,21 +130,6 @@ fun ModuleScreen(
                                 user = uiState.user,
                                 units = uiState.units,
                                 viewModel = quizViewModel
-                            )
-                        }
-                    }
-                    4 -> {
-                        if (uiState.user != null) {
-                            val progressViewModel: ProgressViewModel = viewModel(
-                                factory = ProgressViewModel.provideFactory(uiState.user!!)
-                            )
-                            val timetableViewModel: TimetableViewModel = viewModel(
-                                factory = TimetableViewModel.provideFactory(uiState.user!!)
-                            )
-                            ZenithTab(
-                                user = uiState.user!!, 
-                                progressViewModel = progressViewModel,
-                                timetableViewModel = timetableViewModel
                             )
                         }
                     }
