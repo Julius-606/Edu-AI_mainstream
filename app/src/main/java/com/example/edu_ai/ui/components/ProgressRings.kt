@@ -1,12 +1,13 @@
 package com.example.edu_ai.ui.components
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,30 +30,46 @@ fun ProgressRings(
     learningObjectives: List<String>,
     modifier: Modifier = Modifier
 ) {
+    // Animation state for the rings
+    var animationStarted by remember { mutableStateOf(false) }
+    
+    val animatedPercentages = rings.map { ring ->
+        animateFloatAsState(
+            targetValue = if (animationStarted) ring.percentage else 0f,
+            animationSpec = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+            label = "RingAnimation_${ring.label}"
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        animationStarted = true
+    }
+
     Box(
-        modifier = modifier.size(300.dp),
+        modifier = modifier.size(240.dp),
         contentAlignment = Alignment.Center
     ) {
         // Draw the concentric rings
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokeWidth = 12.dp.toPx()
-            val spacing = 20.dp.toPx()
+            val strokeWidth = 10.dp.toPx()
+            val spacing = 18.dp.toPx()
             
             rings.forEachIndexed { index, ring ->
                 val radius = (size.minDimension / 2) - (index * spacing) - (strokeWidth / 2)
                 
                 // Background Track
                 drawCircle(
-                    color = ring.color.copy(alpha = 0.1f),
+                    color = ring.color.copy(alpha = 0.08f),
                     radius = radius,
                     style = Stroke(width = strokeWidth)
                 )
                 
                 // Progress Arc
+                val sweepAngle = (animatedPercentages[index].value / 100f) * 360f
                 drawArc(
                     color = ring.color,
                     startAngle = -90f,
-                    sweepAngle = (ring.percentage / 100f) * 360f,
+                    sweepAngle = sweepAngle,
                     useCenter = false,
                     topLeft = center.copy(x = center.x - radius, y = center.y - radius),
                     size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
@@ -64,30 +81,31 @@ fun ProgressRings(
         // Center Content: Scrollable Learning Objectives
         Column(
             modifier = Modifier
-                .size(140.dp)
-                .padding(8.dp),
+                .size(110.dp)
+                .padding(4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "Objectives",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
+                text = "FOCUS",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 items(learningObjectives) { objective ->
                     Text(
-                        text = "• $objective",
-                        fontSize = 10.sp,
-                        lineHeight = 12.sp,
+                        text = objective,
+                        fontSize = 9.sp,
+                        lineHeight = 11.sp,
+                        fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(vertical = 2.dp)
+                        modifier = Modifier.padding(vertical = 1.dp)
                     )
                 }
             }

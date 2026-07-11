@@ -7,6 +7,7 @@ import androidx.security.crypto.MasterKey
 object PreferenceManager {
     private const val PREF_NAME = "edu_ai_secure_prefs"
     private const val KEY_AUTH_TOKEN = "auth_token"
+    private const val KEY_DEVELOPER_MODE = "developer_mode"
 
     private fun getSharedPrefs(context: Context) = EncryptedSharedPreferences.create(
         context,
@@ -26,5 +27,13 @@ object PreferenceManager {
 
     fun clearToken(context: Context) {
         getSharedPrefs(context).edit().remove(KEY_AUTH_TOKEN).apply()
+    }
+
+    fun saveDeveloperMode(context: Context, enabled: Boolean) {
+        getSharedPrefs(context).edit().putBoolean(KEY_DEVELOPER_MODE, enabled).apply()
+    }
+
+    fun isDeveloperMode(context: Context): Boolean {
+        return getSharedPrefs(context).getBoolean(KEY_DEVELOPER_MODE, false)
     }
 }

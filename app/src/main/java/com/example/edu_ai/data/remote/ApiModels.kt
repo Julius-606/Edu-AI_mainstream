@@ -11,10 +11,43 @@ data class DashboardResponse(
     @SerializedName("difficulty") val difficulty: String? = null,
     @SerializedName("ai_persona") val aiPersona: String? = null,
     @SerializedName("active_units") val activeUnits: List<String>? = null,
+    @SerializedName("units") val units: List<ApiUnit>? = null,
     @SerializedName("average_pnl") val averagePnl: Double? = null,
     @SerializedName("total_quizzes") val totalQuizzes: Int? = null,
     @SerializedName("quiz_history") val quizHistory: List<ApiQuizHistory>? = null,
     @SerializedName("chat_history") val chatHistory: List<ApiChatHistory>? = null
+)
+
+data class ApiUnit(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("is_active") val isActive: Boolean,
+    @SerializedName("modules") val modules: List<ApiModule> = emptyList()
+)
+
+data class ApiModule(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("topics") val topics: List<ApiTopic> = emptyList()
+)
+
+data class ApiTopic(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("subtopics") val subtopics: List<ApiSubtopic> = emptyList()
+)
+
+data class ApiSubtopic(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("is_completed") val isCompleted: Boolean,
+    @SerializedName("learning_objectives") val learningObjectives: List<ApiLearningObjective> = emptyList()
+)
+
+data class ApiLearningObjective(
+    @SerializedName("id") val id: Int,
+    @SerializedName("description") val description: String,
+    @SerializedName("is_completed") val isCompleted: Boolean
 )
 
 data class ApiQuizHistory(

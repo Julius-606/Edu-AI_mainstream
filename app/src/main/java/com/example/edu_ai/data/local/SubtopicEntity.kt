@@ -9,17 +9,17 @@ import androidx.room.PrimaryKey
     tableName = "subtopics",
     foreignKeys = [
         ForeignKey(
-            entity = ModuleEntity::class,
-            parentColumns = ["moduleId"],
-            childColumns = ["moduleId"],
+            entity = TopicEntity::class,
+            parentColumns = ["topicId"],
+            childColumns = ["topicId"],
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["moduleId"])]
+    indices = [Index(value = ["topicId"])]
 )
 data class SubtopicEntity(
     @PrimaryKey(autoGenerate = true) val subtopicId: Long = 0,
-    val moduleId: Long,
+    val topicId: Long,
     val name: String,
     val isCompleted: Boolean = false
 )

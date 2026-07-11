@@ -22,7 +22,7 @@ interface EduAIDao {
 
     // Units
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertUnits(units: List<UnitEntity>)
+    suspend fun insertUnits(units: List<UnitEntity>): List<Long>
 
     @Query("SELECT * FROM units")
     fun getAllUnits(): Flow<List<UnitEntity>>
@@ -36,17 +36,24 @@ interface EduAIDao {
 
     // Modules
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertModules(modules: List<ModuleEntity>)
+    suspend fun insertModules(modules: List<ModuleEntity>): List<Long>
 
     @Query("SELECT * FROM modules WHERE unitId = :unitId")
     fun getModulesForUnit(unitId: Long): Flow<List<ModuleEntity>>
 
+    // Topics
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTopics(topics: List<TopicEntity>): List<Long>
+
+    @Query("SELECT * FROM topics WHERE moduleId = :moduleId")
+    fun getTopicsForModule(moduleId: Long): Flow<List<TopicEntity>>
+
     // Subtopics
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSubtopics(subtopics: List<SubtopicEntity>)
+    suspend fun insertSubtopics(subtopics: List<SubtopicEntity>): List<Long>
 
-    @Query("SELECT * FROM subtopics WHERE moduleId = :moduleId")
-    fun getSubtopicsForModule(moduleId: Long): Flow<List<SubtopicEntity>>
+    @Query("SELECT * FROM subtopics WHERE topicId = :topicId")
+    fun getSubtopicsForTopic(topicId: Long): Flow<List<SubtopicEntity>>
 
     @Query("UPDATE subtopics SET isCompleted = :isCompleted WHERE subtopicId = :subtopicId")
     suspend fun updateSubtopicStatus(subtopicId: Long, isCompleted: Boolean)

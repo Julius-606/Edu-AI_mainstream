@@ -27,6 +27,7 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
     var isLoading by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    var isDeveloperMode by remember { mutableStateOf(PreferenceManager.isDeveloperMode(context)) }
     val scope = rememberCoroutineScope()
 
     Column(
@@ -107,11 +108,29 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         TextButton(onClick = { 
-            val signupUrl = BuildConfig.BACKEND_BASE_URL + "signup"
+            val baseUrl = if (isDeveloperMode) "http://10.0.2.2:8000/" else BuildConfig.BACKEND_BASE_URL
+            val signupUrl = baseUrl + "signup"
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(signupUrl))
             context.startActivity(intent)
         }) {
             Text("Don't have an account? Sign Up in Browser")
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(8.dp)
+        ) {
+            Text("Developer Mode (Local Backend)", fontSize = 14.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = isDeveloperMode,
+                onCheckedChange = { 
+                    isDeveloperMode = it
+                    PreferenceManager.saveDeveloperMode(context, it)
+                }
+            )
         }
     }
 }

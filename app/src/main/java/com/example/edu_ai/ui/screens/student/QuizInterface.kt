@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import com.example.edu_ai.data.local.ModuleWithSubtopics
+import com.example.edu_ai.data.local.ModuleWithTopics
 import com.example.edu_ai.data.local.QuizHistoryEntity
 import com.example.edu_ai.data.local.UnitEntity
 import com.example.edu_ai.data.local.UnitWithModules
@@ -134,9 +134,9 @@ fun UnitSelectionScreen(
                             AnimatedVisibility(visible = isSelected) {
                                 Column {
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    unitWithModules.modules.forEach { moduleWithSubtopics ->
+                                    unitWithModules.modules.forEach { moduleWithTopics ->
                                         ModuleAccordion(
-                                            moduleWithSubtopics = moduleWithSubtopics,
+                                            moduleWithTopics = moduleWithTopics,
                                             onSubtopicClicked = { onStartQuiz(unit.unitName, it) }
                                         )
                                     }
@@ -214,7 +214,7 @@ fun UnitSelectionScreen(
 
 @Composable
 fun ModuleAccordion(
-    moduleWithSubtopics: ModuleWithSubtopics,
+    moduleWithTopics: ModuleWithTopics,
     onSubtopicClicked: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -234,13 +234,13 @@ fun ModuleAccordion(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                moduleWithSubtopics.module.name,
+                moduleWithTopics.module.name,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold
             )
         }
         if (expanded) {
-            moduleWithSubtopics.subtopics.forEach { subtopic ->
+            moduleWithTopics.topics.flatMap { it.subtopics }.forEach { subtopic ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

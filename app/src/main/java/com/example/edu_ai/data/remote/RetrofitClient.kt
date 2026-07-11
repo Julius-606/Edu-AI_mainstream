@@ -28,6 +28,23 @@ object RetrofitClient {
         override fun intercept(chain: Interceptor.Chain): Response {
             val originalRequest = chain.request()
             
+            // Check Developer Mode first
+            context?.let { ctx ->
+                if (PreferenceManager.isDeveloperMode(ctx)) {
+                    val developerUrl = originalRequest.url.newBuilder()
+                        .scheme("http")
+                        .host("10.0.2.2") // Android Emulator local host
+                        .port(8000)
+                        .build()
+                    
+                    val developerRequest = originalRequest.newBuilder()
+                        .url(developerUrl)
+                        .build()
+                    
+                    return chain.proceed(developerRequest)
+                }
+            }
+
             try {
                 return chain.proceed(originalRequest)
             } catch (e: IOException) {

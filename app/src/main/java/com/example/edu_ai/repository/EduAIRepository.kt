@@ -10,6 +10,7 @@ import com.example.edu_ai.utils.PreferenceManager
 import android.content.Context
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 
 class EduAIRepository(
@@ -46,10 +47,27 @@ class EduAIRepository(
             )
             dao.insertUser(userEntity)
             
-            val unitEntities = response.activeUnits?.map { unitName ->
-                UnitEntity(unitName = unitName, isActive = true)
-            } ?: emptyList()
-            dao.insertUnits(unitEntities)
+            // Sync full hierarchy from backend if available
+            if (response.units != null) {
+                response.units.forEach { apiUnit ->
+                    val unitId = dao.insertUnits(listOf(UnitEntity(unitName = apiUnit.name, isActive = apiUnit.isActive))).first()
+                    apiUnit.modules.forEach { apiModule ->
+                        val moduleId = dao.insertModules(listOf(ModuleEntity(unitId = unitId, name = apiModule.name))).first()
+                        apiModule.topics.forEach { apiTopic ->
+                            val topicId = dao.insertTopics(listOf(TopicEntity(moduleId = moduleId, name = apiTopic.name))).first()
+                            val subtopics = apiTopic.subtopics.map { apiSubtopic ->
+                                SubtopicEntity(topicId = topicId, name = apiSubtopic.name, isCompleted = apiSubtopic.isCompleted)
+                            }
+                            dao.insertSubtopics(subtopics)
+                        }
+                    }
+                }
+            } else {
+                val unitEntities = response.activeUnits?.map { unitName ->
+                    UnitEntity(unitName = unitName, isActive = true)
+                } ?: emptyList()
+                dao.insertUnits(unitEntities)
+            }
 
             // Sync quiz history (REPLACE will handle duplicates if we had IDs, 
             // but since we generate local IDs, we might get duplicates if we are not careful.
@@ -88,6 +106,29 @@ class EduAIRepository(
                     UnitEntity(unitName = "Internal Medicine", isActive = true)
                 )
                 dao.insertUnits(devUnits)
+
+                // Mock hierarchy for visualization
+                val units = dao.getAllUnits().first()
+                units.forEach { unit: UnitEntity ->
+                    val moduleIds = dao.insertModules(listOf(
+                        ModuleEntity(unitId = unit.localId, name = "Introduction"),
+                        ModuleEntity(unitId = unit.localId, name = "Core Mechanisms")
+                    ))
+                    
+                    moduleIds.forEach { moduleId ->
+                        val topicIds = dao.insertTopics(listOf(
+                            TopicEntity(moduleId = moduleId, name = "Fundamental Concepts"),
+                            TopicEntity(moduleId = moduleId, name = "Advanced Applications")
+                        ))
+                        
+                        topicIds.forEach { topicId ->
+                            dao.insertSubtopics(listOf(
+                                SubtopicEntity(topicId = topicId, name = "Overview", isCompleted = true),
+                                SubtopicEntity(topicId = topicId, name = "Key Terms", isCompleted = false)
+                            ))
+                        }
+                    }
+                }
 
                 emit(devUser)
             }

@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.edu_ai.EduAIApplication
 import com.example.edu_ai.data.local.UserEntity
 import com.example.edu_ai.data.local.UnitEntity
+import com.example.edu_ai.data.local.UnitWithModules
 import com.example.edu_ai.repository.EduAIRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 data class StudentUiState(
     val user: UserEntity? = null,
     val units: List<UnitEntity> = emptyList(),
+    val unitsWithModules: List<UnitWithModules> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -27,10 +29,11 @@ class StudentViewModel(private val repository: EduAIRepository, private val dao:
     val uiState: StateFlow<StudentUiState> = combine(
         dao.getUser(),
         dao.getAllUnits(),
+        dao.getAllUnitsWithModules(),
         _isLoading,
         _error
-    ) { user, units, isLoading, error ->
-        StudentUiState(user, units, isLoading, error)
+    ) { user, units, unitsWithModules, isLoading, error ->
+        StudentUiState(user, units, unitsWithModules, isLoading, error)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),

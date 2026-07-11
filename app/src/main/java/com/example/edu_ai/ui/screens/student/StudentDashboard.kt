@@ -13,11 +13,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.edu_ai.data.local.ModuleEntity
+import com.example.edu_ai.data.local.ModuleWithTopics
+import com.example.edu_ai.data.local.SubtopicEntity
+import com.example.edu_ai.data.local.TopicEntity
+import com.example.edu_ai.data.local.TopicWithSubtopics
+import com.example.edu_ai.data.local.UnitEntity
+import com.example.edu_ai.data.local.UnitWithModules
+import com.example.edu_ai.data.local.UserEntity
+import com.example.edu_ai.data.remote.ApiTimetableSlot
 import com.example.edu_ai.ui.components.DynamicBackground
 import com.example.edu_ai.ui.components.ProgressRings
 import com.example.edu_ai.ui.components.RingProgress
+import com.example.edu_ai.ui.theme.TraceTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,11 +41,13 @@ fun StudentDashboard(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    // Using a simple state for recommendations since it's now integrated
-    val progressViewModel: ProgressViewModel = viewModel(factory = ProgressViewModel.provideFactory(uiState.user ?: return Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }))
+    // Use the userId directly if user entity is not yet loaded in DAO
+    val user = uiState.user ?: UserEntity(id = userId, username = "Student", role = "student", sensoryMode = "Visual", semesterStatus = "Active", aiPersona = "Helper")
+
+    val progressViewModel: ProgressViewModel = viewModel(factory = ProgressViewModel.provideFactory(user))
     val recommendation by progressViewModel.recommendation.collectAsState()
     
-    val timetableViewModel: TimetableViewModel = viewModel(factory = TimetableViewModel.provideFactory(uiState.user!!))
+    val timetableViewModel: TimetableViewModel = viewModel(factory = TimetableViewModel.provideFactory(user))
     val timetableUiState by timetableViewModel.uiState.collectAsState()
 
     LaunchedEffect(userId) {
@@ -41,21 +55,46 @@ fun StudentDashboard(
         progressViewModel.refreshRecommendations()
     }
 
+    StudentDashboardContent(
+        user = user,
+        uiState = uiState,
+        recommendation = recommendation,
+        timetableUiState = timetableUiState,
+        onLogout = onLogout,
+        onLaunchModule = onLaunchModule
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StudentDashboardContent(
+    user: UserEntity,
+    uiState: StudentUiState,
+    recommendation: String,
+    timetableUiState: TimetableUiState,
+    onLogout: () -> Unit,
+    onLaunchModule: () -> Unit
+) {
     Box(modifier = Modifier.fillMaxSize()) {
         DynamicBackground()
 
         Scaffold(
-            containerColor = Color.Transparent, // Show background
+            containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
-                    title = { Text("👩‍🎓 Student Dashboard", fontWeight = FontWeight.ExtraBold) },
+                    title = { 
+                        Column {
+                            Text("Trace Portal", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                            Text("Student Dashboard", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        }
+                    },
                     actions = {
                         IconButton(onClick = onLogout) {
                             Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
                     )
                 )
             }
@@ -64,60 +103,149 @@ fun StudentDashboard(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
+                item { Spacer(modifier = Modifier.height(8.dp)) }
+
                 // Welcome Section
                 item {
                     Column {
                         Text(
-                            text = "Welcome back, ${uiState.user?.username ?: "Student"}!",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold
+                            text = "Hi, ${user.username}!",
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = (-1).sp
                         )
                         Text(
-                            text = "Status: ${uiState.user?.semesterStatus ?: "Active"}",
+                            text = user.semesterStatus,
                             color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.bodyLarge
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
 
-                // Progress Rings Section (One per active unit or just the primary one)
+                // Zenith Insight (Prominent)
                 item {
-                    Text("Unit Progress Visualization", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                }
-
-                items(uiState.units) { unit ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                        ),
+                        shape = MaterialTheme.shapes.extraLarge
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.AutoAwesome, 
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text("ZENITH INSIGHT", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                recommendation,
+                                style = MaterialTheme.typography.bodyLarge,
+                                lineHeight = 22.sp
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    Text("Current Progress", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+
+                if (uiState.unitsWithModules.isEmpty() && !uiState.isLoading) {
+                    item {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "No course data available yet.", 
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(onClick = onLaunchModule) {
+                                    Text("EXPLORE COURSES")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Hierarchical Progress Cards
+                items(uiState.unitsWithModules) { unitWithModules ->
+                    val unit = unitWithModules.unit
+                    
+                    // Calculate hierarchical progress
+                    val allTopics = unitWithModules.modules.flatMap { it.topics }
+                    val allSubtopics = allTopics.flatMap { it.subtopics }
+                    
+                    val unitProgress = if (allSubtopics.isNotEmpty()) {
+                        (allSubtopics.count { it.isCompleted }.toFloat() / allSubtopics.size) * 100f
+                    } else 0f
+
+                    // Example: Current Module (First one)
+                    val currentModule = unitWithModules.modules.firstOrNull()
+                    val currentModuleSubtopics = currentModule?.topics?.flatMap { it.subtopics } ?: emptyList()
+                    
+                    val moduleProgress = if (currentModuleSubtopics.isNotEmpty()) {
+                        (currentModuleSubtopics.count { it.isCompleted }.toFloat() / currentModuleSubtopics.size) * 100f
+                    } else 0f
+
+                    // Objectives for the center
+                    val objectives = if (currentModuleSubtopics.isNotEmpty()) {
+                        currentModuleSubtopics.map { it.name }
+                    } else listOf("Explore Unit")
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)),
+                        shape = MaterialTheme.shapes.large
                     ) {
                         Row(
                             modifier = Modifier.padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Mock progress data until backend integration is fully wired to ViewModel
                             val rings = listOf(
-                                RingProgress(75f, MaterialTheme.colorScheme.primary, "Unit"),
-                                RingProgress(60f, MaterialTheme.colorScheme.secondary, "Module"),
-                                RingProgress(40f, MaterialTheme.colorScheme.tertiary, "Topic"),
-                                RingProgress(20f, Color.Magenta, "Subtopic")
+                                RingProgress(unitProgress, MaterialTheme.colorScheme.primary, "Unit"),
+                                RingProgress(moduleProgress, MaterialTheme.colorScheme.secondary, "Module"),
+                                RingProgress(30f, MaterialTheme.colorScheme.tertiary, "Subtopic") // Mock sub-module progress
                             )
                             
                             ProgressRings(
                                 rings = rings,
-                                learningObjectives = listOf("Analyze heart sounds", "Identify JVD", "Measure BP"),
-                                modifier = Modifier.size(150.dp)
+                                learningObjectives = objectives,
+                                modifier = Modifier.size(140.dp)
                             )
                             
-                            Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(20.dp))
                             
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(unit.unitName, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
-                                Text("Last Studied: Today", style = MaterialTheme.typography.bodySmall)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Button(onClick = onLaunchModule) {
+                                Text(
+                                    unit.unitName, 
+                                    fontWeight = FontWeight.ExtraBold, 
+                                    fontSize = 22.sp,
+                                    lineHeight = 26.sp
+                                )
+                                Text(
+                                    currentModule?.module?.name ?: "No Active Module", 
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(
+                                    onClick = onLaunchModule,
+                                    shape = MaterialTheme.shapes.medium,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
                                     Text("CONTINUE")
                                 }
                             }
@@ -125,27 +253,9 @@ fun StudentDashboard(
                     }
                 }
 
-                // Zenith Insight Integrated
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f))
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.AutoAwesome, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Strategic Zenith Insight", fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(recommendation)
-                        }
-                    }
-                }
-
                 // Timetable Preview
                 item {
-                    Text("Today's Schedule", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Today's Schedule", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
 
                 val today = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault()).format(java.util.Date())
@@ -153,17 +263,38 @@ fun StudentDashboard(
 
                 if (todaysSlots.isEmpty()) {
                     item {
-                        Text("No sessions scheduled for today. Rest up!", style = MaterialTheme.typography.bodyMedium)
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Text(
+                                "No sessions scheduled for today. Rest up!", 
+                                modifier = Modifier.padding(16.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 } else {
                     items(todaysSlots) { slot ->
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp), 
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Column {
-                                    Text(slot.time, fontWeight = FontWeight.Bold)
-                                    Text(slot.activity)
+                                    Text(slot.time, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    Text(slot.activity, style = MaterialTheme.typography.bodyLarge)
                                 }
-                                Badge { Text(slot.type) }
+                                SuggestionChip(
+                                    onClick = {},
+                                    label = { Text(slot.type) }
+                                )
                             }
                         }
                     }
@@ -172,5 +303,66 @@ fun StudentDashboard(
                 item { Spacer(modifier = Modifier.height(40.dp)) }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun StudentDashboardPreview() {
+    val sampleUser = UserEntity(
+        id = "1",
+        username = "Jay",
+        role = "student",
+        sensoryMode = "Visual",
+        semesterStatus = "Year 4 - Semester 2",
+        aiPersona = "Motivator"
+    )
+
+    val sampleUnitsWithModules = listOf(
+        UnitWithModules(
+            unit = UnitEntity(localId = 1L, unitName = "Data Science", isActive = true),
+            modules = listOf(
+                ModuleWithTopics(
+                    module = ModuleEntity(moduleId = 1L, unitId = 1L, name = "Introduction to ML"),
+                    topics = listOf(
+                        TopicWithSubtopics(
+                            topic = TopicEntity(topicId = 1L, moduleId = 1L, name = "Supervised Learning"),
+                            subtopics = listOf(
+                                SubtopicEntity(subtopicId = 1L, topicId = 1L, name = "Regression", isCompleted = true),
+                                SubtopicEntity(subtopicId = 2L, topicId = 1L, name = "Classification", isCompleted = false)
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val sampleStudentUiState = StudentUiState(
+        user = sampleUser,
+        unitsWithModules = sampleUnitsWithModules
+    )
+
+    val sampleTimetableUiState = TimetableUiState(
+        weeklyPlan = listOf(
+            ApiTimetableSlot(
+                day = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault()).format(java.util.Date()),
+                time = "10:00 AM",
+                activity = "ML Lecture",
+                unit = "Data Science",
+                type = "Lecture"
+            )
+        )
+    )
+
+    TraceTheme {
+        StudentDashboardContent(
+            user = sampleUser,
+            uiState = sampleStudentUiState,
+            recommendation = "Keep up the great work! You're making steady progress in Data Science.",
+            timetableUiState = sampleTimetableUiState,
+            onLogout = {},
+            onLaunchModule = {}
+        )
     }
 }
