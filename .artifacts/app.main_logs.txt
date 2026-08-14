@@ -1,0 +1,13 @@
+PS C:\Users\lenovo\Jay\Projects\Edu-AI_mainstream\backend> .venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --log-level debug      
+INFO:     Started server process [2264]                     
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:62668 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62669 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62671 - "GET /api/users/1 HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:62672 - "POST /api/ai/chat HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:57520 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57521 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57522 - "GET /api/users/1 HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:57523 - "POST /api/ai/chat HTTP/1.1" 403 Forbidden

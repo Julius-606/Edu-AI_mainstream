@@ -1,83 +1,58 @@
-# Implementation Plan - Phase 3: Structured Learning & Dashboard Redesign
+# [PHASE 3] Dashboard Frontend Prioritization & Hierarchical Visualization
 
-This plan outlines the evolution of the Edu-AI platform to support a hierarchical syllabus (Unit > Module > Topic > Subtopic > Learning Objective), a redesigned dashboard with concentric progress rings, and a dynamic fallback for the backend URL.
+This plan focuses on enhancing the Student Dashboard with dynamic, hierarchical progress visualization and an immersive UI. It also includes the necessary backend changes to support the 5-level hierarchy.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> The hierarchy change is a significant database evolution. Existing data in `modules` and `subtopics` will need to be migrated or reset. I recommend a database reset for development simplicity if the user doesn't have critical data.
-
-- **Concentric Rings**: I'll implement 4 rings per Unit. 1st=Unit, 2nd=Current Module, 3rd=Current Topic, 4th=Current Subtopic.
-- **Dynamic Background**: I'll use a set of local or remote academic-themed images that cycle every few minutes.
+> The dashboard now displays **hierarchical progress** (Unit > Module > Subtopic). I've updated the frontend to use `UnitWithModules` and `ModuleWithSubtopics`.
+> I am now proceeding to align the Backend (FastAPI) to support this full hierarchy during syllabus ingestion.
 
 ## Proposed Changes
 
-### Backend (Python/FastAPI)
+### [Frontend] Dashboard & Components [COMPLETED]
 
-#### [NEW] [tests/README.md](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/tests/README.md)
-- Create a dedicated tests folder.
-- Add a README.md to guide future agents on testing the hierarchical structure and AI features.
+#### [DynamicBackground.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/ui/components/DynamicBackground.kt)
+- Enhanced with an animated gradient and cycling icons for a premium feel.
 
-#### [models.py](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/models.py)
-- Add `Topic` table between `Module` and `Subtopic`.
-- Add `LearningObjective` table under `Subtopic`.
-- Add `UserSyllabusProgress` table to track status (Locked, Unlocked, In_Progress, Completed).
-- Update relationships to reflect the 5-level hierarchy.
+#### [ProgressRings.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/ui/components/ProgressRings.kt)
+- Refined to handle hierarchical rings with entry animations.
 
-#### [schemas.py](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/schemas.py)
-- Update `UnitResponse`, `ModuleResponse`, `SubtopicResponse`.
-- Add `TopicResponse` and `LearningObjectiveResponse`.
-- Update `DashboardResponse` to include progress percentages for each level.
-
-#### [ingestion_engine.py](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/ingestion_engine.py)
-- Update `parse_syllabus_markdown` to handle:
-    - `# Syllabus`
-    - `## Unit`
-    - `### Module`
-    - `#### Topic`
-    - `##### Subtopic`
-    - `- Learning Objective`
-
-#### [main.py](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/main.py)
-- Update `/api/v1/syllabuses/upload` to handle the new hierarchy.
-- Update `/api/v1/syllabuses/{unit_id}/tree` to return the full 5-level tree.
-- Add `PATCH /api/v1/progress/node/{node_id}` to update any node's status.
-- Update `/api/user/{user_id}/dashboard` to return unit-wise hierarchical progress.
-
-#### [ai_engine.py](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/ai_engine.py)
-- Update prompts for `generate_quiz` and `get_recommendations` to leverage the new hierarchy for pinpoint accuracy.
+#### [StudentDashboard.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/ui/screens/student/StudentDashboard.kt)
+- Updated to observe hierarchical data and integrated Zenith Insights/Timetable.
 
 ---
 
-### Frontend (Android/Compose)
+### [Backend] Hierarchical Syllabus Support
 
-#### [RetrofitClient.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/data/remote/RetrofitClient.kt)
-- Implement `FallbackInterceptor` to catch `IOException` and switch `BASE_URL` to `FALLBACK_BACKEND_BASE_URL`.
+#### [api_schemas.py](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/app/schemas/api_schemas.py)
+- Update `ModuleResponse` to include `topics`.
+- Add `TopicResponse` and `LearningObjectiveResponse` to match the DB models.
 
-#### [StudentDashboard.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/ui/screens/student/StudentDashboard.kt)
-- Redesign the layout to move Zenith and Timetable content here.
-- Integrate `DynamicBackground` and `ConcentricRings`.
+#### [learning.py](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/app/api/learning.py)
+- Update `upload_syllabus` to correctly map the 5-level hierarchy from `ingestion_engine.py` into the database models.
+- Ensure `UnitResponse` in `get_syllabus_tree` recursively includes all levels.
 
-#### [NEW] [DynamicBackground.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/ui/components/DynamicBackground.kt)
-- A composable that displays a faded background image that fades between different academic scenes.
+#### [ingestion_engine.py](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/backend/ingestion_engine.py)
+- Refine the parser to strictly follow the `#`, `##`, `###`, `####`, `#####` and `-` convention for Unit, Module, Topic, Subtopic, and Objectives.
 
-#### [NEW] [ProgressRings.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/ui/components/ProgressRings.kt)
-- A custom Canvas-based composable that draws the four concentric rings and the scrollable learning objectives in the center.
+---
+
+### [Frontend] ViewModel & Data Layer [COMPLETED]
+
+#### [StudentViewModel.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/ui/screens/student/StudentViewModel.kt)
+- Updated `StudentUiState` and flow to include `unitsWithModules`.
+
+#### [EduAIRepository.kt](file:///C:/Users/lenovo/Jay/Projects/Edu-AI_mainstream/app/src/main/java/com/example/edu_ai/repository/EduAIRepository.kt)
+- Updated with mock hierarchy generation for local development testing.
 
 ## Verification Plan
 
 ### Automated Tests
-- Create a dedicated `backend/tests/` directory.
-- Move/Create `backend/tests/test_ai_engine.py` to ensure AI functionality is intact.
-- Create `backend/tests/test_hierarchy.py` to test the new ingestion and API tree retrieval.
-```bash
-pytest backend/tests/
-```
+- N/A for UI changes.
+- Will verify Backend ingestion via Swagger (`/docs`).
 
 ### Manual Verification
-- **Backend**: Use `/docs` (Swagger) to upload a markdown syllabus and verify the tree JSON.
-- **Frontend**:
-    1. Start the app with the main backend.
-    2. Shut down/pause the main backend and verify it switches to `127.0.0.1:8000`.
-    3. Verify the Dashboard UI shows the concentric rings for uploaded units.
-    4. Verify the background changes periodically.
+- **Visual Check**: Run the app and verify the `DynamicBackground` and `ProgressRings` animations.
+- **Backend Ingestion**: Upload a markdown syllabus using the new 5-level format and verify the tree JSON matches.
+- **End-to-End**: Verify the Dashboard reflects the uploaded hierarchy correctly.

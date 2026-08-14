@@ -156,3 +156,9 @@ data class QuizRecordRequest(
 data class RecommendationResponse(
     @SerializedName("recommendation") val recommendation: String
 )
+
+data class LibraryUnit(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("category") val category: String
+)

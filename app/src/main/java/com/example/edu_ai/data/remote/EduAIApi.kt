@@ -57,4 +57,15 @@ interface EduAIApi {
 
     @GET("api/parent/dashboard/{student_id}")
     suspend fun getParentDashboard(@Path("student_id") studentId: String): ParentDashboardResponse
+
+    // --- Ingestion / Library Endpoints ---
+
+    @GET("api/units/library")
+    suspend fun getLibraryUnits(): List<LibraryUnit>
+
+    @POST("api/units/library/add/{unit_id}")
+    suspend fun addUnitToUser(
+        @Path("unit_id") unitId: Int,
+        @Query("user_id") userId: String
+    ): Map<String, String>
 }

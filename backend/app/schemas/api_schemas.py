@@ -14,17 +14,32 @@ class UnitUpdate(BaseModel):
     is_active: Optional[bool] = None
     category: Optional[str] = None
 
+class LearningObjectiveResponse(BaseModel):
+    id: int
+    description: str
+    is_completed: bool
+    class Config:
+        from_attributes = True
+
 class SubtopicResponse(BaseModel):
     id: int
     name: str
     is_completed: bool
+    learning_objectives: List[LearningObjectiveResponse] = []
+    class Config:
+        from_attributes = True
+
+class TopicResponse(BaseModel):
+    id: int
+    name: str
+    subtopics: List[SubtopicResponse] = []
     class Config:
         from_attributes = True
 
 class ModuleResponse(BaseModel):
     id: int
     name: str
-    subtopics: List[SubtopicResponse]
+    topics: List[TopicResponse] = []
     class Config:
         from_attributes = True
 
@@ -53,6 +68,7 @@ class DashboardResponse(BaseModel):
     difficulty: str
     ai_persona: str
     active_units: List[str]
+    units: List[UnitResponse] = []
     average_pnl: float
     total_quizzes: int
     quiz_history: List[QuizHistoryResponse]

@@ -108,7 +108,7 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         TextButton(onClick = { 
-            val baseUrl = if (isDeveloperMode) "http://10.0.2.2:8000/" else BuildConfig.BACKEND_BASE_URL
+            val baseUrl = if (isDeveloperMode) "https://untropic-rozanne-noncomprehendingly.ngrok-free.dev/" else BuildConfig.BACKEND_BASE_URL
             val signupUrl = baseUrl + "signup"
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(signupUrl))
             context.startActivity(intent)

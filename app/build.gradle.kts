@@ -12,7 +12,7 @@ android {
     val backendBaseUrl = (project.findProperty("backendBaseUrl") as? String)
         ?: "https://huggingface.co/spaces/Agent606/Edu-AI/"
     val fallbackBackendBaseUrl = (project.findProperty("fallbackBackendBaseUrl") as? String)
-        ?: "http://10.0.2.2:8000/"
+        ?: "https://untropic-rozanne-noncomprehendingly.ngrok-free.dev/"
 
     val internalApiKey = (project.findProperty("INTERNAL_API_KEY") as? String) ?: "DEVELOPMENT_KEY"
 

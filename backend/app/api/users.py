@@ -68,6 +68,7 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         difficulty=user.difficulty,
         ai_persona=user.ai_persona,
         active_units=unit_names,
+        units=active_units,
         average_pnl=round(average_pnl, 2),
         total_quizzes=total_quizzes,
         quiz_history=[schemas.QuizHistoryResponse(unit_name=q.unit_name, pnl=q.pnl, timestamp=q.timestamp) for q in quizzes],

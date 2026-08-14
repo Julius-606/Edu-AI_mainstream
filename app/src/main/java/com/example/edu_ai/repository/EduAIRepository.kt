@@ -181,4 +181,8 @@ class EduAIRepository(
 
     // --- Parent Portal Methods ---
     suspend fun getParentDashboard(studentId: String) = api.getParentDashboard(studentId)
+
+    // --- Ingestion / Library Methods ---
+    suspend fun getLibraryUnits() = api.getLibraryUnits()
+    suspend fun addUnitToUser(unitId: Int, userId: String) = api.addUnitToUser(unitId, userId)
 }

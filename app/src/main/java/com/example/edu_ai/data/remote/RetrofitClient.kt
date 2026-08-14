@@ -32,9 +32,9 @@ object RetrofitClient {
             context?.let { ctx ->
                 if (PreferenceManager.isDeveloperMode(ctx)) {
                     val developerUrl = originalRequest.url.newBuilder()
-                        .scheme("http")
-                        .host("10.0.2.2") // Android Emulator local host
-                        .port(8000)
+                        .scheme("https")
+                        .host("untropic-rozanne-noncomprehendingly.ngrok-free.dev")
+                        .port(443)
                         .build()
                     
                     val developerRequest = originalRequest.newBuilder()
@@ -55,9 +55,9 @@ object RetrofitClient {
                     
                     // Reconstruct request with new URL
                     val newUrl = originalRequest.url.newBuilder()
-                        .scheme("http")
-                        .host("10.0.2.2") // Android Emulator local host
-                        .port(8000)
+                        .scheme("https")
+                        .host("untropic-rozanne-noncomprehendingly.ngrok-free.dev")
+                        .port(443)
                         .build()
                     
                     val newRequest = originalRequest.newBuilder()

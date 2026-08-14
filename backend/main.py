@@ -13,23 +13,16 @@ from sqlalchemy import func
 from typing import List, Optional
 import logging
 
-try:
-    from database import Base, engine, get_db
-    import models as models
-    import schemas as schemas
-    import auth as auth
-    from ai_engine import ai_engine
-except ImportError:
-    from database import Base, engine, get_db
-    from . import models as models
-    from . import schemas as schemas
-    from . import auth as auth
-    from .ai_engine import ai_engine
+from database import engine, get_db, Base
+import models
+import schemas
+import auth
+from ai_engine import ai_engine
 
 # Create database tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=str(os.path.join(os.path.dirname(__file__), "templates")))
 
 INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "DEVELOPMENT_KEY")
 

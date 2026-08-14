@@ -12,6 +12,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.edu_ai.EduAIApplication
 import com.example.edu_ai.ui.screens.LoginScreen
+import com.example.edu_ai.ui.screens.student.LibraryScreen
 import com.example.edu_ai.ui.screens.student.ModuleScreen
 import com.example.edu_ai.ui.screens.student.StudentDashboard
 import com.example.edu_ai.ui.screens.teacher.TeacherDashboard
@@ -78,6 +79,23 @@ fun AppNavigation() {
                 },
                 onLaunchModule = {
                     navController.navigate("module_screen/$userId")
+                },
+                onOpenLibrary = {
+                    navController.navigate("library_screen/$userId")
+                }
+            )
+        }
+
+        composable(
+            route = "library_screen/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            LibraryScreen(
+                userId = userId,
+                onBack = { navController.popBackStack() },
+                onUnitAdded = { 
+                    navController.popBackStack()
                 }
             )
         }

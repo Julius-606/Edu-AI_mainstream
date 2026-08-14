@@ -1,0 +1,65 @@
+(.venv) PS C:\Users\lenovo\Jay\Projects\Edu-AI_mainstream> python .\backend\main.py                                                        
+INFO:     Started server process [17432]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:61607 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61608 - "POST /api/auth/signup-form HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:61609 - "POST /api/auth/login HTTP/1.1" 200 OK
+C:\Users\lenovo\Jay\Projects\Edu-AI_mainstream\backend\main.py:214: PydanticDeprecatedSince20: The `from_orm` method is deprecated; set `model_config['from_attributes']=True` and use `model_validate` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+  response = schemas.UserResponseSchema.from_orm(user)
+INFO:     127.0.0.1:51181 - "GET /api/users/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51182 - "GET /api/users/1/dashboard HTTP/1.1" 404 Not Found
+2026-07-02 00:55:12,895 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:55:14,660 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-07-02 00:55:17,431 - AI_ENGINE - INFO - 🔄 Swapped to API Key Index: 1
+2026-07-02 00:55:18,433 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:55:19,443 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-07-02 00:55:22,586 - AI_ENGINE - INFO - 🔄 Swapped to API Key Index: 2
+2026-07-02 00:55:23,587 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:55:24,617 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-07-02 00:55:31,767 - AI_ENGINE - INFO - 🔄 Swapped to API Key Index: 3
+2026-07-02 00:55:32,770 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:55:33,241 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-07-02 00:55:36,355 - AI_ENGINE - INFO - 🔄 Swapped to API Key Index: 0
+2026-07-02 00:55:37,357 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:55:50,576 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:51183 - "POST /api/ai/chat HTTP/1.1" 200 OK
+2026-07-02 00:55:57,763 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:55:58,299 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-07-02 00:56:00,477 - AI_ENGINE - INFO - 🔄 Swapped to API Key Index: 1
+2026-07-02 00:56:01,479 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:56:02,914 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-07-02 00:56:08,156 - AI_ENGINE - INFO - 🔄 Swapped to API Key Index: 2
+2026-07-02 00:56:09,161 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:56:11,021 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-07-02 00:56:14,733 - AI_ENGINE - INFO - 🔄 Swapped to API Key Index: 3
+2026-07-02 00:56:15,734 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:56:16,728 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-07-02 00:56:18,780 - AI_ENGINE - INFO - 🔄 Swapped to API Key Index: 0
+2026-07-02 00:56:19,781 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:57:45,305 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:62314 - "POST /api/ai/quiz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65144 - "GET /api/ai/recommendations/1 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65145 - "GET /api/users/1/timetable HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65146 - "GET /api/teacher/dashboard HTTP/1.1" 200 OK
+2026-07-02 00:57:50,649 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:57:51,695 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-07-02 00:57:54,260 - AI_ENGINE - INFO - 🔄 Swapped to API Key Index: 1
+2026-07-02 00:57:55,262 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:57:56,302 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-07-02 00:57:58,900 - AI_ENGINE - INFO - 🔄 Swapped to API Key Index: 2
+2026-07-02 00:57:59,924 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:58:01,796 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-07-02 00:58:05,869 - AI_ENGINE - INFO - 🔄 Swapped to API Key Index: 3
+2026-07-02 00:58:06,871 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:58:07,889 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 429 Too Many Requests"
+2026-07-02 00:58:11,150 - AI_ENGINE - INFO - 🔄 Swapped to API Key Index: 0
+2026-07-02 00:58:12,154 - google_genai.models - INFO - AFC is enabled with max remote calls: 10.
+2026-07-02 00:58:20,961 - httpx - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:65147 - "GET /api/parent/dashboard/1 HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17432]
+(.venv) PS C:\Users\lenovo\Jay\Projects\Edu-AI_mainstream> 

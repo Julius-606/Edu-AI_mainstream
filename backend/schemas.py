@@ -65,6 +65,16 @@ class HierarchicalProgress(BaseModel):
     current_subtopic_id: Optional[int] = None
     subtopic_progress: float = 0.0
 
+class QuizHistoryResponse(BaseModel):
+    unit_name: str
+    pnl: float
+    timestamp: str
+
+class ChatMessageResponse(BaseModel):
+    role: str
+    content: str
+    timestamp: str
+
 class DashboardResponse(BaseModel):
     username: str
     role: str

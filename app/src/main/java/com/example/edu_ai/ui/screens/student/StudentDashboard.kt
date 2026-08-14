@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
@@ -37,6 +38,7 @@ fun StudentDashboard(
     userId: String,
     onLogout: () -> Unit,
     onLaunchModule: () -> Unit,
+    onOpenLibrary: () -> Unit,
     viewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -61,7 +63,8 @@ fun StudentDashboard(
         recommendation = recommendation,
         timetableUiState = timetableUiState,
         onLogout = onLogout,
-        onLaunchModule = onLaunchModule
+        onLaunchModule = onLaunchModule,
+        onOpenLibrary = onOpenLibrary
     )
 }
 
@@ -73,7 +76,8 @@ fun StudentDashboardContent(
     recommendation: String,
     timetableUiState: TimetableUiState,
     onLogout: () -> Unit,
-    onLaunchModule: () -> Unit
+    onLaunchModule: () -> Unit,
+    onOpenLibrary: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         DynamicBackground()
@@ -110,18 +114,33 @@ fun StudentDashboardContent(
 
                 // Welcome Section
                 item {
-                    Column {
-                        Text(
-                            text = "Hi, ${user.username}!",
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = (-1).sp
-                        )
-                        Text(
-                            text = user.semesterStatus,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Hi, ${user.username}!",
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = (-1).sp
+                            )
+                            Text(
+                                text = user.semesterStatus,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        
+                        FilledTonalButton(
+                            onClick = onOpenLibrary,
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("ADD UNIT")
+                        }
                     }
                 }
 
@@ -362,7 +381,8 @@ fun StudentDashboardPreview() {
             recommendation = "Keep up the great work! You're making steady progress in Data Science.",
             timetableUiState = sampleTimetableUiState,
             onLogout = {},
-            onLaunchModule = {}
+            onLaunchModule = {},
+            onOpenLibrary = {}
         )
     }
 }
