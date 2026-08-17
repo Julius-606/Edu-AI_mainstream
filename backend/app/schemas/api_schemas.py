@@ -63,7 +63,6 @@ class ChatMessageResponse(BaseModel):
 class DashboardResponse(BaseModel):
     username: str
     role: str
-    sensory_mode: str
     semester_status: str
     difficulty: str
     ai_persona: str
@@ -73,6 +72,7 @@ class DashboardResponse(BaseModel):
     total_quizzes: int
     quiz_history: List[QuizHistoryResponse]
     chat_history: List[ChatMessageResponse]
+    last_point: str = "Start your journey"
 
 class ChaosRequest(BaseModel):
     unit: str
@@ -88,16 +88,14 @@ class UserCreate(BaseModel):
     email: str
     password: str
     role: str = "Student"
-    sensory_mode: str = "Standard"
     difficulty: str = "Medium (Standard)"
     ai_persona: str = "Standard Trace"
-    semester_status: str = "Year 4 - Redemption Arc"
+    semester_status: str = "Active"
     interests: List[str] = []
     active_units: List[str] = []
 
 class UserUpdate(BaseModel):
     role: Optional[str] = None
-    sensory_mode: Optional[str] = None
     difficulty: Optional[str] = None
     ai_persona: Optional[str] = None
     semester_status: Optional[str] = None
@@ -108,7 +106,6 @@ class UserResponseSchema(BaseModel):
     id: int
     username: str
     role: str
-    sensory_mode: str
     difficulty: str
     ai_persona: str
     semester_status: str
@@ -119,7 +116,6 @@ class UserResponseSchema(BaseModel):
         from_attributes = True
 
 class UserPreferencesUpdate(BaseModel):
-    sensory_mode: Optional[str] = None
     ai_persona: Optional[str] = None
 
 # --- TEACHER PORTAL SCHEMAS ---

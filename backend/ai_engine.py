@@ -6,6 +6,7 @@ import re
 import json
 import os
 import random
+import threading
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -43,12 +44,14 @@ if not GEMINI_API_KEYS:
 class AiEngine:
     def __init__(self):
         self.key_index = 0
+        self.lock = threading.Lock()
         # Recommended sure-bet models
         self.model_variants = [
             "gemini-2.0-flash",
             "gemini-2.5-flash",
+            "gemini-1.5-flash",
             "gemini-2.0-flash-lite",
-            "gemini-1.5-flash"
+            "gemini-1.5-pro"
         ]
         self.logs = [] # Internal store for recent activities
 
@@ -63,9 +66,10 @@ class AiEngine:
 
     def _rotate_key(self):
         if not GEMINI_API_KEYS: return
-        self.key_index = (self.key_index + 1) % len(GEMINI_API_KEYS)
-        self._create_client()
-        logger.info(f"🔄 Swapped to API Key Index: {self.key_index % len(GEMINI_API_KEYS)}")
+        with self.lock:
+            self.key_index = (self.key_index + 1) % len(GEMINI_API_KEYS)
+            self._create_client()
+            logger.info(f"🔄 Swapped to API Key Index: {self.key_index}")
 
     def _log_performance(self, model, key_idx, duration, status, task):
         log_entry = {

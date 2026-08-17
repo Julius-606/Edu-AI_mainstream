@@ -1,17 +1,19 @@
 from google import genai
-from google.genai import types
+from google.genai import types, errors
+from pydantic import BaseModel
 import time
 import logging
 import json
 import os
-import random
+import asyncio
 from datetime import datetime
+from typing import List, Optional
 from dotenv import load_dotenv
 
 load_dotenv()
-
 logger = logging.getLogger("AI_SERVICE")
 
+# --- Key Loading Logic ---
 GEMINI_API_KEYS = []
 i = 1
 while True:
@@ -19,8 +21,7 @@ while True:
     if not key:
         if i == 1:
             key = os.getenv("GEMINI_API_KEY")
-            if key:
-                GEMINI_API_KEYS.append(key)
+            if key: GEMINI_API_KEYS.append(key)
         break
     GEMINI_API_KEYS.append(key)
     i += 1
@@ -31,32 +32,51 @@ if not GEMINI_API_KEYS:
         "AIzaSyDgvt1qfR_IG-UN__WcOPj1hv5s1IVUWHY"
     ]
 
+# --- Pydantic Models for Response Schemas ---
+class QuizQuestion(BaseModel):
+    question_text: str
+    options: List[str]
+    correct_option_index: int
+    explanation: str
+
+class QuizSchema(BaseModel):
+    quiz_title: str
+    questions: List[QuizQuestion]
+
+class TimetableSlot(BaseModel):
+    day: str
+    time: str
+    activity: str
+    unit: Optional[str] = None
+    type: str
+
+class TimetableSchema(BaseModel):
+    weekly_plan: List[TimetableSlot]
+    ai_brief: str
+
 class AiService:
     def __init__(self):
+        # Create a separate client for every API key
+        self.clients = [genai.Client(api_key=key) for key in GEMINI_API_KEYS]
         self.key_index = 0
+        self.lock = asyncio.Lock() # Async lock for safe rotation
+
+        # Models updated as per migration plan to prevent 404s
         self.model_variants = [
-            "gemini-flash-latest",
-            "gemini-2.5-flash",
-            "gemini-flash-lite-latest",
-            "gemini-2.5-flash-lite",
-            "gemini-2.0-flash-lite",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite"
         ]
         self.logs = []
+        logger.info(f"🔑 Configured {len(self.clients)} Gemini Clients for rotation.")
 
-        if GEMINI_API_KEYS:
-            self._create_client()
-        else:
-            logger.error("❌ No Gemini API keys found.")
-
-    def _create_client(self):
-        key = GEMINI_API_KEYS[self.key_index % len(GEMINI_API_KEYS)]
-        self.client = genai.Client(api_key=key)
-
-    def _rotate_key(self):
-        if not GEMINI_API_KEYS: return
-        self.key_index = (self.key_index + 1) % len(GEMINI_API_KEYS)
-        self._create_client()
-        logger.info(f"🔄 Swapped to API Key Index: {self.key_index % len(GEMINI_API_KEYS)}")
+    async def _rotate_key(self):
+        if not self.clients: return
+        async with self.lock:
+            self.key_index = (self.key_index + 1) % len(self.clients)
+            logger.warning(f"🚨 Rotated to API Client Index: {self.key_index}")
 
     def _log_performance(self, model, key_idx, duration, status, task):
         log_entry = {
@@ -70,156 +90,154 @@ class AiService:
         self.logs.append(log_entry)
         if len(self.logs) > 50: self.logs.pop(0)
 
-    def ask(self, prompt, system_instruction=None):
-        if not GEMINI_API_KEYS: return None
-
+    async def ask(self, prompt: str, system_instruction: str = None) -> str:
+        if not self.clients: return None
         task_name = "Chat/General"
-        for variant in self.model_variants:
-            for _ in range(len(GEMINI_API_KEYS)):
-                start_time = time.time()
-                current_key_idx = self.key_index % len(GEMINI_API_KEYS)
-                try:
-                    config = None
-                    if system_instruction:
-                        config = types.GenerateContentConfig(system_instruction=system_instruction)
 
-                    response = self.client.models.generate_content(
+        config = types.GenerateContentConfig()
+        if system_instruction:
+            config.system_instruction = system_instruction
+
+        for variant in self.model_variants:
+            for _ in range(len(self.clients)):
+                start_time = time.time()
+                current_key_idx = self.key_index % len(self.clients)
+                current_client = self.clients[current_key_idx]
+
+                try:
+                    response = await current_client.aio.models.generate_content(
                         model=variant,
                         contents=prompt,
                         config=config
                     )
+                    duration = time.time() - start_time
+                    self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
+                    return response.text
 
-                    if response and response.text:
-                        duration = time.time() - start_time
-                        self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
-                        return response.text
                 except Exception as e:
                     duration = time.time() - start_time
                     err_msg = str(e).lower()
+                    logger.error(f"❌ AI Error with {variant} (Key {current_key_idx}): {str(e)}")
                     self._log_performance(variant, current_key_idx, duration, "FAILED", task_name)
 
                     if "404" in err_msg:
-                        logger.warning(f"⚠️ Model {variant} not found. Trying next variant...")
-                        break
+                        logger.warning(f"⚠️ Model {variant} not found. Skipping to next variant.")
+                        break # Break inner loop, try next model variant
 
-                    self._rotate_key()
-                    time.sleep(1)
+                    if "429" in err_msg or "quota" in err_msg:
+                        logger.warning(f"🚨 Rate limit hit for {variant}. Rotating key...")
+                        await self._rotate_key()
+                        await asyncio.sleep(2)
+                        continue # Retry SAME model with NEW key
+
+                    # For other unknown errors, rotate and retry
+                    await self._rotate_key()
+                    await asyncio.sleep(1)
                     continue
+
         return None
 
-    def generate_quiz(self, unit_name, student_level, topic=None):
-        if not GEMINI_API_KEYS: return None
-
-        num_questions = random.randint(7, 12)
+    async def generate_quiz(self, unit_name: str, student_level: str, topic: str = None):
+        if not self.clients: return None
         task_name = f"Quiz: {unit_name}"
         focus_clause = f" specifically focusing on '{topic}'" if topic else ""
+
         prompt = f"""
-        Generate a {num_questions}-question rigorous academic multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
-        Level: {student_level}.
-
-        CRITICAL INSTRUCTIONS:
-        1. Tone: Professional, academic, and clinical. Avoid overly casual language.
-        2. Content: Focus on high-yield medical concepts, pathophysiology, and diagnostic criteria relevant to the topic.
-        3. Explanations: For each question, the 'explanation' field must provide a deep clinical rationale.
-           It should explain the physiological basis for the correct answer and clarify why the distractors are incorrect or less appropriate.
-
-        Format:
-        Return ONLY valid JSON.
-        {{
-          "quiz_title": "{unit_name} Advanced Assessment",
-          "questions": [
-            {{
-              "question_text": "...",
-              "options": ["A", "B", "C", "D"],
-              "correct_option_index": 0,
-              "explanation": "CLINICAL RATIONALE: ... DIFFERENTIAL ANALYSIS: ..."
-            }}
-          ]
-        }}
+        Generate a rigorous academic multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
+        Level: {student_level}. Focus on high-yield medical concepts and pathophysiology.
+        Provide deep clinical rationale for each question.
         """
 
-        for variant in self.model_variants:
-            for _ in range(len(GEMINI_API_KEYS)):
-                start_time = time.time()
-                current_key_idx = self.key_index % len(GEMINI_API_KEYS)
-                try:
-                    config = types.GenerateContentConfig(
-                        response_mime_type="application/json"
-                    )
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=QuizSchema, # Guaranteed JSON structure
+        )
 
-                    response = self.client.models.generate_content(
+        for variant in self.model_variants:
+            for _ in range(len(self.clients)):
+                start_time = time.time()
+                current_key_idx = self.key_index % len(self.clients)
+                current_client = self.clients[current_key_idx]
+
+                try:
+                    response = await current_client.aio.models.generate_content(
                         model=variant,
                         contents=prompt,
                         config=config
                     )
+                    duration = time.time() - start_time
+                    self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
 
-                    if response and response.text:
-                        raw_text = response.text.strip()
-                        if "```json" in raw_text:
-                            raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+                    return json.loads(response.text)
 
-                        duration = time.time() - start_time
-                        self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
-                        return json.loads(raw_text)
                 except Exception as e:
                     duration = time.time() - start_time
                     err_msg = str(e).lower()
+                    logger.error(f"❌ Quiz Error with {variant} (Key {current_key_idx}): {str(e)}")
                     self._log_performance(variant, current_key_idx, duration, "FAILED", task_name)
 
                     if "404" in err_msg:
                         break
 
-                    self._rotate_key()
-                    time.sleep(1)
+                    await self._rotate_key()
+                    await asyncio.sleep(1)
                     continue
+
         return None
 
-    def generate_timetable(self, user_info, quiz_history, active_units, recent_chat_titles, previous_timetable=None):
+    async def generate_timetable(self, user_info, quiz_history, active_units, recent_chat_titles, previous_timetable=None):
+        if not self.clients: return None
+        task_name = "Timetable"
+
         performance_summary = ""
         for q in quiz_history:
             performance_summary += f"- {q.unit_name}: {q.pnl}% score\n"
 
         chat_context = ", ".join(recent_chat_titles)
-
-        timetable_continuity = ""
-        if previous_timetable:
-            timetable_continuity = f"Previous Timetable Context:\n{json.dumps(previous_timetable)}\n"
+        timetable_continuity = f"Previous Context: {json.dumps(previous_timetable)}\n" if previous_timetable else ""
 
         prompt = f"""
         Generate a dynamic weekly study timetable for {user_info['username']}.
-        Current Level: {user_info['semester_status']}
         Active Units: {', '.join(active_units)}
-
-        Performance Context:
-        {performance_summary if performance_summary else "No assessments taken yet."}
-
-        Recent Consultation Topics:
-        {chat_context if chat_context else "No recent consultations."}
-
+        Performance: {performance_summary if performance_summary else "No assessments."}
+        Recent Topics: {chat_context if chat_context else "No recent consultations."}
         {timetable_continuity}
-
-        Format:
-        {{
-          "weekly_plan": [
-            {{ "day": "Monday", "time": "09:00 - 10:30", "activity": "Intensive Study: [Unit]", "unit": "[Unit]", "type": "Study" }},
-            ...
-          ],
-          "ai_brief": "Rationale..."
-        }}
         """
 
-        response = self.ask(prompt)
-        if response:
-            try:
-                raw_text = response.strip()
-                if "```json" in raw_text:
-                    raw_text = raw_text.split("```json")[1].split("```")[0].strip()
-                return json.loads(raw_text)
-            except:
-                logger.error("Failed to parse timetable JSON")
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=TimetableSchema,
+        )
+
+        for variant in self.model_variants:
+            for _ in range(len(self.clients)):
+                start_time = time.time()
+                current_key_idx = self.key_index % len(self.clients)
+                current_client = self.clients[current_key_idx]
+
+                try:
+                    response = await current_client.aio.models.generate_content(
+                        model=variant,
+                        contents=prompt,
+                        config=config
+                    )
+                    duration = time.time() - start_time
+                    self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
+                    return json.loads(response.text)
+                except Exception as e:
+                    duration = time.time() - start_time
+                    err_msg = str(e).lower()
+                    self._log_performance(variant, current_key_idx, duration, "FAILED", task_name)
+
+                    if "404" in err_msg:
+                        break
+
+                    await self._rotate_key()
+                    await asyncio.sleep(1)
+                    continue
         return None
 
-    def get_recommendations(self, user_info, quiz_history, active_units):
+    async def get_recommendations(self, user_info, quiz_history, active_units):
         history_summary = ""
         for q in quiz_history:
             history_summary += f"- {q.unit_name}: {q.pnl}% score\n"
@@ -229,12 +247,21 @@ class AiService:
         Persona: {user_info['ai_persona']}
         Level: {user_info['semester_status']}
         Active Units: {', '.join(active_units)}
-        Recent Performance:
-        {history_summary if history_summary else "No assessments taken yet."}
+        Recent Performance: {history_summary}
 
         Provide a concise study recommendation (max 3 sentences).
         """
 
-        return self.ask(prompt)
+        return await self.ask(prompt)
+
+    async def generate_learning_content(self, objective_description, username):
+        prompt = f"""
+        Objective: {objective_description}
+        Learner: {username}
+
+        Generate an interactive learning session for this objective.
+        Explain clearly, use Markdown, and end with a 'Check for Understanding' question.
+        """
+        return await self.ask(prompt)
 
 ai_service = AiService()

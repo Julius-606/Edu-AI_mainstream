@@ -13,7 +13,9 @@ data class UserEntity(
     @PrimaryKey val id: String,
     val username: String,
     val role: String,
-    val sensoryMode: String,
     val semesterStatus: String,
-    val aiPersona: String
+    val difficulty: String,
+    val aiPersona: String,
+    val lastRecommendationText: String = "",
+    val lastRecommendationDate: Long = 0
 )

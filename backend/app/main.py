@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.db.session import engine, Base, get_db
-from app.api import auth, users, ai, teacher, parent, learning
+from app.api import auth, users, ai, learning
 from app.core import security
 from app.models import database_models as models
 import ingestion_engine
@@ -64,8 +64,6 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(users.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
-app.include_router(teacher.router, prefix="/api")
-app.include_router(parent.router, prefix="/api")
 app.include_router(learning.router, prefix="/api")
 
 # Helper to find user (same as in users.py)

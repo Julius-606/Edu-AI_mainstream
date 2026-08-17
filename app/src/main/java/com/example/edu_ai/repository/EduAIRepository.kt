@@ -28,6 +28,7 @@ class EduAIRepository(
         dao.clearAllQuizHistory()
         dao.clearAllTimetables()
         dao.clearAllNotes()
+        dao.clearAllLearningContent()
     }
 
     fun getDashboardData(userId: String): Flow<UserEntity?> = flow {
@@ -41,8 +42,8 @@ class EduAIRepository(
                 id = userId,
                 username = response.username ?: userId,
                 role = response.role ?: "Student",
-                sensoryMode = response.sensoryMode ?: "Visual",
                 semesterStatus = response.semesterStatus ?: "Active",
+                difficulty = response.difficulty ?: "Medium (Standard)",
                 aiPersona = response.aiPersona ?: "Socratic Mentor"
             )
             dao.insertUser(userEntity)
@@ -50,13 +51,33 @@ class EduAIRepository(
             // Sync full hierarchy from backend if available
             if (response.units != null) {
                 response.units.forEach { apiUnit ->
-                    val unitId = dao.insertUnits(listOf(UnitEntity(unitName = apiUnit.name, isActive = apiUnit.isActive))).first()
+                    val unitId = dao.insertUnits(listOf(UnitEntity(
+                        localId = apiUnit.id.toLong(),
+                        unitName = apiUnit.name,
+                        isActive = apiUnit.isActive
+                    ))).first()
+                    
                     apiUnit.modules.forEach { apiModule ->
-                        val moduleId = dao.insertModules(listOf(ModuleEntity(unitId = unitId, name = apiModule.name))).first()
+                        val moduleId = dao.insertModules(listOf(ModuleEntity(
+                            moduleId = apiModule.id.toLong(),
+                            unitId = unitId,
+                            name = apiModule.name
+                        ))).first()
+                        
                         apiModule.topics.forEach { apiTopic ->
-                            val topicId = dao.insertTopics(listOf(TopicEntity(moduleId = moduleId, name = apiTopic.name))).first()
+                            val topicId = dao.insertTopics(listOf(TopicEntity(
+                                topicId = apiTopic.id.toLong(),
+                                moduleId = moduleId,
+                                name = apiTopic.name
+                            ))).first()
+                            
                             val subtopics = apiTopic.subtopics.map { apiSubtopic ->
-                                SubtopicEntity(topicId = topicId, name = apiSubtopic.name, isCompleted = apiSubtopic.isCompleted)
+                                SubtopicEntity(
+                                    subtopicId = apiSubtopic.id.toLong(),
+                                    topicId = topicId,
+                                    name = apiSubtopic.name,
+                                    isCompleted = apiSubtopic.isCompleted
+                                )
                             }
                             dao.insertSubtopics(subtopics)
                         }
@@ -94,42 +115,11 @@ class EduAIRepository(
                     id = userId,
                     username = userId,
                     role = "Student",
-                    sensoryMode = "Visual",
-                    semesterStatus = "Year 4 - Redemption Arc 🔥",
+                    semesterStatus = "Active",
+                    difficulty = "Medium (Standard)",
                     aiPersona = "Socratic Mentor"
                 )
                 dao.insertUser(devUser)
-
-                val devUnits = listOf(
-                    UnitEntity(unitName = "Biochemistry II", isActive = true),
-                    UnitEntity(unitName = "General Surgery", isActive = true),
-                    UnitEntity(unitName = "Internal Medicine", isActive = true)
-                )
-                dao.insertUnits(devUnits)
-
-                // Mock hierarchy for visualization
-                val units = dao.getAllUnits().first()
-                units.forEach { unit: UnitEntity ->
-                    val moduleIds = dao.insertModules(listOf(
-                        ModuleEntity(unitId = unit.localId, name = "Introduction"),
-                        ModuleEntity(unitId = unit.localId, name = "Core Mechanisms")
-                    ))
-                    
-                    moduleIds.forEach { moduleId ->
-                        val topicIds = dao.insertTopics(listOf(
-                            TopicEntity(moduleId = moduleId, name = "Fundamental Concepts"),
-                            TopicEntity(moduleId = moduleId, name = "Advanced Applications")
-                        ))
-                        
-                        topicIds.forEach { topicId ->
-                            dao.insertSubtopics(listOf(
-                                SubtopicEntity(topicId = topicId, name = "Overview", isCompleted = true),
-                                SubtopicEntity(topicId = topicId, name = "Key Terms", isCompleted = false)
-                            ))
-                        }
-                    }
-                }
-
                 emit(devUser)
             }
         }
@@ -182,7 +172,19 @@ class EduAIRepository(
     // --- Parent Portal Methods ---
     suspend fun getParentDashboard(studentId: String) = api.getParentDashboard(studentId)
 
+    suspend fun getDashboardResponse(userId: String): com.example.edu_ai.data.remote.DashboardResponse {
+        return api.getDashboard(userId)
+    }
+
     // --- Ingestion / Library Methods ---
     suspend fun getLibraryUnits() = api.getLibraryUnits()
     suspend fun addUnitToUser(unitId: Int, userId: String) = api.addUnitToUser(unitId, userId)
+
+    // --- Learning Trace Methods ---
+    suspend fun getLearningSession(subtopicId: Int, userId: String) = api.getLearningSession(subtopicId, userId)
+    suspend fun nextObjective(subtopicId: Int, userId: String, userMessage: String? = null) = api.nextObjective(subtopicId, userId)
+
+    suspend fun saveLearningContent(content: LearningContentEntity) = dao.insertLearningContent(content)
+    fun getSavedLearningContent(subtopicId: Long) = dao.getLearningContentForSubtopic(subtopicId)
+    suspend fun updateSubtopicProgress(subtopicId: Long, isCompleted: Boolean) = dao.updateSubtopicStatus(subtopicId, isCompleted)
 }

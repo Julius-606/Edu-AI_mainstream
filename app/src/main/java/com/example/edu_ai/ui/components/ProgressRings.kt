@@ -78,37 +78,15 @@ fun ProgressRings(
             }
         }
 
-        // Center Content: Scrollable Learning Objectives
-        Column(
+        // Center Content: Removed FOCUS as per user request
+        Box(
             modifier = Modifier
                 .size(110.dp)
                 .padding(4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "FOCUS",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                items(learningObjectives) { objective ->
-                    Text(
-                        text = objective,
-                        fontSize = 9.sp,
-                        lineHeight = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(vertical = 1.dp)
-                    )
-                }
-            }
+            // Empty box or maybe just the percentage of the outermost ring?
+            // The user said "Instead let the concentric rings just be."
         }
     }
 }

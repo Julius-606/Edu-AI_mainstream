@@ -19,18 +19,23 @@ def find_user(user_id_or_name: str, db: Session):
     return user
 
 def user_response(user: models.User) -> schemas.UserResponseSchema:
-    response = schemas.UserResponseSchema.model_validate(user)
-    response.active_units = user.active_units_list
-    return response
+    # Manual mapping to exclude sensory_mode if it exists in the model but not in the schema
+    return schemas.UserResponseSchema(
+        id=user.id,
+        username=user.username,
+        role=user.role,
+        difficulty=user.difficulty,
+        ai_persona=user.ai_persona,
+        semester_status=user.semester_status,
+        interests=user.interests,
+        active_units=user.active_units_list
+    )
 
 @router.get("/{user_id}", response_model=schemas.UserResponseSchema)
 def get_user(user_id: str, db: Session = Depends(get_db)):
     user = find_user(user_id, db)
     if not user:
-        # Auto-create logic from main.py
-        role = "Student"
-        if "teacher" in user_id.lower(): role = "Teacher"
-        user = models.User(username=user_id, role=role)
+        user = models.User(username=user_id, role="Student")
         db.add(user)
         db.commit()
         db.refresh(user)
@@ -47,14 +52,21 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         db.refresh(user)
 
     active_units = db.query(models.Unit).filter(models.Unit.owner_id == user.id, models.Unit.is_active == True).all()
-    if not active_units:
-        defaults = ["Biochemistry II", "General Surgery", "Internal Medicine"]
-        for name in defaults:
-            db.add(models.Unit(name=name, owner_id=user.id))
-        db.commit()
-        active_units = db.query(models.Unit).filter(models.Unit.owner_id == user.id, models.Unit.is_active == True).all()
-
     unit_names = [u.name for u in active_units]
+
+    # Trace logic: Find the last learning progress
+    last_progress = db.query(models.UserSyllabusProgress).filter(
+        models.UserSyllabusProgress.user_id == user.id,
+        models.UserSyllabusProgress.status == "In_Progress"
+    ).order_by(models.UserSyllabusProgress.last_studied_at.desc()).first()
+
+    last_point = "Start your journey"
+    if last_progress:
+        # Resolve node name based on type
+        if last_progress.node_type == "objective":
+            obj = db.query(models.LearningObjective).filter(models.LearningObjective.id == last_progress.node_id).first()
+            if obj: last_point = f"Resume: {obj.description[:50]}..."
+
     quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
     total_quizzes = len(quizzes)
     average_pnl = sum([q.pnl for q in quizzes]) / total_quizzes if total_quizzes > 0 else 0.0
@@ -63,7 +75,6 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     return schemas.DashboardResponse(
         username=user.username,
         role=user.role,
-        sensory_mode=user.sensory_mode,
         semester_status=user.semester_status,
         difficulty=user.difficulty,
         ai_persona=user.ai_persona,
@@ -72,7 +83,8 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         average_pnl=round(average_pnl, 2),
         total_quizzes=total_quizzes,
         quiz_history=[schemas.QuizHistoryResponse(unit_name=q.unit_name, pnl=q.pnl, timestamp=q.timestamp) for q in quizzes],
-        chat_history=[schemas.ChatMessageResponse(role=c.role, content=c.content, timestamp=c.timestamp or "") for c in chat_messages]
+        chat_history=[schemas.ChatMessageResponse(role=c.role, content=c.content, timestamp=c.timestamp or "") for c in chat_messages],
+        last_point=last_point
     )
 
 @router.get("/{user_id}/timetable", response_model=schemas.TimetableResponse)

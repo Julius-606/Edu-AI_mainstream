@@ -14,8 +14,18 @@ def find_user(user_id_or_name: str, db: Session):
         return db.query(models.User).filter(models.User.id == int(user_id_or_name)).first()
     return db.query(models.User).filter(models.User.username == str(user_id_or_name)).first()
 
+@router.get("/health")
+async def ai_health():
+    # Simplified health check focusing on internal state
+    return {
+        "status": "online",
+        "active_models": ai_service.model_variants,
+        "current_key_index": ai_service.key_index,
+        "total_keys_loaded": len(ai_service.clients)
+    }
+
 @router.post("/chat", response_model=schemas.ChatResponse)
-def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
+async def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
     user = find_user(str(request.user_id), db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -31,7 +41,9 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
         history_text += f"{msg.role}: {msg.content}\n"
 
     full_prompt = f"{history_text}User: {request.prompt}"
-    response_text = ai_service.ask(prompt=full_prompt, system_instruction=system_instruction)
+
+    # AWAIT the async service call
+    response_text = await ai_service.ask(prompt=full_prompt, system_instruction=system_instruction)
 
     if not response_text:
         raise HTTPException(status_code=500, detail="AI engine is currently unavailable.")
@@ -43,7 +55,7 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
     return schemas.ChatResponse(response=response_text)
 
 @router.post("/quiz", response_model=schemas.QuizResponse)
-def generate_quiz(
+async def generate_quiz(
     request: schemas.QuizRequest,
     topic: Optional[str] = Query(None),
     db: Session = Depends(get_db)
@@ -52,7 +64,8 @@ def generate_quiz(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    quiz_data = ai_service.generate_quiz(
+    # AWAIT the async service call
+    quiz_data = await ai_service.generate_quiz(
         unit_name=request.unit_name,
         student_level=user.semester_status,
         topic=topic
@@ -62,7 +75,7 @@ def generate_quiz(
     return quiz_data
 
 @router.get("/recommendations/{user_id}", response_model=schemas.RecommendationResponse)
-def get_recommendations(user_id: str, db: Session = Depends(get_db)):
+async def get_recommendations(user_id: str, db: Session = Depends(get_db)):
     user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -76,5 +89,6 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db)):
         "semester_status": user.semester_status
     }
 
-    rec_text = ai_service.get_recommendations(user_info, quiz_history, active_units)
+    # AWAIT the async service call
+    rec_text = await ai_service.get_recommendations(user_info, quiz_history, active_units)
     return schemas.RecommendationResponse(recommendation=rec_text or "Keep going!")

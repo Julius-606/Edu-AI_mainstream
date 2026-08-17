@@ -40,17 +40,32 @@ class ProgressViewModel(
         initialValue = ProgressUiState(isLoading = true)
     )
 
-    private val _recommendation = MutableStateFlow("Analyze your recent quizzes to see where you can grow.")
+    private val _recommendation = MutableStateFlow(user.lastRecommendationText.ifEmpty { "Analyze your recent quizzes to see where you can grow." })
     val recommendation: StateFlow<String> = _recommendation.asStateFlow()
 
     fun refreshRecommendations() {
         viewModelScope.launch {
+            val oneDayInMillis = 24 * 60 * 60 * 1000L
+            val isFresh = (System.currentTimeMillis() - user.lastRecommendationDate) < oneDayInMillis
+            
+            if (isFresh && user.lastRecommendationText.isNotEmpty()) {
+                _recommendation.value = user.lastRecommendationText
+                return@launch
+            }
+
             _isLoading.value = true
             try {
                 val rec = aiService.getRecommendations(user)
                 _recommendation.value = rec
+                // Update user in DB
+                dao.insertUser(user.copy(
+                    lastRecommendationText = rec,
+                    lastRecommendationDate = System.currentTimeMillis()
+                ))
             } catch (e: Exception) {
-                _recommendation.value = "Stay consistent! Your next breakthrough is just one study session away."
+                if (user.lastRecommendationText.isEmpty()) {
+                    _recommendation.value = "Stay consistent! Your next breakthrough is just one study session away."
+                }
             } finally {
                 _isLoading.value = false
             }

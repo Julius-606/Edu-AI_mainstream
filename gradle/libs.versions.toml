@@ -11,10 +11,11 @@ composeBom = "2024.12.01"
 retrofit = "2.11.0"
 room = "2.7.0-alpha11"
 coroutines = "1.9.0"
-ksp = "2.3.2"
+ksp = "2.2.10-2.0.2"
 navigationCompose = "2.8.5"
 generativeAi = "0.9.0"
 securityCrypto = "1.1.0-alpha06"
+coil = "2.6.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -37,6 +38,7 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 google-generativeai = { group = "com.google.ai.client.generativeai", name = "generativeai", version.ref = "generativeAi" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
 # Retrofit
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }

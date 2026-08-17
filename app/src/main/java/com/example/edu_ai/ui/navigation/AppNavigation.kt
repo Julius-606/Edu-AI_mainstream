@@ -12,13 +12,12 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.edu_ai.EduAIApplication
 import com.example.edu_ai.ui.screens.LoginScreen
+import com.example.edu_ai.ui.screens.student.LearnScreen
 import com.example.edu_ai.ui.screens.student.LibraryScreen
+import com.example.edu_ai.ui.screens.student.LearningRepositoryScreen
 import com.example.edu_ai.ui.screens.student.ModuleScreen
 import com.example.edu_ai.ui.screens.student.StudentDashboard
-import com.example.edu_ai.ui.screens.teacher.TeacherDashboard
-import com.example.edu_ai.ui.screens.teacher.TeacherViewModel
-import com.example.edu_ai.ui.screens.teacher.TeacherViewModelFactory
-import com.example.edu_ai.ui.screens.parent.ParentDashboard
+import com.example.edu_ai.ui.screens.student.UnitOutlineScreen
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
@@ -34,12 +33,7 @@ fun AppNavigation() {
     LaunchedEffect(Unit) {
         val user = dao.getUser().firstOrNull()
         if (user != null) {
-            val destination = when (user.role) {
-                "Teacher" -> "teacher_dashboard"
-                "Parent" -> "parent_dashboard/${user.id}"
-                else -> "student_dashboard/${user.id}"
-            }
-            navController.navigate(destination) {
+            navController.navigate("student_dashboard/${user.id}") {
                 popUpTo("login") { inclusive = true }
             }
         }
@@ -50,17 +44,15 @@ fun AppNavigation() {
         composable("login") {
             LoginScreen(
                 onLoginSuccess = { role, userId ->
-                    val destination = when (role) {
-                        "Teacher" -> "teacher_dashboard"
-                        "Parent" -> "parent_dashboard/$userId"
-                        else -> "student_dashboard/$userId"
-                    }
-                    navController.navigate(destination) {
+                    navController.navigate("student_dashboard/$userId") {
                         popUpTo("login") { inclusive = true }
                     }
                 }
             )
         }
+
+
+// ... (inside NavHost)
 
         composable(
             route = "student_dashboard/{userId}",
@@ -77,12 +69,53 @@ fun AppNavigation() {
                         }
                     }
                 },
-                onLaunchModule = {
-                    navController.navigate("module_screen/$userId")
+                onLaunchModule = { subtopicId ->
+                    if (subtopicId != null) {
+                        navController.navigate("learn_screen/$userId/$subtopicId")
+                    } else {
+                        navController.navigate("module_screen/$userId")
+                    }
                 },
                 onOpenLibrary = {
                     navController.navigate("library_screen/$userId")
+                },
+                onViewUnitOutline = { unitId ->
+                    navController.navigate("unit_outline/$unitId")
+                },
+                onOpenConsultations = {
+                    navController.navigate("module_screen/$userId")
                 }
+            )
+        }
+
+        composable(
+            route = "unit_outline/{unitId}",
+            arguments = listOf(navArgument("unitId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val unitId = backStackEntry.arguments?.getLong("unitId") ?: 0L
+            UnitOutlineScreen(
+                unitId = unitId,
+                onBack = { navController.popBackStack() },
+                onViewSubtopicRepository = { subtopicId, name ->
+                    navController.navigate("learning_repository/$subtopicId/$name")
+                }
+            )
+        }
+
+        composable(
+            route = "learning_repository/{subtopicId}/{subtopicName}",
+            arguments = listOf(
+                navArgument("subtopicId") { type = NavType.LongType },
+                navArgument("subtopicName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val subtopicId = backStackEntry.arguments?.getLong("subtopicId") ?: 0L
+            val subtopicName = backStackEntry.arguments?.getString("subtopicName") ?: ""
+            LearningRepositoryScreen(
+                subtopicId = subtopicId,
+                subtopicName = subtopicName,
+                onBack = { navController.popBackStack() },
+                repository = repository
             )
         }
 
@@ -113,38 +146,22 @@ fun AppNavigation() {
             )
         }
 
-        composable("teacher_dashboard") {
-            val teacherViewModel: TeacherViewModel = viewModel(
-                factory = TeacherViewModelFactory(repository)
-            )
-            TeacherDashboard(
-                viewModel = teacherViewModel,
-                onLogout = {
-                    scope.launch {
-                        repository.logout(context)
-                        navController.navigate("login") {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    }
-                }
-            )
-        }
-
         composable(
-            route = "parent_dashboard/{studentId}",
-            arguments = listOf(navArgument("studentId") { type = NavType.StringType })
+            route = "learn_screen/{userId}/{subtopicId}",
+            arguments = listOf(
+                navArgument("userId") { type = NavType.StringType },
+                navArgument("subtopicId") { type = NavType.IntType }
+            )
         ) { backStackEntry ->
-            val studentId = backStackEntry.arguments?.getString("studentId") ?: ""
-            ParentDashboard(
-                studentId = studentId,
-                repository = repository,
-                onLogout = {
-                    scope.launch {
-                        repository.logout(context)
-                        navController.navigate("login") {
-                            popUpTo(0) { inclusive = true }
-                        }
-                    }
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            val subtopicId = backStackEntry.arguments?.getInt("subtopicId") ?: 0
+            LearnScreen(
+                subtopicId = subtopicId,
+                userId = userId,
+                onBack = { navController.popBackStack() },
+                onTriggerQuiz = {
+                    // Navigate to Quiz Screen (using existing logic)
+                    navController.navigate("quiz_screen/$userId") // Adjust if needed
                 }
             )
         }

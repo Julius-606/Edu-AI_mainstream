@@ -348,8 +348,8 @@ fun ZenithTab(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         ProfileInfoRow(label = "Username", value = user.username)
                         ProfileInfoRow(label = "AI Persona", value = user.aiPersona)
-                        ProfileInfoRow(label = "Difficulty", value = user.semesterStatus)
-                        ProfileInfoRow(label = "Sensory Mode", value = user.sensoryMode)
+                        ProfileInfoRow(label = "Difficulty", value = user.difficulty)
+                        ProfileInfoRow(label = "Status", value = user.semesterStatus)
                     }
                 }
             }

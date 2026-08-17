@@ -1,9 +1,11 @@
 package com.example.edu_ai.ui.screens.student
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ExitToApp
@@ -37,14 +39,16 @@ import com.example.edu_ai.ui.theme.TraceTheme
 fun StudentDashboard(
     userId: String,
     onLogout: () -> Unit,
-    onLaunchModule: () -> Unit,
+    onLaunchModule: (Int?) -> Unit,
     onOpenLibrary: () -> Unit,
+    onViewUnitOutline: (Long) -> Unit,
+    onOpenConsultations: () -> Unit,
     viewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
     // Use the userId directly if user entity is not yet loaded in DAO
-    val user = uiState.user ?: UserEntity(id = userId, username = "Student", role = "student", sensoryMode = "Visual", semesterStatus = "Active", aiPersona = "Helper")
+    val user = uiState.user ?: UserEntity(id = userId, username = "Student", role = "student", difficulty = "Medium (Standard)", semesterStatus = "Active", aiPersona = "Helper")
 
     val progressViewModel: ProgressViewModel = viewModel(factory = ProgressViewModel.provideFactory(user))
     val recommendation by progressViewModel.recommendation.collectAsState()
@@ -64,7 +68,9 @@ fun StudentDashboard(
         timetableUiState = timetableUiState,
         onLogout = onLogout,
         onLaunchModule = onLaunchModule,
-        onOpenLibrary = onOpenLibrary
+        onOpenLibrary = onOpenLibrary,
+        onViewUnitOutline = onViewUnitOutline,
+        onOpenConsultations = onOpenConsultations
     )
 }
 
@@ -76,8 +82,10 @@ fun StudentDashboardContent(
     recommendation: String,
     timetableUiState: TimetableUiState,
     onLogout: () -> Unit,
-    onLaunchModule: () -> Unit,
-    onOpenLibrary: () -> Unit
+    onLaunchModule: (Int?) -> Unit,
+    onOpenLibrary: () -> Unit,
+    onViewUnitOutline: (Long) -> Unit,
+    onOpenConsultations: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         DynamicBackground()
@@ -93,6 +101,9 @@ fun StudentDashboardContent(
                         }
                     },
                     actions = {
+                        IconButton(onClick = onOpenConsultations) {
+                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Consultations", tint = MaterialTheme.colorScheme.primary)
+                        }
                         IconButton(onClick = onLogout) {
                             Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
                         }
@@ -133,13 +144,15 @@ fun StudentDashboardContent(
                             )
                         }
                         
-                        FilledTonalButton(
-                            onClick = onOpenLibrary,
-                            shape = MaterialTheme.shapes.medium
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("ADD UNIT")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                             FilledTonalButton(
+                                onClick = onOpenLibrary,
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("UNIT")
+                            }
                         }
                     }
                 }
@@ -186,13 +199,13 @@ fun StudentDashboardContent(
                         ) {
                             Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    "No course data available yet.", 
+                                    "Your library is empty.", 
                                     style = MaterialTheme.typography.bodyMedium,
                                     textAlign = TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Button(onClick = onLaunchModule) {
-                                    Text("EXPLORE COURSES")
+                                Button(onClick = onOpenLibrary) {
+                                    Text("ADD YOUR FIRST UNIT")
                                 }
                             }
                         }
@@ -218,11 +231,8 @@ fun StudentDashboardContent(
                     val moduleProgress = if (currentModuleSubtopics.isNotEmpty()) {
                         (currentModuleSubtopics.count { it.isCompleted }.toFloat() / currentModuleSubtopics.size) * 100f
                     } else 0f
-
-                    // Objectives for the center
-                    val objectives = if (currentModuleSubtopics.isNotEmpty()) {
-                        currentModuleSubtopics.map { it.name }
-                    } else listOf("Explore Unit")
+                    
+                    val currentSubtopic = allSubtopics.find { !it.isCompleted } ?: allSubtopics.lastOrNull()
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -236,13 +246,13 @@ fun StudentDashboardContent(
                             val rings = listOf(
                                 RingProgress(unitProgress, MaterialTheme.colorScheme.primary, "Unit"),
                                 RingProgress(moduleProgress, MaterialTheme.colorScheme.secondary, "Module"),
-                                RingProgress(30f, MaterialTheme.colorScheme.tertiary, "Subtopic") // Mock sub-module progress
+                                RingProgress(if (currentSubtopic?.isCompleted == true) 100f else 0f, MaterialTheme.colorScheme.tertiary, "Subtopic")
                             )
                             
                             ProgressRings(
                                 rings = rings,
-                                learningObjectives = objectives,
-                                modifier = Modifier.size(140.dp)
+                                learningObjectives = emptyList(), // Removed FOCUS list
+                                modifier = Modifier.size(120.dp)
                             )
                             
                             Spacer(modifier = Modifier.width(20.dp))
@@ -251,17 +261,27 @@ fun StudentDashboardContent(
                                 Text(
                                     unit.unitName, 
                                     fontWeight = FontWeight.ExtraBold, 
-                                    fontSize = 22.sp,
-                                    lineHeight = 26.sp
+                                    fontSize = 20.sp,
+                                    lineHeight = 24.sp,
+                                    modifier = Modifier.clickable { onViewUnitOutline(unit.localId) }
+                                )
+                                Text(
+                                    currentSubtopic?.name ?: "Unit Completed", 
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
                                 )
                                 Text(
                                     currentModule?.module?.name ?: "No Active Module", 
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
                                 Button(
-                                    onClick = onLaunchModule,
+                                    onClick = { 
+                                        val subtopicToStart = allSubtopics.find { !it.isCompleted } ?: allSubtopics.firstOrNull()
+                                        onLaunchModule(subtopicToStart?.subtopicId?.toInt())
+                                    },
                                     shape = MaterialTheme.shapes.medium,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
@@ -318,6 +338,36 @@ fun StudentDashboardContent(
                         }
                     }
                 }
+
+                // Full Weekly Timetable
+                item {
+                    Text("Weekly Schedule", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+
+                if (timetableUiState.weeklyPlan.isNotEmpty()) {
+                    val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+                    items(days) { day ->
+                        val slotsForDay = timetableUiState.weeklyPlan.filter { it.day.equals(day, ignoreCase = true) }
+                        if (slotsForDay.isNotEmpty()) {
+                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                Text(day, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                slotsForDay.forEach { slot ->
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                        shape = MaterialTheme.shapes.small
+                                    ) {
+                                        Row(modifier = Modifier.padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("${slot.time}: ${slot.activity}", style = MaterialTheme.typography.bodySmall)
+                                            Text(slot.type, style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 
                 item { Spacer(modifier = Modifier.height(40.dp)) }
             }
@@ -332,7 +382,7 @@ fun StudentDashboardPreview() {
         id = "1",
         username = "Jay",
         role = "student",
-        sensoryMode = "Visual",
+        difficulty = "Medium (Standard)",
         semesterStatus = "Year 4 - Semester 2",
         aiPersona = "Motivator"
     )
@@ -382,7 +432,9 @@ fun StudentDashboardPreview() {
             timetableUiState = sampleTimetableUiState,
             onLogout = {},
             onLaunchModule = {},
-            onOpenLibrary = {}
+            onOpenLibrary = {},
+            onViewUnitOutline = {},
+            onOpenConsultations = {}
         )
     }
 }

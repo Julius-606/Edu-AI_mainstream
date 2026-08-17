@@ -67,6 +67,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.google.generativeai)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.coil.compose)
 
     // Retrofit
     implementation(libs.retrofit)

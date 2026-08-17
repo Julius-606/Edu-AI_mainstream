@@ -68,4 +68,18 @@ interface EduAIApi {
         @Path("unit_id") unitId: Int,
         @Query("user_id") userId: String
     ): Map<String, String>
+
+    // --- Learning Trace Endpoints ---
+
+    @GET("api/learning/session/{subtopic_id}")
+    suspend fun getLearningSession(
+        @Path("subtopic_id") subtopicId: Int,
+        @Query("user_id") userId: String
+    ): Map<String, Any>
+
+    @POST("api/learning/next/{subtopic_id}")
+    suspend fun nextObjective(
+        @Path("subtopic_id") subtopicId: Int,
+        @Query("user_id") userId: String
+    ): Map<String, Any>
 }

@@ -6,7 +6,6 @@ import com.google.gson.annotations.SerializedName
 data class DashboardResponse(
     @SerializedName("username") val username: String? = null,
     @SerializedName("role") val role: String? = null,
-    @SerializedName("sensory_mode") val sensoryMode: String? = null,
     @SerializedName("semester_status") val semesterStatus: String? = null,
     @SerializedName("difficulty") val difficulty: String? = null,
     @SerializedName("ai_persona") val aiPersona: String? = null,
@@ -15,7 +14,8 @@ data class DashboardResponse(
     @SerializedName("average_pnl") val averagePnl: Double? = null,
     @SerializedName("total_quizzes") val totalQuizzes: Int? = null,
     @SerializedName("quiz_history") val quizHistory: List<ApiQuizHistory>? = null,
-    @SerializedName("chat_history") val chatHistory: List<ApiChatHistory>? = null
+    @SerializedName("chat_history") val chatHistory: List<ApiChatHistory>? = null,
+    @SerializedName("last_point") val lastPoint: String? = null
 )
 
 data class ApiUnit(

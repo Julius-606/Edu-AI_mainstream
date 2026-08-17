@@ -134,4 +134,14 @@ interface EduAIDao {
 
     @Query("DELETE FROM notes")
     suspend fun clearAllNotes()
+
+    // Learning Content
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLearningContent(content: LearningContentEntity)
+
+    @Query("SELECT * FROM learning_content WHERE subtopicId = :subtopicId ORDER BY timestamp ASC")
+    fun getLearningContentForSubtopic(subtopicId: Long): Flow<List<LearningContentEntity>>
+
+    @Query("DELETE FROM learning_content")
+    suspend fun clearAllLearningContent()
 }
