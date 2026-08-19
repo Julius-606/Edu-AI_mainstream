@@ -21,22 +21,29 @@ class EduAIRepository(
 
     suspend fun logout(context: Context) {
         PreferenceManager.clearToken(context)
-        dao.clearUsers()
-        dao.deleteAllUnits()
-        dao.clearAllChatSessions()
-        dao.clearAllChatHistory()
-        dao.clearAllQuizHistory()
-        dao.clearAllTimetables()
-        dao.clearAllNotes()
-        dao.clearAllLearningContent()
+        PreferenceManager.clearLastUserId(context)
+        // We no longer clear all data here to support multi-user offline persistence.
+        // dao.clearUsers() 
+        // dao.deleteAllUnits()
+        // ...
+    }
+
+    suspend fun offlineLogin(email: String, password: String): UserEntity? {
+        val user = dao.getUserByEmail(email)
+        // Simple password check - in a real app use BCrypt or similar
+        return if (user != null && user.passwordHash == password) {
+            user
+        } else {
+            null
+        }
     }
 
     fun getDashboardData(userId: String): Flow<UserEntity?> = flow {
         try {
             val response = api.getDashboard(userId)
-            // Instead of clearing everything, we sync. 
-            // We can clear units for THIS user if we want a fresh list of active units.
-            dao.deleteAllUnits() 
+            
+            // PRESERVE CREDENTIALS
+            val existingUser = dao.getUserById(userId)
 
             val userEntity = UserEntity(
                 id = userId,
@@ -44,15 +51,21 @@ class EduAIRepository(
                 role = response.role ?: "Student",
                 semesterStatus = response.semesterStatus ?: "Active",
                 difficulty = response.difficulty ?: "Medium (Standard)",
-                aiPersona = response.aiPersona ?: "Socratic Mentor"
+                aiPersona = response.aiPersona ?: "Socratic Mentor",
+                email = existingUser?.email ?: "",
+                passwordHash = existingUser?.passwordHash ?: ""
             )
             dao.insertUser(userEntity)
-            
+
             // Sync full hierarchy from backend if available
             if (response.units != null) {
+                // We'll rely on REPLACE to update, but we might have orphans if units are deleted on backend.
+                // dao.deleteUnitsForUser(userId) 
+                
                 response.units.forEach { apiUnit ->
                     val unitId = dao.insertUnits(listOf(UnitEntity(
                         localId = apiUnit.id.toLong(),
+                        userId = userId,
                         unitName = apiUnit.name,
                         isActive = apiUnit.isActive
                     ))).first()
@@ -85,14 +98,14 @@ class EduAIRepository(
                 }
             } else {
                 val unitEntities = response.activeUnits?.map { unitName ->
-                    UnitEntity(unitName = unitName, isActive = true)
+                    UnitEntity(userId = userId, unitName = unitName, isActive = true)
                 } ?: emptyList()
-                dao.insertUnits(unitEntities)
+                if (unitEntities.isNotEmpty()) {
+                    dao.insertUnits(unitEntities)
+                }
             }
 
-            // Sync quiz history (REPLACE will handle duplicates if we had IDs, 
-            // but since we generate local IDs, we might get duplicates if we are not careful.
-            // For now, let's just insert. Ideally we'd have unique IDs from backend.)
+            // Sync quiz history (REPLACE will handle duplicates if we had IDs)
             response.quizHistory?.forEach { q ->
                 dao.insertQuizHistory(
                     QuizHistoryEntity(
@@ -123,6 +136,22 @@ class EduAIRepository(
                 emit(devUser)
             }
         }
+    }
+
+    suspend fun syncUserToLocal(userId: String, email: String, passwordHash: String) {
+        val response = api.getDashboard(userId)
+        val existingUser = dao.getUserById(userId)
+        val userEntity = UserEntity(
+            id = userId,
+            username = response.username ?: userId,
+            role = response.role ?: "Student",
+            semesterStatus = response.semesterStatus ?: "Active",
+            difficulty = response.difficulty ?: "Medium (Standard)",
+            aiPersona = response.aiPersona ?: "Socratic Mentor",
+            email = email.ifBlank { existingUser?.email ?: "" },
+            passwordHash = passwordHash.ifBlank { existingUser?.passwordHash ?: "" }
+        )
+        dao.insertUser(userEntity)
     }
 
     suspend fun getWeeklyTimetable(userId: String): ApiTimetableResponse {
@@ -186,5 +215,12 @@ class EduAIRepository(
 
     suspend fun saveLearningContent(content: LearningContentEntity) = dao.insertLearningContent(content)
     fun getSavedLearningContent(subtopicId: Long) = dao.getLearningContentForSubtopic(subtopicId)
-    suspend fun updateSubtopicProgress(subtopicId: Long, isCompleted: Boolean) = dao.updateSubtopicStatus(subtopicId, isCompleted)
+    suspend fun updateSubtopicProgress(subtopicId: Long, isCompleted: Boolean) {
+        dao.updateSubtopicStatus(subtopicId, isCompleted)
+        try {
+            api.updateSubtopicProgress(subtopicId.toInt(), isCompleted)
+        } catch (e: Exception) {
+            // Background sync could be added here
+        }
+    }
 }

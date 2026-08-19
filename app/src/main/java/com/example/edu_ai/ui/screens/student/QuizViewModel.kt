@@ -62,7 +62,7 @@ class QuizViewModel(
 
     private fun loadUnitsWithModules() {
         viewModelScope.launch {
-            dao.getAllUnitsWithModules().collect { units ->
+            dao.getAllUnitsWithModules(user.id).collect { units ->
                 _uiState.update { it.copy(unitsWithModules = units) }
             }
         }

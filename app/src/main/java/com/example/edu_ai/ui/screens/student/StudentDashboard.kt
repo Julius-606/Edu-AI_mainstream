@@ -389,7 +389,7 @@ fun StudentDashboardPreview() {
 
     val sampleUnitsWithModules = listOf(
         UnitWithModules(
-            unit = UnitEntity(localId = 1L, unitName = "Data Science", isActive = true),
+            unit = UnitEntity(localId = 1L, userId = "1", unitName = "Data Science", isActive = true),
             modules = listOf(
                 ModuleWithTopics(
                     module = ModuleEntity(moduleId = 1L, unitId = 1L, name = "Introduction to ML"),

@@ -17,5 +17,7 @@ data class UserEntity(
     val difficulty: String,
     val aiPersona: String,
     val lastRecommendationText: String = "",
-    val lastRecommendationDate: Long = 0
+    val lastRecommendationDate: Long = 0,
+    val email: String = "",
+    val passwordHash: String = "" // In a real app, this should be a secure hash
 )

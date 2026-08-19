@@ -13,6 +13,9 @@ interface EduAIDao {
 
     @Query("SELECT * FROM users LIMIT 1")
     fun getUser(): Flow<UserEntity?>
+
+    @Query("SELECT * FROM users WHERE email = :email LIMIT 1")
+    suspend fun getUserByEmail(email: String): UserEntity?
     
     @Query("SELECT * FROM users WHERE id = :userId")
     suspend fun getUserById(userId: String): UserEntity?
@@ -24,12 +27,15 @@ interface EduAIDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUnits(units: List<UnitEntity>): List<Long>
 
-    @Query("SELECT * FROM units")
-    fun getAllUnits(): Flow<List<UnitEntity>>
+    @Query("SELECT * FROM units WHERE userId = :userId")
+    fun getAllUnits(userId: String): Flow<List<UnitEntity>>
 
     @Transaction
-    @Query("SELECT * FROM units")
-    fun getAllUnitsWithModules(): Flow<List<UnitWithModules>>
+    @Query("SELECT * FROM units WHERE userId = :userId")
+    fun getAllUnitsWithModules(userId: String): Flow<List<UnitWithModules>>
+
+    @Query("DELETE FROM units WHERE userId = :userId")
+    suspend fun deleteUnitsForUser(userId: String)
 
     @Query("DELETE FROM units")
     suspend fun deleteAllUnits()

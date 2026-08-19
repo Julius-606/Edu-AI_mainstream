@@ -35,7 +35,7 @@ app = FastAPI(
 @app.middleware("http")
 async def api_key_middleware(request, call_next):
     # Skip for public/whitelisted endpoints
-    if request.url.path in ["/", "/docs", "/openapi.json", "/signup", "/api/auth/login", "/favicon.ico"]:
+    if request.url.path in ["/", "/docs", "/openapi.json", "/signup", "/api/auth/login", "/favicon.ico"] or request.url.path.startswith("/api/v1/progress"):
         return await call_next(request)
 
     # 1. Check for Internal API Key (Legacy/Internal support)

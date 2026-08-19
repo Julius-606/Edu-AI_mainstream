@@ -29,29 +29,42 @@ class StudentViewModel(private val repository: EduAIRepository, private val dao:
     private val _error = MutableStateFlow<String?>(null)
     private val _dashboardResponse = MutableStateFlow<DashboardResponse?>(null)
 
-    val uiState: StateFlow<StudentUiState> = combine(
-        dao.getUser(),
-        dao.getAllUnits(),
-        dao.getAllUnitsWithModules(),
-        _isLoading,
-        _error,
-        _dashboardResponse
-    ) { params: Array<Any?> ->
-        StudentUiState(
-            user = params[0] as? UserEntity,
-            units = params[1] as? List<UnitEntity> ?: emptyList(),
-            unitsWithModules = params[2] as? List<UnitWithModules> ?: emptyList(),
-            isLoading = params[3] as? Boolean ?: false,
-            error = params[4] as? String,
-            dashboardResponse = params[5] as? DashboardResponse
-        )
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val uiState: StateFlow<StudentUiState> = dao.getUser().flatMapLatest { user ->
+        if (user == null) {
+            flowOf(StudentUiState(isLoading = true))
+        } else {
+            combine(
+                dao.getAllUnits(user.id),
+                dao.getAllUnitsWithModules(user.id),
+                _isLoading,
+                _error,
+                _dashboardResponse
+            ) { units, unitsWithModules, isLoading, error, dashboardResponse ->
+                StudentUiState(
+                    user = user,
+                    units = units,
+                    unitsWithModules = unitsWithModules,
+                    isLoading = isLoading,
+                    error = error,
+                    dashboardResponse = dashboardResponse
+                )
+            }
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = StudentUiState(isLoading = true)
     )
 
-    fun refreshDashboard(userId: String) {
+    private var lastRefreshTime = 0L
+
+    fun refreshDashboard(userId: String, force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && (now - lastRefreshTime) < 300_000) { // 5 minute cache
+            return
+        }
+
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
@@ -61,6 +74,7 @@ class StudentViewModel(private val repository: EduAIRepository, private val dao:
                 _dashboardResponse.value = response
                 // Still use the sync logic in repository to update local DB
                 repository.getDashboardData(userId).collect()
+                lastRefreshTime = System.currentTimeMillis()
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {

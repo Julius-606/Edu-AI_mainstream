@@ -3,6 +3,7 @@ package com.example.edu_ai.data.remote
 
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -81,5 +82,11 @@ interface EduAIApi {
     suspend fun nextObjective(
         @Path("subtopic_id") subtopicId: Int,
         @Query("user_id") userId: String
+    ): Map<String, Any>
+
+    @PATCH("/api/v1/progress/subtopic/{subtopic_id}")
+    suspend fun updateSubtopicProgress(
+        @Path("subtopic_id") subtopicId: Int,
+        @Query("is_completed") isCompleted: Boolean
     ): Map<String, Any>
 }

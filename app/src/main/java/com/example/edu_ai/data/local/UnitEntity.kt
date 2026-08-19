@@ -11,6 +11,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "units")
 data class UnitEntity(
     @PrimaryKey(autoGenerate = true) val localId: Long = 0,
+    val userId: String, // Added for multi-user isolation
     val unitName: String,
     val isActive: Boolean
 )

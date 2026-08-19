@@ -12,6 +12,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.edu_ai.EduAIApplication
 import com.example.edu_ai.ui.screens.LoginScreen
+import com.example.edu_ai.utils.PreferenceManager
 import com.example.edu_ai.ui.screens.student.LearnScreen
 import com.example.edu_ai.ui.screens.student.LibraryScreen
 import com.example.edu_ai.ui.screens.student.LearningRepositoryScreen
@@ -31,9 +32,11 @@ fun AppNavigation() {
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        val user = dao.getUser().firstOrNull()
-        if (user != null) {
-            navController.navigate("student_dashboard/${user.id}") {
+        val lastUserId = PreferenceManager.getLastUserId(context)
+        val token = PreferenceManager.getToken(context)
+        
+        if (token != null && lastUserId != null) {
+            navController.navigate("student_dashboard/$lastUserId") {
                 popUpTo("login") { inclusive = true }
             }
         }
