@@ -10,8 +10,10 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "quiz_history")
 data class QuizHistoryEntity(
     @PrimaryKey(autoGenerate = true) val localId: Long = 0,
-    val userId: String, // Added to support multi-user isolation
+    val userId: String, 
     val unitName: String,
+    val topic: String? = null, // Added to identify the specific quiz context
     val pnlScore: Double,
-    val timestamp: Long
+    val timestamp: Long,
+    val quizJson: String? = null // Added to store questions for offline retake
 )

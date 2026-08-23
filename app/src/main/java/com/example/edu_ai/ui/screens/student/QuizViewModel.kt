@@ -14,6 +14,7 @@ import com.example.edu_ai.data.remote.ai.AiService
 import com.example.edu_ai.data.remote.ai.AiServiceFactory
 import com.example.edu_ai.data.remote.ai.QuizQuestion
 import com.example.edu_ai.data.remote.ai.QuizResponse
+import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +33,7 @@ data class QuizUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val selectedUnit: String? = null,
+    val selectedTopic: String? = null,
     val unitsWithModules: List<UnitWithModules> = emptyList(),
     val isReviewMode: Boolean = false,
     val quizHistory: List<QuizHistoryEntity> = emptyList()
@@ -45,6 +47,7 @@ class QuizViewModel(
 
     private val _uiState = MutableStateFlow(QuizUiState())
     val uiState: StateFlow<QuizUiState> = _uiState.asStateFlow()
+    private val gson = Gson()
 
     init {
         loadQuizHistory()
@@ -84,6 +87,7 @@ class QuizViewModel(
                 isLoading = true,
                 error = null,
                 selectedUnit = unitName,
+                selectedTopic = topic,
                 isReviewMode = false
             ) }
             val quiz = aiService.generateQuiz(unitName, user, topic)
@@ -102,6 +106,69 @@ class QuizViewModel(
                 _uiState.update { it.copy(isLoading = false, error = "Failed to ignite the Quiz Engine.") }
             }
         }
+    }
+
+    fun retakeQuiz(history: QuizHistoryEntity) {
+        val savedQuiz = history.quizJson?.let {
+            try {
+                gson.fromJson(it, QuizResponse::class.java)
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        if (savedQuiz != null) {
+            // Shuffle options for each question to break predictable patterns
+            val shuffledQuestions = savedQuiz.questions.map { question ->
+                val optionsWithIndices = question.options.withIndex().toList()
+                val shuffled = optionsWithIndices.shuffled()
+                val newCorrectIndex = shuffled.indexOfFirst { it.index == question.correctIndex }
+                val newOptions = shuffled.map { it.value }
+                question.copy(options = newOptions, correctIndex = newCorrectIndex)
+            }
+            val shuffledQuiz = savedQuiz.copy(questions = shuffledQuestions)
+
+            _uiState.update { it.copy(
+                quiz = shuffledQuiz,
+                currentQuestionIndex = 0,
+                selectedOptions = emptyMap(),
+                submittedQuestions = emptySet(),
+                score = 0,
+                isQuizFinished = false,
+                isLoading = false,
+                error = null,
+                selectedUnit = history.unitName,
+                selectedTopic = history.topic,
+                isReviewMode = false
+            ) }
+        } else {
+            // Fallback to generating a new one if JSON is missing or corrupt
+            startQuiz(history.unitName, history.topic)
+        }
+    }
+
+    fun retakeCurrentQuiz() {
+        val currentQuiz = _uiState.value.quiz ?: return
+        // Shuffle options for each question for a fresh feel
+        val shuffledQuestions = currentQuiz.questions.map { question ->
+            val optionsWithIndices = question.options.withIndex().toList()
+            val shuffled = optionsWithIndices.shuffled()
+            val newCorrectIndex = shuffled.indexOfFirst { it.index == question.correctIndex }
+            val newOptions = shuffled.map { it.value }
+            question.copy(options = newOptions, correctIndex = newCorrectIndex)
+        }
+        val shuffledQuiz = currentQuiz.copy(questions = shuffledQuestions)
+
+        _uiState.update { it.copy(
+            quiz = shuffledQuiz,
+            currentQuestionIndex = 0,
+            selectedOptions = emptyMap(),
+            submittedQuestions = emptySet(),
+            score = 0,
+            isQuizFinished = false,
+            isLoading = false,
+            isReviewMode = false
+        ) }
     }
 
     fun selectOption(index: Int) {
@@ -158,20 +225,23 @@ class QuizViewModel(
         val quiz = state.quiz ?: return
         
         val finalScorePercentage = (state.score.toDouble() / quiz.questions.size) * 100
+        val quizJson = gson.toJson(quiz)
         
         viewModelScope.launch {
             // Save locally with user isolation
             dao.insertQuizHistory(
                 QuizHistoryEntity(
                     userId = user.id,
-                    unitName = quiz.title,
+                    unitName = state.selectedUnit ?: quiz.title,
+                    topic = state.selectedTopic,
                     pnlScore = finalScorePercentage,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    quizJson = quizJson
                 )
             )
             // Save to backend
             aiService.recordQuizResult(
-                unitName = quiz.title,
+                unitName = state.selectedUnit ?: quiz.title,
                 score = state.score,
                 total = quiz.questions.size,
                 userContext = user

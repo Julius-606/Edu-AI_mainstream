@@ -18,7 +18,7 @@ import androidx.room.RoomDatabase
         NoteEntity::class,
         LearningContentEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class EduAIDatabase : RoomDatabase() {
