@@ -12,6 +12,8 @@ import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
+import java.util.UUID
 
 class EduAIRepository(
     private val api: EduAIApi,
@@ -217,10 +219,39 @@ class EduAIRepository(
     fun getSavedLearningContent(subtopicId: Long) = dao.getLearningContentForSubtopic(subtopicId)
     suspend fun updateSubtopicProgress(subtopicId: Long, isCompleted: Boolean) {
         dao.updateSubtopicStatus(subtopicId, isCompleted)
+        val userId = dao.getUser().first()?.id ?: return
+        dao.enqueueSyncOperation(
+            SyncOperationEntity(
+                operationId = UUID.randomUUID().toString(),
+                userId = userId,
+                entityType = "subtopic_progress",
+                entityId = subtopicId,
+                payload = gson.toJson(mapOf("is_completed" to isCompleted))
+            )
+        )
+        syncPendingChanges(userId)
+    }
+
+    suspend fun syncPendingChanges(userId: String) {
+        val pending = dao.getPendingSyncOperations(userId)
+        if (pending.isEmpty()) return
         try {
-            api.updateSubtopicProgress(subtopicId.toInt(), isCompleted)
+            val response = api.sync(
+                com.example.edu_ai.data.remote.SyncRequest(
+                    userId = userId,
+                    operations = pending.map {
+                        com.example.edu_ai.data.remote.SyncOperation(
+                            operationId = it.operationId,
+                            entityType = it.entityType,
+                            entityId = it.entityId,
+                            payload = gson.fromJson(it.payload, Map::class.java) as Map<String, Any?>
+                        )
+                    }
+                )
+            )
+            response.appliedOperationIds.forEach { dao.deleteSyncOperation(it) }
         } catch (e: Exception) {
-            // Background sync could be added here
+            // Keep the operation queued for the next synchronization attempt.
         }
     }
 }

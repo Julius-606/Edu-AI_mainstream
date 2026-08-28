@@ -150,4 +150,13 @@ interface EduAIDao {
 
     @Query("DELETE FROM learning_content")
     suspend fun clearAllLearningContent()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun enqueueSyncOperation(operation: SyncOperationEntity)
+
+    @Query("SELECT * FROM sync_operations WHERE userId = :userId ORDER BY createdAt ASC")
+    suspend fun getPendingSyncOperations(userId: String): List<SyncOperationEntity>
+
+    @Query("DELETE FROM sync_operations WHERE operationId = :operationId")
+    suspend fun deleteSyncOperation(operationId: String)
 }

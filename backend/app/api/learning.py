@@ -72,6 +72,8 @@ async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(g
 
     objectives = subtopic.learning_objectives
     if not objectives:
+        subtopic.is_completed = True
+        db.commit()
         return {"status": "subtopic_completed", "trigger_quiz": True}
 
     current_progress = db.query(models.UserSyllabusProgress).filter(
@@ -81,6 +83,19 @@ async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(g
     ).first()
 
     if not current_progress:
+        # Check if the subtopic is already completed or if all objectives are completed for this user
+        completed_progress = db.query(models.UserSyllabusProgress).filter(
+            models.UserSyllabusProgress.user_id == user.id,
+            models.UserSyllabusProgress.node_type == "objective",
+            models.UserSyllabusProgress.status == "Completed",
+            models.UserSyllabusProgress.node_id.in_([o.id for o in objectives])
+        ).all()
+        completed_ids = {p.node_id for p in completed_progress}
+        if completed_ids and all(o.id in completed_ids for o in objectives):
+            subtopic.is_completed = True
+            db.commit()
+            return {"status": "subtopic_completed", "trigger_quiz": True}
+
         return await get_learning_session(subtopic_id, user_id, db)
 
     # Mark current as completed
@@ -106,6 +121,26 @@ async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(g
         db.commit()
         return await get_learning_session(subtopic_id, user_id, db)
     else:
-        # End of subtopic - Trigger Quiz
+        # End of subtopic - Mark subtopic completed and return subtopic_completed
+        subtopic.is_completed = True
+        subtopic_progress = db.query(models.UserSyllabusProgress).filter(
+            models.UserSyllabusProgress.user_id == user.id,
+            models.UserSyllabusProgress.node_id == subtopic.id,
+            models.UserSyllabusProgress.node_type == "subtopic"
+        ).first()
+
+        if not subtopic_progress:
+            subtopic_progress = models.UserSyllabusProgress(
+                user_id=user.id,
+                node_id=subtopic.id,
+                node_type="subtopic",
+                status="Completed",
+                last_studied_at=time.time()
+            )
+            db.add(subtopic_progress)
+        else:
+            subtopic_progress.status = "Completed"
+            subtopic_progress.last_studied_at = time.time()
+
         db.commit()
         return {"status": "subtopic_completed", "trigger_quiz": True}

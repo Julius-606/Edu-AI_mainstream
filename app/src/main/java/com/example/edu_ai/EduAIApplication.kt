@@ -5,6 +5,8 @@ import androidx.room.Room
 import com.example.edu_ai.data.local.EduAIDatabase
 import com.example.edu_ai.data.remote.RetrofitClient
 import com.example.edu_ai.repository.EduAIRepository
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 class EduAIApplication : Application() {
 
@@ -19,7 +21,12 @@ class EduAIApplication : Application() {
             EduAIDatabase::class.java,
             "edu_ai_db"
         )
-        .fallbackToDestructiveMigration(dropAllTables = true) // Updated to non-deprecated version
+        .addMigrations(object : Migration(11, 12) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE TABLE IF NOT EXISTS sync_operations (operationId TEXT NOT NULL PRIMARY KEY, userId TEXT NOT NULL, entityType TEXT NOT NULL, entityId INTEGER NOT NULL, payload TEXT NOT NULL, createdAt INTEGER NOT NULL)")
+            }
+        })
+        .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
 
         repository = EduAIRepository(

@@ -11,6 +11,9 @@ import retrofit2.http.Query
 
 interface EduAIApi {
 
+    @POST("api/sync")
+    suspend fun sync(@Body request: SyncRequest): SyncResponse
+
     @GET("api/users/{user_id}/dashboard")
     suspend fun getDashboard(@Path("user_id") userId: String): DashboardResponse
 

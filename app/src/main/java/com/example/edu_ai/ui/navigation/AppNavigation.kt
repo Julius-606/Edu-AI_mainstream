@@ -163,8 +163,9 @@ fun AppNavigation() {
                 userId = userId,
                 onBack = { navController.popBackStack() },
                 onTriggerQuiz = {
-                    // Navigate to Quiz Screen (using existing logic)
-                    navController.navigate("quiz_screen/$userId") // Adjust if needed
+                    if (!navController.popBackStack()) {
+                        navController.navigate("student_dashboard/$userId")
+                    }
                 }
             )
         }

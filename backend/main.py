@@ -35,7 +35,7 @@ app = FastAPI(
 @app.middleware("http")
 async def api_key_middleware(request, call_next):
     # Skip for public/whitelisted endpoints
-    if request.url.path in ["/", "/docs", "/openapi.json", "/signup", "/api/auth/login", "/favicon.ico"] or request.url.path.startswith("/api/v1/progress"):
+    if request.url.path in ["/", "/docs", "/openapi.json", "/signup", "/api/auth/login", "/favicon.ico", "/api/sync"] or request.url.path.startswith("/api/v1/progress"):
         return await call_next(request)
 
     # 1. Check for Internal API Key (Legacy/Internal support)
@@ -709,6 +709,55 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db), current_use
         rec_text = "Keep focusing on your current units! You're making progress."
 
     return schemas.RecommendationResponse(recommendation=rec_text)
+
+@app.post("/api/sync")
+def sync_operations(request: dict, db: Session = Depends(get_db)):
+    user_id = request.get("userId")
+    operations = request.get("operations", [])
+    applied_ids = []
+    user = find_user(user_id, db) if user_id else None
+
+    for op in operations:
+        try:
+            op_id = op.get("operationId")
+            entity_type = op.get("entityType")
+            entity_id = op.get("entityId")
+            payload = op.get("payload", {})
+
+            if entity_type == "subtopic_progress" and entity_id:
+                subtopic = db.query(models.Subtopic).filter(models.Subtopic.id == entity_id).first()
+                if subtopic:
+                    is_completed = payload.get("is_completed", payload.get("isCompleted", True))
+                    subtopic.is_completed = bool(is_completed)
+
+                    if user:
+                        progress = db.query(models.UserSyllabusProgress).filter(
+                            models.UserSyllabusProgress.user_id == user.id,
+                            models.UserSyllabusProgress.node_id == subtopic.id,
+                            models.UserSyllabusProgress.node_type == "subtopic"
+                        ).first()
+
+                        if not progress:
+                            progress = models.UserSyllabusProgress(
+                                user_id=user.id,
+                                node_id=subtopic.id,
+                                node_type="subtopic",
+                                status="Completed" if is_completed else "In_Progress",
+                                last_studied_at=time.time()
+                            )
+                            db.add(progress)
+                        else:
+                            progress.status = "Completed" if is_completed else "In_Progress"
+                            progress.last_studied_at = time.time()
+
+                applied_ids.append(op_id)
+            else:
+                applied_ids.append(op_id)
+        except Exception as e:
+            pass
+
+    db.commit()
+    return {"appliedOperationIds": applied_ids}
 
 if __name__ == "__main__":
     import uvicorn

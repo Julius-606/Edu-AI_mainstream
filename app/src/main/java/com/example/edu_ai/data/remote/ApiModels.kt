@@ -3,6 +3,22 @@ package com.example.edu_ai.data.remote
 
 import com.google.gson.annotations.SerializedName
 
+data class SyncRequest(
+    val userId: String,
+    val operations: List<SyncOperation>
+)
+
+data class SyncOperation(
+    val operationId: String,
+    val entityType: String,
+    val entityId: Long,
+    val payload: Map<String, Any?>
+)
+
+data class SyncResponse(
+    val appliedOperationIds: List<String> = emptyList()
+)
+
 data class DashboardResponse(
     @SerializedName("username") val username: String? = null,
     @SerializedName("role") val role: String? = null,
