@@ -98,6 +98,18 @@ class StudentViewModel(private val repository: EduAIRepository, private val dao:
         }
     }
 
+    fun updateUserProfile(difficulty: String, aiPersona: String, semesterStatus: String) {
+        val currentUser = uiState.value.user ?: return
+        val updatedUser = currentUser.copy(
+            difficulty = difficulty,
+            aiPersona = aiPersona,
+            semesterStatus = semesterStatus
+        )
+        viewModelScope.launch {
+            repository.updateUser(updatedUser)
+        }
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {

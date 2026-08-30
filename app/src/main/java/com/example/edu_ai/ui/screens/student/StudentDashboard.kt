@@ -6,12 +6,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.*
@@ -64,6 +66,7 @@ fun StudentDashboard(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
+    var showAccountDialog by remember { mutableStateOf(false) }
     var showManageUnitsDialog by remember { mutableStateOf(false) }
     var showArchivesDialog by remember { mutableStateOf(false) }
     var unitToDelete by remember { mutableStateOf<UnitEntity?>(null) }
@@ -89,12 +92,12 @@ fun StudentDashboard(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.School, contentDescription = null) },
-                        label = { Text("Manage Units") },
+                        icon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        label = { Text("Account") },
                         selected = false,
                         onClick = {
                             scope.launch { drawerState.close() }
-                            showManageUnitsDialog = true
+                            showAccountDialog = true
                         }
                     )
 
@@ -105,6 +108,16 @@ fun StudentDashboard(
                         onClick = {
                             scope.launch { drawerState.close() }
                             showArchivesDialog = true
+                        }
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.School, contentDescription = null) },
+                        label = { Text("Manage Units") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            showManageUnitsDialog = true
                         }
                     )
 
@@ -124,19 +137,7 @@ fun StudentDashboard(
                         selected = false,
                         onClick = {
                             scope.launch { drawerState.close() }
-                            onOpenConsultations() // Navigates to module/quiz screen
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.ExitToApp, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                        label = { Text("Sign Out", color = MaterialTheme.colorScheme.error) },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onLogout()
+                            onOpenConsultations()
                         }
                     )
                 }
@@ -154,6 +155,75 @@ fun StudentDashboard(
             onOpenLibrary = onOpenLibrary,
             onViewUnitOutline = onViewUnitOutline,
             onOpenConsultations = onOpenConsultations
+        )
+    }
+
+    // Account Management Dialog
+    if (showAccountDialog) {
+        var difficulty by remember { mutableStateOf(user.difficulty) }
+        var aiPersona by remember { mutableStateOf(user.aiPersona) }
+        var semesterStatus by remember { mutableStateOf(user.semesterStatus) }
+
+        AlertDialog(
+            onDismissRequest = { showAccountDialog = false },
+            title = { Text("Account Management") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("User: ${user.username}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    if (user.email.isNotEmpty()) {
+                        Text("Email: ${user.email}", style = MaterialTheme.typography.bodySmall)
+                    }
+                    
+                    OutlinedTextField(
+                        value = semesterStatus,
+                        onValueChange = { semesterStatus = it },
+                        label = { Text("Academic Level / Semester") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = difficulty,
+                        onValueChange = { difficulty = it },
+                        label = { Text("Target Difficulty") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = aiPersona,
+                        onValueChange = { aiPersona = it },
+                        label = { Text("AI Persona / Consultant Style") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Button(
+                        onClick = {
+                            showAccountDialog = false
+                            onLogout()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("SIGN OUT / LOGOUT")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.updateUserProfile(difficulty, aiPersona, semesterStatus)
+                    showAccountDialog = false
+                }) {
+                    Text("SAVE CHANGES")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAccountDialog = false }) {
+                    Text("CANCEL")
+                }
+            }
         )
     }
 
@@ -298,9 +368,6 @@ fun StudentDashboardContent(
                     actions = {
                         IconButton(onClick = onOpenConsultations) {
                             Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Consultations", tint = MaterialTheme.colorScheme.primary)
-                        }
-                        IconButton(onClick = onLogout) {
-                            Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(

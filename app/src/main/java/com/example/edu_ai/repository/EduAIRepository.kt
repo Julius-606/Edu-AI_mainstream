@@ -156,6 +156,22 @@ class EduAIRepository(
         dao.insertUser(userEntity)
     }
 
+    suspend fun updateUser(user: UserEntity) {
+        dao.insertUser(user)
+        try {
+            api.updateStudentProfile(
+                userId = user.id,
+                updates = mapOf(
+                    "difficulty" to user.difficulty,
+                    "ai_persona" to user.aiPersona,
+                    "semester_status" to user.semesterStatus
+                )
+            )
+        } catch (e: Exception) {
+            // Silently ignore network update errors if offline
+        }
+    }
+
     suspend fun getWeeklyTimetable(userId: String): ApiTimetableResponse {
         val cachedTimetable = dao.getTimetableByUserId(userId)
         val oneWeekInMillis = 7 * 24 * 60 * 60 * 1000L
