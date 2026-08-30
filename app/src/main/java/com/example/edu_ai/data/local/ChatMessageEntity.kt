@@ -23,5 +23,6 @@ data class ChatMessageEntity(
     val userId: String,
     val role: String, // "user" or "model"
     val content: String,
+    val contentHash: String = "",
     val timestamp: Long = System.currentTimeMillis()
 )

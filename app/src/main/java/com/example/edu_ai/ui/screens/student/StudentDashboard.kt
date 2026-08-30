@@ -7,8 +7,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Quiz
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +38,7 @@ import com.example.edu_ai.ui.components.DynamicBackground
 import com.example.edu_ai.ui.components.ProgressRings
 import com.example.edu_ai.ui.components.RingProgress
 import com.example.edu_ai.ui.theme.TraceTheme
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,7 +53,6 @@ fun StudentDashboard(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    // Use the userId directly if user entity is not yet loaded in DAO
     val user = uiState.user ?: UserEntity(id = userId, username = "Student", role = "student", difficulty = "Medium (Standard)", semesterStatus = "Active", aiPersona = "Helper")
 
     val progressViewModel: ProgressViewModel = viewModel(factory = ProgressViewModel.provideFactory(user))
@@ -56,22 +61,206 @@ fun StudentDashboard(
     val timetableViewModel: TimetableViewModel = viewModel(factory = TimetableViewModel.provideFactory(user))
     val timetableUiState by timetableViewModel.uiState.collectAsState()
 
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    var showManageUnitsDialog by remember { mutableStateOf(false) }
+    var showArchivesDialog by remember { mutableStateOf(false) }
+    var unitToDelete by remember { mutableStateOf<UnitEntity?>(null) }
+
     LaunchedEffect(userId) {
         viewModel.refreshDashboard(userId)
         progressViewModel.refreshRecommendations()
     }
 
-    StudentDashboardContent(
-        user = user,
-        uiState = uiState,
-        recommendation = recommendation,
-        timetableUiState = timetableUiState,
-        onLogout = onLogout,
-        onLaunchModule = onLaunchModule,
-        onOpenLibrary = onOpenLibrary,
-        onViewUnitOutline = onViewUnitOutline,
-        onOpenConsultations = onOpenConsultations
-    )
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp)
+                ) {
+                    Text("Trace Navigation", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(user.username, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.School, contentDescription = null) },
+                        label = { Text("Manage Units") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            showManageUnitsDialog = true
+                        }
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                        label = { Text("Archives") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            showArchivesDialog = true
+                        }
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null) },
+                        label = { Text("Consultations") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onOpenConsultations()
+                        }
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Quiz, contentDescription = null) },
+                        label = { Text("Quizzes") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onOpenConsultations() // Navigates to module/quiz screen
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.ExitToApp, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                        label = { Text("Sign Out", color = MaterialTheme.colorScheme.error) },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onLogout()
+                        }
+                    )
+                }
+            }
+        }
+    ) {
+        StudentDashboardContent(
+            user = user,
+            uiState = uiState,
+            recommendation = recommendation,
+            timetableUiState = timetableUiState,
+            onOpenDrawer = { scope.launch { drawerState.open() } },
+            onLogout = onLogout,
+            onLaunchModule = onLaunchModule,
+            onOpenLibrary = onOpenLibrary,
+            onViewUnitOutline = onViewUnitOutline,
+            onOpenConsultations = onOpenConsultations
+        )
+    }
+
+    // Manage Units Dialog
+    if (showManageUnitsDialog) {
+        AlertDialog(
+            onDismissRequest = { showManageUnitsDialog = false },
+            title = { Text("Manage Ongoing Units") },
+            text = {
+                Column {
+                    Text("Active Units:", fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (uiState.units.isEmpty()) {
+                        Text("No active units. Add units from the library.")
+                    } else {
+                        uiState.units.forEach { unit ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(unit.unitName, modifier = Modifier.weight(1f))
+                                IconButton(onClick = { unitToDelete = unit }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete Unit", tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    showManageUnitsDialog = false
+                    onOpenLibrary()
+                }) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("ADD UNIT")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showManageUnitsDialog = false }) {
+                    Text("CLOSE")
+                }
+            }
+        )
+    }
+
+    // Delete Unit Confirmation Dialog
+    unitToDelete?.let { unit ->
+        AlertDialog(
+            onDismissRequest = { unitToDelete = null },
+            title = { Text("Delete Unit '${unit.unitName}'?") },
+            text = { Text("This will remove this ongoing unit and its associated progress.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteUnit(unit.localId)
+                    unitToDelete = null
+                }) {
+                    Text("DELETE", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { unitToDelete = null }) {
+                    Text("CANCEL")
+                }
+            }
+        )
+    }
+
+    // Archives Dialog
+    if (showArchivesDialog) {
+        AlertDialog(
+            onDismissRequest = { showArchivesDialog = false },
+            title = { Text("Archived & Completed Units") },
+            text = {
+                Column {
+                    Text("Access completed unit content and quizzes:", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (uiState.archivedUnits.isEmpty()) {
+                        Text("No archived units yet.")
+                    } else {
+                        uiState.archivedUnits.forEach { unit ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(unit.unitName, modifier = Modifier.weight(1f))
+                                TextButton(onClick = {
+                                    showArchivesDialog = false
+                                    onViewUnitOutline(unit.localId)
+                                }) {
+                                    Text("VIEW")
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showArchivesDialog = false }) {
+                    Text("CLOSE")
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,6 +270,7 @@ fun StudentDashboardContent(
     uiState: StudentUiState,
     recommendation: String,
     timetableUiState: TimetableUiState,
+    onOpenDrawer: () -> Unit = {},
     onLogout: () -> Unit,
     onLaunchModule: (Int?) -> Unit,
     onOpenLibrary: () -> Unit,
@@ -94,6 +284,11 @@ fun StudentDashboardContent(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
+                    navigationIcon = {
+                        IconButton(onClick = onOpenDrawer) {
+                            Icon(Icons.Default.Menu, contentDescription = "Open Sidebar Menu")
+                        }
+                    },
                     title = { 
                         Column {
                             Text("Trace Portal", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
@@ -216,7 +411,6 @@ fun StudentDashboardContent(
                 items(uiState.unitsWithModules) { unitWithModules ->
                     val unit = unitWithModules.unit
                     
-                    // Calculate hierarchical progress
                     val allTopics = unitWithModules.modules.flatMap { it.topics }
                     val allSubtopics = allTopics.flatMap { it.subtopics }
                     
@@ -224,15 +418,38 @@ fun StudentDashboardContent(
                         (allSubtopics.count { it.isCompleted }.toFloat() / allSubtopics.size) * 100f
                     } else 0f
 
-                    // Example: Current Module (First one)
-                    val currentModule = unitWithModules.modules.firstOrNull()
-                    val currentModuleSubtopics = currentModule?.topics?.flatMap { it.subtopics } ?: emptyList()
+                    var activeModule: ModuleEntity? = null
+                    var activeTopic: TopicEntity? = null
+                    var activeSubtopic: SubtopicEntity? = null
+
+                    outer@ for (mod in unitWithModules.modules) {
+                        for (top in mod.topics) {
+                            for (sub in top.subtopics) {
+                                if (!sub.isCompleted) {
+                                    activeModule = mod.module
+                                    activeTopic = top.topic
+                                    activeSubtopic = sub
+                                    break@outer
+                                }
+                            }
+                        }
+                    }
+
+                    if (activeSubtopic == null && allSubtopics.isNotEmpty()) {
+                        val lastMod = unitWithModules.modules.lastOrNull()
+                        val lastTop = lastMod?.topics?.lastOrNull()
+                        val lastSub = lastTop?.subtopics?.lastOrNull()
+                        activeModule = lastMod?.module
+                        activeTopic = lastTop?.topic
+                        activeSubtopic = lastSub
+                    }
+
+                    val activeModuleWithTopics = unitWithModules.modules.find { it.module.moduleId == activeModule?.moduleId } ?: unitWithModules.modules.firstOrNull()
+                    val activeModuleSubtopics = activeModuleWithTopics?.topics?.flatMap { it.subtopics } ?: emptyList()
                     
-                    val moduleProgress = if (currentModuleSubtopics.isNotEmpty()) {
-                        (currentModuleSubtopics.count { it.isCompleted }.toFloat() / currentModuleSubtopics.size) * 100f
+                    val moduleProgress = if (activeModuleSubtopics.isNotEmpty()) {
+                        (activeModuleSubtopics.count { it.isCompleted }.toFloat() / activeModuleSubtopics.size) * 100f
                     } else 0f
-                    
-                    val currentSubtopic = allSubtopics.find { !it.isCompleted } ?: allSubtopics.lastOrNull()
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -246,12 +463,12 @@ fun StudentDashboardContent(
                             val rings = listOf(
                                 RingProgress(unitProgress, MaterialTheme.colorScheme.primary, "Unit"),
                                 RingProgress(moduleProgress, MaterialTheme.colorScheme.secondary, "Module"),
-                                RingProgress(if (currentSubtopic?.isCompleted == true) 100f else 0f, MaterialTheme.colorScheme.tertiary, "Subtopic")
+                                RingProgress(if (activeSubtopic?.isCompleted == true) 100f else 0f, MaterialTheme.colorScheme.tertiary, "Subtopic")
                             )
                             
                             ProgressRings(
                                 rings = rings,
-                                learningObjectives = emptyList(), // Removed FOCUS list
+                                learningObjectives = emptyList(),
                                 modifier = Modifier.size(120.dp)
                             )
                             
@@ -265,22 +482,41 @@ fun StudentDashboardContent(
                                     lineHeight = 24.sp,
                                     modifier = Modifier.clickable { onViewUnitOutline(unit.localId) }
                                 )
-                                Text(
-                                    currentSubtopic?.name ?: "Unit Completed", 
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    currentModule?.module?.name ?: "No Active Module", 
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                if (activeSubtopic != null) {
+                                    if (activeModule != null) {
+                                        Text(
+                                            "Module: ${activeModule.name}", 
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.secondary,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                    if (activeTopic != null) {
+                                        Text(
+                                            "Topic: ${activeTopic.name}", 
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Text(
+                                        "Subtopic: ${activeSubtopic.name}", 
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                } else {
+                                    Text(
+                                        "Unit Completed", 
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Button(
                                     onClick = { 
-                                        val subtopicToStart = allSubtopics.find { !it.isCompleted } ?: allSubtopics.firstOrNull()
-                                        onLaunchModule(subtopicToStart?.subtopicId?.toInt())
+                                        onLaunchModule(activeSubtopic?.subtopicId?.toInt())
                                     },
                                     shape = MaterialTheme.shapes.medium,
                                     modifier = Modifier.fillMaxWidth()
@@ -372,69 +608,5 @@ fun StudentDashboardContent(
                 item { Spacer(modifier = Modifier.height(40.dp)) }
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun StudentDashboardPreview() {
-    val sampleUser = UserEntity(
-        id = "1",
-        username = "Jay",
-        role = "student",
-        difficulty = "Medium (Standard)",
-        semesterStatus = "Year 4 - Semester 2",
-        aiPersona = "Motivator"
-    )
-
-    val sampleUnitsWithModules = listOf(
-        UnitWithModules(
-            unit = UnitEntity(localId = 1L, userId = "1", unitName = "Data Science", isActive = true),
-            modules = listOf(
-                ModuleWithTopics(
-                    module = ModuleEntity(moduleId = 1L, unitId = 1L, name = "Introduction to ML"),
-                    topics = listOf(
-                        TopicWithSubtopics(
-                            topic = TopicEntity(topicId = 1L, moduleId = 1L, name = "Supervised Learning"),
-                            subtopics = listOf(
-                                SubtopicEntity(subtopicId = 1L, topicId = 1L, name = "Regression", isCompleted = true),
-                                SubtopicEntity(subtopicId = 2L, topicId = 1L, name = "Classification", isCompleted = false)
-                            )
-                        )
-                    )
-                )
-            )
-        )
-    )
-
-    val sampleStudentUiState = StudentUiState(
-        user = sampleUser,
-        unitsWithModules = sampleUnitsWithModules
-    )
-
-    val sampleTimetableUiState = TimetableUiState(
-        weeklyPlan = listOf(
-            ApiTimetableSlot(
-                day = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault()).format(java.util.Date()),
-                time = "10:00 AM",
-                activity = "ML Lecture",
-                unit = "Data Science",
-                type = "Lecture"
-            )
-        )
-    )
-
-    TraceTheme {
-        StudentDashboardContent(
-            user = sampleUser,
-            uiState = sampleStudentUiState,
-            recommendation = "Keep up the great work! You're making steady progress in Data Science.",
-            timetableUiState = sampleTimetableUiState,
-            onLogout = {},
-            onLaunchModule = {},
-            onOpenLibrary = {},
-            onViewUnitOutline = {},
-            onOpenConsultations = {}
-        )
     }
 }

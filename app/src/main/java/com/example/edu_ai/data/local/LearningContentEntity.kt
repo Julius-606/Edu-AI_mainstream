@@ -9,5 +9,6 @@ data class LearningContentEntity(
     val subtopicId: Long,
     val objectiveDescription: String,
     val content: String,
+    val contentHash: String = "",
     val timestamp: Long = System.currentTimeMillis()
 )

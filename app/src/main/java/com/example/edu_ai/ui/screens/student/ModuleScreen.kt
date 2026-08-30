@@ -304,7 +304,7 @@ fun ZenithTab(
                     Spacer(modifier = Modifier.height(20.dp))
                     
                     Button(
-                        onClick = { progressViewModel.refreshRecommendations() },
+                        onClick = { progressViewModel.refreshRecommendations(force = true) },
                         modifier = Modifier.align(Alignment.End)
                     ) {
                         Text("REFRESH STRATEGY")

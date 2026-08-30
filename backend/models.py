@@ -1,10 +1,32 @@
 # IDENTITY: backend/models.py
-# VERSION: 1.6.0
-# ⚙️ GEAR 1.2: Database Models (Entities) - PostgreSQL Optimized
+# VERSION: 1.7.0
+# ⚙️ GEAR 1.2: Database Models (Entities) - PostgreSQL & CAS Optimized
 
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, JSON, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, JSON, Text, LargeBinary
 from sqlalchemy.orm import relationship
 from database import Base
+
+class CasBlob(Base):
+    __tablename__ = "cas_blobs"
+
+    hash = Column(String(64), primary_key=True, index=True)
+    compressed_content = Column(LargeBinary, nullable=True)
+    content_size = Column(Integer, default=0)
+    created_at = Column(Float)
+
+class CommitLog(Base):
+    __tablename__ = "commit_logs"
+
+    commit_hash = Column(String(64), primary_key=True, index=True)
+    parent_hash = Column(String(64), nullable=True)
+    entity_type = Column(String(50)) # "note", "chat", "quiz", "subtopic"
+    entity_id = Column(String(100))
+    delta_patch = Column(Text, default="")
+    blob_hash = Column(String(64), default="")
+    timestamp = Column(Float)
+
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User")
 
 class User(Base):
     __tablename__ = "users"
@@ -27,10 +49,15 @@ class User(Base):
     chat_sessions = relationship("ChatSession", back_populates="owner", cascade="all, delete-orphan")
     performance_logs = relationship("PerformanceLog", back_populates="owner", cascade="all, delete-orphan")
     timetables = relationship("Timetable", back_populates="owner", cascade="all, delete-orphan")
+    notes = relationship("Note", back_populates="owner", cascade="all, delete-orphan")
 
     @property
     def active_units_list(self):
         return [u.name for u in self.units if u.is_active]
+
+    @property
+    def archived_units_list(self):
+        return [u.name for u in self.units if not u.is_active]
 
 class Unit(Base):
     __tablename__ = "units"
@@ -55,7 +82,6 @@ class Module(Base):
     unit_id = Column(Integer, ForeignKey("units.id"))
     unit = relationship("Unit", back_populates="modules")
 
-    # NEW: Module -> Topic
     topics = relationship("Topic", back_populates="module", cascade="all, delete-orphan")
 
 class Topic(Base):
@@ -67,7 +93,6 @@ class Topic(Base):
     module_id = Column(Integer, ForeignKey("modules.id"))
     module = relationship("Module", back_populates="topics")
 
-    # Topic -> Subtopic
     subtopics = relationship("Subtopic", back_populates="topic", cascade="all, delete-orphan")
 
 class Subtopic(Base):
@@ -80,7 +105,6 @@ class Subtopic(Base):
     topic_id = Column(Integer, ForeignKey("topics.id"))
     topic = relationship("Topic", back_populates="subtopics")
 
-    # Subtopic -> LearningObjective
     learning_objectives = relationship("LearningObjective", back_populates="subtopic", cascade="all, delete-orphan")
 
 class LearningObjective(Base):
@@ -98,9 +122,9 @@ class UserSyllabusProgress(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    node_id = Column(Integer) # Can be Unit, Module, Topic, or Subtopic ID
-    node_type = Column(String(50)) # "unit", "module", "topic", "subtopic"
-    status = Column(String(50), default="Locked") # "Locked", "Unlocked", "In_Progress", "Completed"
+    node_id = Column(Integer)
+    node_type = Column(String(50))
+    status = Column(String(50), default="Locked")
     last_studied_at = Column(Float, nullable=True)
 
     user = relationship("User")
@@ -114,6 +138,7 @@ class QuizHistory(Base):
     total = Column(Integer)
     pnl = Column(Float)
     timestamp = Column(String(100))
+    quiz_json_hash = Column(String(64), nullable=True)
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="quiz_history")
@@ -135,8 +160,9 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    role = Column(String(20)) # "user" or "model"
+    role = Column(String(20))
     content = Column(Text)
+    content_hash = Column(String(64), nullable=True)
     timestamp = Column(String(100))
 
     owner_id = Column(Integer, ForeignKey("users.id"))
@@ -144,6 +170,20 @@ class ChatMessage(Base):
 
     session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=True)
     session = relationship("ChatSession", back_populates="messages")
+
+class Note(Base):
+    __tablename__ = "notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200))
+    content_hash = Column(String(64), nullable=True)
+    head_commit_hash = Column(String(64), nullable=True)
+    timestamp = Column(Float)
+
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="notes")
+
+    session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=True)
 
 class PerformanceLog(Base):
     __tablename__ = "performance_logs"
@@ -162,7 +202,7 @@ class Timetable(Base):
     id = Column(Integer, primary_key=True, index=True)
     weekly_plan_json = Column(JSON)
     ai_brief = Column(Text)
-    timestamp = Column(Float) # Time of generation
+    timestamp = Column(Float)
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="timetables")

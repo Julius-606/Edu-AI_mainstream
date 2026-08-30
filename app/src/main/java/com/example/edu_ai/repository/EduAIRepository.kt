@@ -232,6 +232,62 @@ class EduAIRepository(
         syncPendingChanges(userId)
     }
 
+    // --- Unit Management Methods ---
+    fun getArchivedUnits(userId: String): Flow<List<UnitEntity>> = dao.getArchivedUnits(userId)
+    fun getAllUnitsWithModulesIncludeArchived(userId: String): Flow<List<UnitWithModules>> = dao.getAllUnitsWithModulesIncludeArchived(userId)
+
+    suspend fun deleteUnit(unitId: Long, userId: String) {
+        dao.deleteUnit(unitId)
+        dao.enqueueSyncOperation(
+            SyncOperationEntity(
+                operationId = UUID.randomUUID().toString(),
+                userId = userId,
+                entityType = "unit_delete",
+                entityId = unitId,
+                payload = gson.toJson(mapOf("unit_id" to unitId))
+            )
+        )
+        syncPendingChanges(userId)
+    }
+
+    suspend fun archiveUnit(unitId: Long, isActive: Boolean, userId: String) {
+        dao.setUnitActiveStatus(unitId, isActive)
+        dao.enqueueSyncOperation(
+            SyncOperationEntity(
+                operationId = UUID.randomUUID().toString(),
+                userId = userId,
+                entityType = "unit_archive",
+                entityId = unitId,
+                payload = gson.toJson(mapOf("is_active" to isActive))
+            )
+        )
+        syncPendingChanges(userId)
+    }
+
+    // --- CAS Methods ---
+    suspend fun saveTextToCas(text: String): String {
+        if (text.isBlank()) return ""
+        val hash = com.example.edu_ai.data.local.cas.CasEngine.sha256(text)
+        val compressed = com.example.edu_ai.data.local.cas.CasEngine.compress(text)
+        val blob = com.example.edu_ai.data.local.cas.CasBlobEntity(
+            hash = hash,
+            compressedContent = compressed,
+            contentSize = text.length
+        )
+        dao.insertCasBlob(blob)
+        return hash
+    }
+
+    suspend fun resolveCasText(hash: String, fallback: String): String {
+        if (hash.isBlank()) return fallback
+        val blob = dao.getCasBlob(hash) ?: return fallback
+        return try {
+            com.example.edu_ai.data.local.cas.CasEngine.decompress(blob.compressedContent)
+        } catch (e: Exception) {
+            fallback
+        }
+    }
+
     suspend fun syncPendingChanges(userId: String) {
         val pending = dao.getPendingSyncOperations(userId)
         if (pending.isEmpty()) return

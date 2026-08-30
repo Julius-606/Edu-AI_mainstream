@@ -43,27 +43,42 @@ class ProgressViewModel(
     private val _recommendation = MutableStateFlow(user.lastRecommendationText.ifEmpty { "Analyze your recent quizzes to see where you can grow." })
     val recommendation: StateFlow<String> = _recommendation.asStateFlow()
 
-    fun refreshRecommendations() {
+    init {
         viewModelScope.launch {
+            dao.getUser().collect { freshUser ->
+                if (freshUser != null && freshUser.lastRecommendationText.isNotEmpty()) {
+                    _recommendation.value = freshUser.lastRecommendationText
+                }
+            }
+        }
+    }
+
+    fun refreshRecommendations(force: Boolean = false) {
+        viewModelScope.launch {
+            val freshUser = dao.getUserById(user.id) ?: user
             val oneDayInMillis = 24 * 60 * 60 * 1000L
-            val isFresh = (System.currentTimeMillis() - user.lastRecommendationDate) < oneDayInMillis
+            val isFresh = (System.currentTimeMillis() - freshUser.lastRecommendationDate) < oneDayInMillis
             
-            if (isFresh && user.lastRecommendationText.isNotEmpty()) {
-                _recommendation.value = user.lastRecommendationText
+            if (!force && isFresh && freshUser.lastRecommendationText.isNotEmpty()) {
+                _recommendation.value = freshUser.lastRecommendationText
                 return@launch
             }
 
             _isLoading.value = true
             try {
-                val rec = aiService.getRecommendations(user)
+                val rec = aiService.getRecommendations(freshUser)
                 _recommendation.value = rec
                 // Update user in DB
-                dao.insertUser(user.copy(
+                dao.insertUser(freshUser.copy(
                     lastRecommendationText = rec,
                     lastRecommendationDate = System.currentTimeMillis()
                 ))
             } catch (e: Exception) {
-                if (user.lastRecommendationText.isEmpty()) {
+                if (freshUser.lastRecommendationText.isNotEmpty()) {
+                    _recommendation.value = freshUser.lastRecommendationText
+                } else if (user.lastRecommendationText.isNotEmpty()) {
+                    _recommendation.value = user.lastRecommendationText
+                } else {
                     _recommendation.value = "Stay consistent! Your next breakthrough is just one study session away."
                 }
             } finally {

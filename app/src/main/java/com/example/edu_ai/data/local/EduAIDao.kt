@@ -2,6 +2,8 @@
 package com.example.edu_ai.data.local
 
 import androidx.room.*
+import com.example.edu_ai.data.local.cas.CasBlobEntity
+import com.example.edu_ai.data.local.cas.CommitLogEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -27,12 +29,25 @@ interface EduAIDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUnits(units: List<UnitEntity>): List<Long>
 
-    @Query("SELECT * FROM units WHERE userId = :userId")
+    @Query("SELECT * FROM units WHERE userId = :userId AND isActive = 1")
     fun getAllUnits(userId: String): Flow<List<UnitEntity>>
+
+    @Query("SELECT * FROM units WHERE userId = :userId AND isActive = 0")
+    fun getArchivedUnits(userId: String): Flow<List<UnitEntity>>
+
+    @Transaction
+    @Query("SELECT * FROM units WHERE userId = :userId AND isActive = 1")
+    fun getAllUnitsWithModules(userId: String): Flow<List<UnitWithModules>>
 
     @Transaction
     @Query("SELECT * FROM units WHERE userId = :userId")
-    fun getAllUnitsWithModules(userId: String): Flow<List<UnitWithModules>>
+    fun getAllUnitsWithModulesIncludeArchived(userId: String): Flow<List<UnitWithModules>>
+
+    @Query("DELETE FROM units WHERE localId = :unitId")
+    suspend fun deleteUnit(unitId: Long)
+
+    @Query("UPDATE units SET isActive = :isActive WHERE localId = :unitId")
+    suspend fun setUnitActiveStatus(unitId: Long, isActive: Boolean)
 
     @Query("DELETE FROM units WHERE userId = :userId")
     suspend fun deleteUnitsForUser(userId: String)
@@ -151,6 +166,7 @@ interface EduAIDao {
     @Query("DELETE FROM learning_content")
     suspend fun clearAllLearningContent()
 
+    // Sync Operations
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun enqueueSyncOperation(operation: SyncOperationEntity)
 
@@ -159,4 +175,20 @@ interface EduAIDao {
 
     @Query("DELETE FROM sync_operations WHERE operationId = :operationId")
     suspend fun deleteSyncOperation(operationId: String)
+
+    // CAS Blobs & Commit Logs
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCasBlob(blob: CasBlobEntity)
+
+    @Query("SELECT * FROM cas_blobs WHERE hash = :hash LIMIT 1")
+    suspend fun getCasBlob(hash: String): CasBlobEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCommitLog(log: CommitLogEntity)
+
+    @Query("SELECT * FROM commit_logs WHERE commitHash = :commitHash LIMIT 1")
+    suspend fun getCommitLog(commitHash: String): CommitLogEntity?
+
+    @Query("SELECT * FROM commit_logs WHERE entityId = :entityId ORDER BY timestamp ASC")
+    fun getCommitLogsForEntity(entityId: String): Flow<List<CommitLogEntity>>
 }

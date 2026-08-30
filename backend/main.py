@@ -17,6 +17,7 @@ from database import engine, get_db, Base
 import models
 import schemas
 import auth
+import cas
 from ai_engine import ai_engine
 
 # Create database tables if they don't exist
@@ -710,6 +711,59 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db), current_use
 
     return schemas.RecommendationResponse(recommendation=rec_text)
 
+# --- UNIT MANAGEMENT ENDPOINTS ---
+
+@app.delete("/api/units/{unit_id}", tags=["Unit Management"])
+def delete_unit(unit_id: int, db: Session = Depends(get_db)):
+    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unit not found")
+    db.delete(unit)
+    db.commit()
+    return {"status": "success", "message": f"Unit {unit_id} deleted"}
+
+@app.patch("/api/units/{unit_id}/archive", tags=["Unit Management"])
+def archive_unit(unit_id: int, is_active: bool = Query(False), db: Session = Depends(get_db)):
+    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unit not found")
+    unit.is_active = is_active
+    db.commit()
+    return {"status": "success", "unit_id": unit_id, "is_active": is_active}
+
+# --- CAS & TWO-WAY DELTA SYNC ENDPOINTS ---
+
+@app.post("/api/cas/blob", response_model=schemas.CasBlobResponse, tags=["CAS"])
+def store_cas_blob(request: schemas.CasBlobRequest, db: Session = Depends(get_db)):
+    computed_hash = cas.sha256(request.content)
+    existing = db.query(models.CasBlob).filter(models.CasBlob.hash == computed_hash).first()
+    if existing:
+        return schemas.CasBlobResponse(
+            hash=existing.hash,
+            content=request.content,
+            content_size=existing.content_size
+        )
+
+    compressed = cas.compress(request.content)
+    blob = models.CasBlob(
+        hash=computed_hash,
+        compressed_content=compressed,
+        content_size=len(request.content),
+        created_at=time.time()
+    )
+    db.add(blob)
+    db.commit()
+    return schemas.CasBlobResponse(hash=computed_hash, content=request.content, content_size=len(request.content))
+
+@app.get("/api/cas/blob/{hash_val}", response_model=schemas.CasBlobResponse, tags=["CAS"])
+def get_cas_blob(hash_val: str, db: Session = Depends(get_db)):
+    blob = db.query(models.CasBlob).filter(models.CasBlob.hash == hash_val).first()
+    if not blob or not blob.compressed_content:
+        raise HTTPException(status_code=404, detail="CAS Blob not found")
+
+    content = cas.decompress(blob.compressed_content)
+    return schemas.CasBlobResponse(hash=blob.hash, content=content, content_size=blob.content_size)
+
 @app.post("/api/sync")
 def sync_operations(request: dict, db: Session = Depends(get_db)):
     user_id = request.get("userId")
@@ -750,6 +804,28 @@ def sync_operations(request: dict, db: Session = Depends(get_db)):
                             progress.status = "Completed" if is_completed else "In_Progress"
                             progress.last_studied_at = time.time()
 
+                applied_ids.append(op_id)
+            elif entity_type == "commit_log":
+                commit_hash = payload.get("commit_hash")
+                if commit_hash:
+                    existing = db.query(models.CommitLog).filter(models.CommitLog.commit_hash == commit_hash).first()
+                    if not existing:
+                        commit_log = models.CommitLog(
+                            commit_hash=commit_hash,
+                            parent_hash=payload.get("parent_hash"),
+                            entity_type=payload.get("entity_type", "note"),
+                            entity_id=str(payload.get("entity_id", "")),
+                            delta_patch=payload.get("delta_patch", ""),
+                            blob_hash=payload.get("blob_hash", ""),
+                            timestamp=payload.get("timestamp", time.time()),
+                            owner_id=user.id if user else None
+                        )
+                        db.add(commit_log)
+                applied_ids.append(op_id)
+            elif entity_type == "unit_delete" and entity_id:
+                unit = db.query(models.Unit).filter(models.Unit.id == entity_id).first()
+                if unit:
+                    db.delete(unit)
                 applied_ids.append(op_id)
             else:
                 applied_ids.append(op_id)

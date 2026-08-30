@@ -227,3 +227,23 @@ class TokenResponse(BaseModel):
 
 class RecommendationResponse(BaseModel):
     recommendation: str
+
+class CasBlobRequest(BaseModel):
+    hash: str
+    content: str
+
+class CasBlobResponse(BaseModel):
+    hash: str
+    content: str
+    content_size: int
+
+class CommitLogSchema(BaseModel):
+    commit_hash: str
+    parent_hash: Optional[str] = None
+    entity_type: str
+    entity_id: str
+    delta_patch: str = ""
+    blob_hash: str = ""
+    user_id: str
+    timestamp: float
+

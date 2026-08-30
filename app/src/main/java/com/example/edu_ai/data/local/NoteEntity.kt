@@ -10,6 +10,9 @@ data class NoteEntity(
     val sessionId: Int,
     val title: String,
     val content: String,
+    val contentHash: String = "",
+    val headCommitHash: String = "",
+    val parentHash: String? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val lastUpdated: Long = System.currentTimeMillis()
 )

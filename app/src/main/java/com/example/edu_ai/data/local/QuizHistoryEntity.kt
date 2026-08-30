@@ -1,6 +1,5 @@
 // IDENTITY: data/local/QuizHistoryEntity.kt
-// VERSION: 1.2.0
-// ⚙️ GEAR 1.2: The Local Database (SQLite)
+// VERSION: 1.3.0
 
 package com.example.edu_ai.data.local
 
@@ -12,8 +11,9 @@ data class QuizHistoryEntity(
     @PrimaryKey(autoGenerate = true) val localId: Long = 0,
     val userId: String, 
     val unitName: String,
-    val topic: String? = null, // Added to identify the specific quiz context
+    val topic: String? = null,
     val pnlScore: Double,
     val timestamp: Long,
-    val quizJson: String? = null // Added to store questions for offline retake
+    val quizJson: String? = null,
+    val quizJsonHash: String = ""
 )

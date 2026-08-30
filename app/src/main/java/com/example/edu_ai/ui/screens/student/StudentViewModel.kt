@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 data class StudentUiState(
     val user: UserEntity? = null,
     val units: List<UnitEntity> = emptyList(),
+    val archivedUnits: List<UnitEntity> = emptyList(),
     val unitsWithModules: List<UnitWithModules> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -35,16 +36,18 @@ class StudentViewModel(private val repository: EduAIRepository, private val dao:
             flowOf(StudentUiState(isLoading = true))
         } else {
             combine(
-                dao.getAllUnits(user.id),
-                dao.getAllUnitsWithModules(user.id),
+                combine(dao.getAllUnits(user.id), dao.getArchivedUnits(user.id), dao.getAllUnitsWithModules(user.id)) { units, archived, unitsWithModules ->
+                    Triple(units, archived, unitsWithModules)
+                },
                 _isLoading,
                 _error,
                 _dashboardResponse
-            ) { units, unitsWithModules, isLoading, error, dashboardResponse ->
+            ) { tuple, isLoading, error, dashboardResponse ->
                 StudentUiState(
                     user = user,
-                    units = units,
-                    unitsWithModules = unitsWithModules,
+                    units = tuple.first,
+                    archivedUnits = tuple.second,
+                    unitsWithModules = tuple.third,
                     isLoading = isLoading,
                     error = error,
                     dashboardResponse = dashboardResponse
@@ -69,10 +72,8 @@ class StudentViewModel(private val repository: EduAIRepository, private val dao:
             _isLoading.value = true
             _error.value = null
             try {
-                // Fetch full response to get lastPoint
                 val response = repository.getDashboardResponse(userId)
                 _dashboardResponse.value = response
-                // Still use the sync logic in repository to update local DB
                 repository.getDashboardData(userId).collect()
                 lastRefreshTime = System.currentTimeMillis()
             } catch (e: Exception) {
@@ -80,6 +81,20 @@ class StudentViewModel(private val repository: EduAIRepository, private val dao:
             } finally {
                 _isLoading.value = false
             }
+        }
+    }
+
+    fun deleteUnit(unitId: Long) {
+        val user = uiState.value.user ?: return
+        viewModelScope.launch {
+            repository.deleteUnit(unitId, user.id)
+        }
+    }
+
+    fun archiveUnit(unitId: Long, isActive: Boolean) {
+        val user = uiState.value.user ?: return
+        viewModelScope.launch {
+            repository.archiveUnit(unitId, isActive, user.id)
         }
     }
 
