@@ -80,7 +80,7 @@ fun LearnScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
-                            onClick = { /* Back logic if implemented */ },
+                            onClick = { viewModel.previousObjective(subtopicId, userId) },
                             enabled = !uiState.isFirst && !uiState.isLoading
                         ) {
                             Icon(Icons.Default.ChevronLeft, contentDescription = "Back")
@@ -97,13 +97,19 @@ fun LearnScreen(
                         )
 
                         Button(
-                            onClick = { viewModel.nextObjective(subtopicId, userId, onTriggerQuiz) },
+                            onClick = {
+                                if (uiState.userMessage.isNotBlank()) {
+                                    viewModel.sendUserQuestion(subtopicId, userId)
+                                } else {
+                                    viewModel.nextObjective(subtopicId, userId, onTriggerQuiz)
+                                }
+                            },
                             enabled = !uiState.isLoading,
                             shape = MaterialTheme.shapes.medium,
                             contentPadding = PaddingValues(horizontal = 12.dp)
                         ) {
-                            Text(if (uiState.isLast) "FINISH" else "NEXT", fontSize = 12.sp)
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Text(if (uiState.userMessage.isNotBlank()) "SEND" else if (uiState.isLast) "FINISH" else "NEXT", fontSize = 12.sp)
+                            Icon(if (uiState.userMessage.isNotBlank()) Icons.Default.ChevronRight else Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(16.dp))
                         }
                     }
                 }

@@ -44,6 +44,25 @@ class LearnViewModel(private val repository: EduAIRepository) : ViewModel() {
         }
     }
 
+    fun sendUserQuestion(subtopicId: Int, userId: String) {
+        viewModelScope.launch {
+            val message = _uiState.value.userMessage
+            if (message.isBlank()) return@launch
+            _uiState.update { it.copy(isLoading = true, userMessage = "") }
+            try {
+                val response = repository.nextObjective(subtopicId, userId, message)
+                if (response["status"] == "subtopic_completed") {
+                    repository.updateSubtopicProgress(subtopicId.toLong(), true)
+                    _uiState.update { it.copy(subtopicCompleted = true, isLoading = false) }
+                } else {
+                    updateStateWithResponse(response, subtopicId.toLong())
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.message) }
+            }
+        }
+    }
+
     fun nextObjective(subtopicId: Int, userId: String, onTriggerQuiz: () -> Unit) {
         viewModelScope.launch {
             val message = _uiState.value.userMessage
@@ -57,6 +76,18 @@ class LearnViewModel(private val repository: EduAIRepository) : ViewModel() {
                 } else {
                     updateStateWithResponse(response, subtopicId.toLong())
                 }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.message) }
+            }
+        }
+    }
+
+    fun previousObjective(subtopicId: Int, userId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            try {
+                val response = repository.previousObjective(subtopicId, userId)
+                updateStateWithResponse(response, subtopicId.toLong())
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = e.message) }
             }

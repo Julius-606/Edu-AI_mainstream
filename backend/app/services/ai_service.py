@@ -254,14 +254,32 @@ class AiService:
 
         return await self.ask(prompt)
 
-    async def generate_learning_content(self, objective_description, username):
-        prompt = f"""
-        Objective: {objective_description}
-        Learner: {username}
+    async def generate_learning_content(self, objective_description, username, student_message: str = None, session_context: str = None):
+        clean_objective = (objective_description or '').strip()
+        clean_student_message = (student_message or '').strip()
+        clean_context = (session_context or '').strip()
 
-        Generate an interactive learning session for this objective.
-        Explain clearly, use Markdown, and end with a 'Check for Understanding' question.
-        """
+        if clean_student_message:
+            prompt = f"""
+            Objective: {clean_objective}
+            Learner: {username}
+            Student question / follow-up: {clean_student_message}
+            Prior context: {clean_context if clean_context else 'No prior context.'}
+
+            Teach this objective in a friendly, concise way. Use Markdown and keep the session coherent with the student's question.
+            Start with a single brief greeting only when the student is just beginning the objective; otherwise continue directly with the explanation.
+            End with a 'Check for Understanding' question.
+            """
+        else:
+            prompt = f"""
+            Objective: {clean_objective}
+            Learner: {username}
+            Prior context: {clean_context if clean_context else 'No prior context.'}
+
+            Generate an interactive learning session for this objective.
+            Explain clearly, use Markdown, and keep the explanation focused and coherent.
+            End with a 'Check for Understanding' question.
+            """
         return await self.ask(prompt)
 
 ai_service = AiService()

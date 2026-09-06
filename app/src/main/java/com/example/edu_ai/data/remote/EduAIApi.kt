@@ -84,6 +84,13 @@ interface EduAIApi {
     @POST("api/learning/next/{subtopic_id}")
     suspend fun nextObjective(
         @Path("subtopic_id") subtopicId: Int,
+        @Query("user_id") userId: String,
+        @Query("student_message") studentMessage: String? = null
+    ): Map<String, Any>
+
+    @POST("api/learning/previous/{subtopic_id}")
+    suspend fun previousObjective(
+        @Path("subtopic_id") subtopicId: Int,
         @Query("user_id") userId: String
     ): Map<String, Any>
 

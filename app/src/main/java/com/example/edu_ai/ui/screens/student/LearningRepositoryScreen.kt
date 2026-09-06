@@ -26,6 +26,7 @@ fun LearningRepositoryScreen(
     repository: com.example.edu_ai.repository.EduAIRepository
 ) {
     val contents by repository.getSavedLearningContent(subtopicId).collectAsState(initial = emptyList())
+    var showObjectives by remember { mutableStateOf(true) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         DynamicBackground()
@@ -43,26 +44,65 @@ fun LearningRepositoryScreen(
                 )
             }
         ) { padding ->
-            if (contents.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                    Text("No content saved for this subtopic yet.")
+            when {
+                contents.isEmpty() && showObjectives -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding)
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            "Learning Objectives for $subtopicName",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Continue learning to unlock saved content. Here are the key objectives for this subtopic:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "• Understand the core concepts of this topic\n• Apply knowledge through practice exercises\n• Achieve mastery through repeated learning",
+                            style = MaterialTheme.typography.bodyMedium,
+                            lineHeight = 24.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Button(
+                            onClick = { showObjectives = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Got it, Let's Learn")
+                        }
+                    }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
-                ) {
-                    items(contents) { content ->
-                        Column {
-                            Text(
-                                text = content.objectiveDescription,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            FormattedText(text = content.content)
-                            HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
+                contents.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                        Text("No content saved for this subtopic yet.", color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(24.dp)
+                    ) {
+                        items(contents) { content ->
+                            Column {
+                                Text(
+                                    text = content.objectiveDescription,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                FormattedText(text = content.content)
+                                HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
+                            }
                         }
                     }
                 }

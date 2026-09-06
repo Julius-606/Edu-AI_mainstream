@@ -229,7 +229,8 @@ class EduAIRepository(
 
     // --- Learning Trace Methods ---
     suspend fun getLearningSession(subtopicId: Int, userId: String) = api.getLearningSession(subtopicId, userId)
-    suspend fun nextObjective(subtopicId: Int, userId: String, userMessage: String? = null) = api.nextObjective(subtopicId, userId)
+    suspend fun nextObjective(subtopicId: Int, userId: String, userMessage: String? = null) = api.nextObjective(subtopicId, userId, userMessage)
+    suspend fun previousObjective(subtopicId: Int, userId: String) = api.previousObjective(subtopicId, userId)
 
     suspend fun saveLearningContent(content: LearningContentEntity) = dao.insertLearningContent(content)
     fun getSavedLearningContent(subtopicId: Long) = dao.getLearningContentForSubtopic(subtopicId)

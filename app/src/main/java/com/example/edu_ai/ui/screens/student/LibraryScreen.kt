@@ -3,6 +3,7 @@ package com.example.edu_ai.ui.screens.student
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -25,7 +26,8 @@ import com.example.edu_ai.ui.components.DynamicBackground
 fun LibraryScreen(
     userId: String,
     onBack: () -> Unit,
-    onUnitAdded: () -> Unit
+    onUnitAdded: () -> Unit,
+    onViewUnitOutline: (Long) -> Unit = {}
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as EduAIApplication
@@ -86,7 +88,9 @@ fun LibraryScreen(
                 ) {
                     items(uiState.availableUnits) { unit ->
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onViewUnitOutline(unit.id.toLong()) },
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
                             ),

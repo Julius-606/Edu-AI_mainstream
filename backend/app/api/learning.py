@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from typing import Optional
 from app.db.session import get_db
 from app.models import database_models as models
 from app.schemas import api_schemas as schemas
@@ -9,7 +10,7 @@ import time
 router = APIRouter(prefix="/learning", tags=["Learning Trace"])
 
 @router.get("/session/{subtopic_id}")
-async def get_learning_session(subtopic_id: int, user_id: str, db: Session = Depends(get_db)):
+async def get_learning_session(subtopic_id: int, user_id: str, db: Session = Depends(get_db), student_message: Optional[str] = Query(None)):
     # 1. Find the subtopic and its objectives
     subtopic = db.query(models.Subtopic).filter(models.Subtopic.id == subtopic_id).first()
     if not subtopic:
@@ -49,7 +50,12 @@ async def get_learning_session(subtopic_id: int, user_id: str, db: Session = Dep
         db.commit()
 
     # 3. Generate AI content for this objective
-    content = await ai_service.generate_learning_content(current_objective.description, user.username)
+    content = await ai_service.generate_learning_content(
+        current_objective.description,
+        user.username,
+        student_message=student_message,
+        session_context=f"Subtopic: {subtopic.name}."
+    )
 
     return {
         "subtopic_name": subtopic.name,
@@ -61,7 +67,7 @@ async def get_learning_session(subtopic_id: int, user_id: str, db: Session = Dep
     }
 
 @router.post("/next/{subtopic_id}")
-async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(get_db)):
+async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(get_db), student_message: Optional[str] = Query(None)):
     user = db.query(models.User).filter((models.User.id == (int(user_id) if user_id.isdigit() else -1)) | (models.User.username == user_id)).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -96,7 +102,7 @@ async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(g
             db.commit()
             return {"status": "subtopic_completed", "trigger_quiz": True}
 
-        return await get_learning_session(subtopic_id, user_id, db)
+        return await get_learning_session(subtopic_id, user_id, db, student_message=student_message)
 
     # Mark current as completed
     current_progress.status = "Completed"
@@ -119,7 +125,7 @@ async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(g
         )
         db.add(new_progress)
         db.commit()
-        return await get_learning_session(subtopic_id, user_id, db)
+        return await get_learning_session(subtopic_id, user_id, db, student_message=student_message)
     else:
         # End of subtopic - Mark subtopic completed and return subtopic_completed
         subtopic.is_completed = True
@@ -144,3 +150,37 @@ async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(g
 
         db.commit()
         return {"status": "subtopic_completed", "trigger_quiz": True}
+
+
+@router.post("/previous/{subtopic_id}")
+async def previous_objective(subtopic_id: int, user_id: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter((models.User.id == (int(user_id) if user_id.isdigit() else -1)) | (models.User.username == user_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    subtopic = db.query(models.Subtopic).filter(models.Subtopic.id == subtopic_id).first()
+    if not subtopic:
+        raise HTTPException(status_code=404, detail="Subtopic not found")
+
+    objectives = subtopic.learning_objectives
+    if not objectives:
+        return {"status": "subtopic_completed", "trigger_quiz": True}
+
+    current_progress = db.query(models.UserSyllabusProgress).filter(
+        models.UserSyllabusProgress.user_id == user.id,
+        models.UserSyllabusProgress.node_type == "objective",
+        models.UserSyllabusProgress.status == "In_Progress"
+    ).first()
+
+    if not current_progress:
+        return await get_learning_session(subtopic_id, user_id, db)
+
+    current_index = next((index for index, obj in enumerate(objectives) if obj.id == current_progress.node_id), -1)
+    if current_index <= 0:
+        return await get_learning_session(subtopic_id, user_id, db)
+
+    previous_obj = objectives[current_index - 1]
+    current_progress.node_id = previous_obj.id
+    current_progress.last_studied_at = time.time()
+    db.commit()
+    return await get_learning_session(subtopic_id, user_id, db)

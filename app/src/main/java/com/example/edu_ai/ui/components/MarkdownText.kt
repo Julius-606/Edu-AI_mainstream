@@ -36,7 +36,8 @@ fun FormattedText(
     onLinkClick: ((String) -> Unit)? = null
 ) {
     val blocks = remember(text) { splitIntoBlocks(text) }
-    
+    val resolvedStyle = if (style.color == Color.Unspecified) style.copy(color = MaterialTheme.colorScheme.onSurface) else style
+
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         blocks.forEach { block ->
             when (block.type) {
@@ -46,7 +47,7 @@ fun FormattedText(
                     val annotatedString = parseMarkdown(block.content)
                     androidx.compose.foundation.text.ClickableText(
                         text = annotatedString,
-                        style = style,
+                        style = resolvedStyle,
                         maxLines = maxLines,
                         overflow = overflow,
                         onClick = { offset ->
@@ -65,43 +66,60 @@ fun FormattedText(
 enum class BlockType { TEXT, TABLE, IMAGE }
 data class MarkdownBlock(val type: BlockType, val content: String, val extra: String? = null)
 
-fun splitIntoBlocks(text: String): List<MarkdownBlock> {
-    val lines = text.lines()
-    val blocks = mutableListOf<MarkdownBlock>()
-    var currentTable = mutableListOf<String>()
-    
-    val imageRegex = Regex("""^!\[(.*?)]\((.*?)\)$""")
+private fun sanitizeMarkdownText(text: String): String = text
+    .replace("\r\n", "\n")
+    .replace("\r", "\n")
+    .replace("\u200B", "")
+    .replace("\u00A0", " ")
+    .replace("\uFEFF", "")
+    .replace(Regex("[\\u0000-\\u001F\\u007F]")) { "" }
+    .trim()
 
-    for (line in lines) {
-        val trimmed = line.trim()
-        
-        // Check for Image
+fun splitIntoBlocks(text: String): List<MarkdownBlock> {
+    val normalized = sanitizeMarkdownText(text)
+    if (normalized.isBlank()) return emptyList()
+
+    val lines = normalized.lines()
+    val blocks = mutableListOf<MarkdownBlock>()
+    val tableLines = mutableListOf<String>()
+    val imageRegex = Regex("""^\s*!\[(.*?)]\((https?://[^\s)]+|/[^\s)]+|[^\s)]+)\)\s*$""", RegexOption.IGNORE_CASE)
+
+    fun flushTable() {
+        if (tableLines.isNotEmpty()) {
+            blocks.add(MarkdownBlock(BlockType.TABLE, tableLines.joinToString("\n")))
+            tableLines.clear()
+        }
+    }
+
+    for (rawLine in lines) {
+        val trimmed = rawLine.trim()
+        if (trimmed.isEmpty()) continue
+
         val imageMatch = imageRegex.find(trimmed)
         if (imageMatch != null) {
-            if (currentTable.isNotEmpty()) {
-                blocks.add(MarkdownBlock(BlockType.TABLE, currentTable.joinToString("\n")))
-                currentTable = mutableListOf()
-            }
+            flushTable()
             blocks.add(MarkdownBlock(BlockType.IMAGE, imageMatch.groupValues[2], imageMatch.groupValues[1]))
             continue
         }
 
-        // Check for Table
         if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
-            currentTable.add(line)
-        } else {
-            if (currentTable.isNotEmpty()) {
-                blocks.add(MarkdownBlock(BlockType.TABLE, currentTable.joinToString("\n")))
-                currentTable = mutableListOf()
-            }
-            if (line.isNotBlank()) {
-                blocks.add(MarkdownBlock(BlockType.TEXT, line))
-            }
+            tableLines.add(trimmed)
+            continue
+        }
+
+        // Clean up markdown formatting characters before processing
+        // We only want to clean them for the text blocks that are not tables
+        val cleanedText = trimmed.replace(Regex("""\*\*(.*?)\*\*"""), "$1")
+            .replace(Regex("""\*(.*?)\*"""), "$1")
+            .replace(Regex("""^---$"""), "") // Remove explicit line dividers in text blocks
+
+        flushTable()
+        if (cleanedText.isNotBlank()) {
+            blocks.add(MarkdownBlock(BlockType.TEXT, cleanedText))
         }
     }
-    if (currentTable.isNotEmpty()) {
-        blocks.add(MarkdownBlock(BlockType.TABLE, currentTable.joinToString("\n")))
-    }
+
+    flushTable()
     return blocks
 }
 
@@ -157,50 +175,62 @@ fun ImageBlock(url: String, alt: String?) {
  * A simple Markdown parser for Compose.
  */
 fun parseMarkdown(text: String): AnnotatedString {
-    return buildAnnotatedString {
-        val boldRegex = Regex("""\*\*(.*?)\*\*""", RegexOption.DOT_MATCHES_ALL)
-        val italicRegex = Regex("""\*(.*?)\*""", RegexOption.DOT_MATCHES_ALL)
-        val codeRegex = Regex("""`(.*?)`""", RegexOption.DOT_MATCHES_ALL)
-        val linkRegex = Regex("""\[(.*?)]\((.*?)\)""", RegexOption.DOT_MATCHES_ALL)
-        val headerRegex = Regex("""^#+\s*(.*)$""", RegexOption.MULTILINE)
-        val listRegex = Regex("""^\s*[-*+]\s+(.*)$""", RegexOption.MULTILINE)
+    val sanitized = sanitizeMarkdownText(text)
+    if (sanitized.isBlank()) return AnnotatedString("")
 
-        var processedText = text
-            .replace(headerRegex) { it.groupValues[1] }
-            .replace(listRegex) { "• ${it.groupValues[1]}" }
+    return buildAnnotatedString {
+        val boldRegex = Regex("""(?<!\*)\*\*(.+?)(?<!\\)\*\*(?!\*)""", RegexOption.DOT_MATCHES_ALL)
+        val italicRegex = Regex("""(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)""", RegexOption.DOT_MATCHES_ALL)
+        val codeRegex = Regex("""`([^`\n]+)`""")
+        val linkRegex = Regex("""(?<!\!)\[([^\]]+)]\((https?://[^\s)]+|/[^\s)]+|[^\s)]+)\)""", RegexOption.DOT_MATCHES_ALL)
+        val headerRegex = Regex("""(?m)^#{1,6}\s*(.+?)\s*#*\s*$""")
+        val listRegex = Regex("""(?m)^\s*[-*+]\s+(.*)$""")
+
+        var processedText = sanitized
+            .replace(headerRegex) { it.groupValues[1].trim() }
+            .replace(listRegex) { "• ${it.groupValues[1].trim()}" }
+            .replace(Regex("""(?m)^\s*\d+[.)]\s+""")) { "" }
+            .replace(Regex("""---"""), "")
+            .replace(Regex("""\*\*(.*?)\*\*"""), "$1") // Ensure bold is handled
+            .replace(Regex("""\*(.*?)\*"""), "$1")    // Ensure italics are handled
 
         val tokens = mutableListOf<Token>()
-        
         boldRegex.findAll(processedText).forEach { tokens.add(Token(it.range, "bold", it.groupValues[1])) }
         italicRegex.findAll(processedText).forEach { match ->
-            if (tokens.none { it.range.contains(match.range.first) }) {
+            if (tokens.none { token -> token.range.first <= match.range.first && match.range.last <= token.range.last }) {
                 tokens.add(Token(match.range, "italic", match.groupValues[1]))
             }
         }
         codeRegex.findAll(processedText).forEach { tokens.add(Token(it.range, "code", it.groupValues[1])) }
         linkRegex.findAll(processedText).forEach { tokens.add(Token(it.range, "link", it.groupValues[1], it.groupValues[2])) }
-        
+
         tokens.sortBy { it.range.first }
-        
+
         var lastIndex = 0
         for (token in tokens) {
             if (token.range.first > lastIndex) {
                 append(processedText.substring(lastIndex, token.range.first))
             }
-            
+
             when (token.type) {
                 "bold" -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(token.content) }
                 "italic" -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(token.content) }
-                "code" -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color.LightGray.copy(alpha = 0.3f))) { append(token.content) }
+                "code" -> withStyle(
+                    SpanStyle(
+                        fontFamily = FontFamily.Monospace,
+                        background = Color.LightGray.copy(alpha = 0.25f),
+                        color = Color(0xFF1F2937)
+                    )
+                ) { append(token.content) }
                 "link" -> {
                     pushStringAnnotation(tag = "URL", annotation = token.url ?: "")
-                    withStyle(SpanStyle(color = Color.Blue, fontWeight = FontWeight.Bold)) { append(token.content) }
+                    withStyle(SpanStyle(color = Color(0xFF2563EB), fontWeight = FontWeight.Bold)) { append(token.content) }
                     pop()
                 }
             }
             lastIndex = token.range.last + 1
         }
-        
+
         if (lastIndex < processedText.length) {
             append(processedText.substring(lastIndex))
         }

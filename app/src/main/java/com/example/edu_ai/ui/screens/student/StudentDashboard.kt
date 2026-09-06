@@ -347,6 +347,17 @@ fun StudentDashboardContent(
     onViewUnitOutline: (Long) -> Unit,
     onOpenConsultations: () -> Unit
 ) {
+    val viewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
+    
+    LaunchedEffect(uiState.unitsWithModules) {
+        uiState.unitsWithModules.forEach { unitWithModules ->
+            val allSubtopics = unitWithModules.modules.flatMap { it.topics }.flatMap { it.subtopics }
+            if (allSubtopics.isNotEmpty() && allSubtopics.all { it.isCompleted }) {
+                viewModel.archiveUnit(unitWithModules.unit.localId, isActive = false)
+            }
+        }
+    }
+    
     Box(modifier = Modifier.fillMaxSize()) {
         DynamicBackground()
 
@@ -475,7 +486,10 @@ fun StudentDashboardContent(
                 }
 
                 // Hierarchical Progress Cards
-                items(uiState.unitsWithModules) { unitWithModules ->
+                items(uiState.unitsWithModules.filter { unitWithModules ->
+                    val allSubtopics = unitWithModules.modules.flatMap { it.topics }.flatMap { it.subtopics }
+                    allSubtopics.isNotEmpty() && allSubtopics.any { !it.isCompleted }
+                }) { unitWithModules ->
                     val unit = unitWithModules.unit
                     
                     val allTopics = unitWithModules.modules.flatMap { it.topics }
