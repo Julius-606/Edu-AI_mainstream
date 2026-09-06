@@ -1,6 +1,7 @@
 package com.example.edu_ai.ui.components
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -42,6 +43,7 @@ fun FormattedText(
             when (block.type) {
                 BlockType.TABLE -> TableBlock(block.content)
                 BlockType.IMAGE -> ImageBlock(block.content, block.extra)
+                BlockType.CODE -> CodeBlock(block.content)
                 else -> {
                     val annotatedString = parseMarkdown(block.content)
                     androidx.compose.foundation.text.ClickableText(
@@ -62,47 +64,92 @@ fun FormattedText(
     }
 }
 
-enum class BlockType { TEXT, TABLE, IMAGE }
+enum class BlockType { TEXT, TABLE, IMAGE, CODE }
 data class MarkdownBlock(val type: BlockType, val content: String, val extra: String? = null)
 
 fun splitIntoBlocks(text: String): List<MarkdownBlock> {
     val lines = text.lines()
     val blocks = mutableListOf<MarkdownBlock>()
     var currentTable = mutableListOf<String>()
-    
+    var currentText = mutableListOf<String>()
+    var currentCode = mutableListOf<String>()
+    var inCodeBlock = false
     val imageRegex = Regex("""^!\[(.*?)]\((.*?)\)$""")
+
+    fun flushText() {
+        if (currentText.isNotEmpty()) {
+            blocks.add(MarkdownBlock(BlockType.TEXT, currentText.joinToString("\n")))
+            currentText = mutableListOf()
+        }
+    }
+
+    fun flushTable() {
+        if (currentTable.isNotEmpty()) {
+            blocks.add(MarkdownBlock(BlockType.TABLE, currentTable.joinToString("\n")))
+            currentTable = mutableListOf()
+        }
+    }
 
     for (line in lines) {
         val trimmed = line.trim()
+
+        if (trimmed.startsWith("```")) {
+            if (inCodeBlock) {
+                blocks.add(MarkdownBlock(BlockType.CODE, currentCode.joinToString("\n")))
+                currentCode = mutableListOf()
+                inCodeBlock = false
+            } else {
+                flushText()
+                flushTable()
+                inCodeBlock = true
+            }
+            continue
+        }
+
+        if (inCodeBlock) {
+            currentCode.add(line)
+            continue
+        }
         
         // Check for Image
         val imageMatch = imageRegex.find(trimmed)
         if (imageMatch != null) {
-            if (currentTable.isNotEmpty()) {
-                blocks.add(MarkdownBlock(BlockType.TABLE, currentTable.joinToString("\n")))
-                currentTable = mutableListOf()
-            }
+            flushText()
+            flushTable()
             blocks.add(MarkdownBlock(BlockType.IMAGE, imageMatch.groupValues[2], imageMatch.groupValues[1]))
             continue
         }
 
         // Check for Table
         if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+            flushText()
             currentTable.add(line)
         } else {
-            if (currentTable.isNotEmpty()) {
-                blocks.add(MarkdownBlock(BlockType.TABLE, currentTable.joinToString("\n")))
-                currentTable = mutableListOf()
-            }
+            flushTable()
             if (line.isNotBlank()) {
-                blocks.add(MarkdownBlock(BlockType.TEXT, line))
+                currentText.add(line)
             }
         }
     }
-    if (currentTable.isNotEmpty()) {
-        blocks.add(MarkdownBlock(BlockType.TABLE, currentTable.joinToString("\n")))
+    flushText()
+    flushTable()
+    if (inCodeBlock && currentCode.isNotEmpty()) {
+        blocks.add(MarkdownBlock(BlockType.CODE, currentCode.joinToString("\n")))
     }
     return blocks
+}
+
+@Composable
+fun CodeBlock(content: String) {
+    Text(
+        text = content,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.LightGray.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        style = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace),
+        softWrap = true
+    )
 }
 
 @Composable
@@ -160,14 +207,17 @@ fun parseMarkdown(text: String): AnnotatedString {
     return buildAnnotatedString {
         val boldRegex = Regex("""\*\*(.*?)\*\*""", RegexOption.DOT_MATCHES_ALL)
         val italicRegex = Regex("""\*(.*?)\*""", RegexOption.DOT_MATCHES_ALL)
+        val strikeRegex = Regex("""~~(.*?)~~""", RegexOption.DOT_MATCHES_ALL)
         val codeRegex = Regex("""`(.*?)`""", RegexOption.DOT_MATCHES_ALL)
         val linkRegex = Regex("""\[(.*?)]\((.*?)\)""", RegexOption.DOT_MATCHES_ALL)
         val headerRegex = Regex("""^#+\s*(.*)$""", RegexOption.MULTILINE)
         val listRegex = Regex("""^\s*[-*+]\s+(.*)$""", RegexOption.MULTILINE)
+        val orderedListRegex = Regex("""^\s*(\d+)\.\s+(.*)$""", RegexOption.MULTILINE)
 
         var processedText = text
             .replace(headerRegex) { it.groupValues[1] }
             .replace(listRegex) { "• ${it.groupValues[1]}" }
+            .replace(orderedListRegex) { "${it.groupValues[1]}. ${it.groupValues[2]}" }
 
         val tokens = mutableListOf<Token>()
         
@@ -175,6 +225,11 @@ fun parseMarkdown(text: String): AnnotatedString {
         italicRegex.findAll(processedText).forEach { match ->
             if (tokens.none { it.range.contains(match.range.first) }) {
                 tokens.add(Token(match.range, "italic", match.groupValues[1]))
+            }
+        }
+        strikeRegex.findAll(processedText).forEach { match ->
+            if (tokens.none { it.range.contains(match.range.first) }) {
+                tokens.add(Token(match.range, "strike", match.groupValues[1]))
             }
         }
         codeRegex.findAll(processedText).forEach { tokens.add(Token(it.range, "code", it.groupValues[1])) }
@@ -191,6 +246,7 @@ fun parseMarkdown(text: String): AnnotatedString {
             when (token.type) {
                 "bold" -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(token.content) }
                 "italic" -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(token.content) }
+                "strike" -> withStyle(SpanStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough)) { append(token.content) }
                 "code" -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color.LightGray.copy(alpha = 0.3f))) { append(token.content) }
                 "link" -> {
                     pushStringAnnotation(tag = "URL", annotation = token.url ?: "")
