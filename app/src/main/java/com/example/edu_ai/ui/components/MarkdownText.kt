@@ -162,7 +162,12 @@ private fun CodeBlock(content: String, style: TextStyle) {
 
 @Composable
 private fun TableBlock(content: String, style: TextStyle, onLinkClick: ((String) -> Unit)?) {
-    val rows = content.lines().filterNot { it.matches(Regex("""^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$""")) }
+    val rows = content.lines().filterNot { row ->
+        row.split("|")
+            .map { it.trim().removePrefix(":").removeSuffix(":") }
+            .filter { it.isNotEmpty() }
+            .all { it.length >= 3 && it.all { character -> character == '-' } }
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()

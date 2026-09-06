@@ -37,10 +37,13 @@ import com.example.edu_ai.data.local.UnitWithModules
 import com.example.edu_ai.data.local.UserEntity
 import com.example.edu_ai.data.remote.ApiTimetableSlot
 import com.example.edu_ai.ui.components.DynamicBackground
+import com.example.edu_ai.ui.components.FormattedText
+import com.example.edu_ai.ui.components.InAppBrowser
 import com.example.edu_ai.ui.components.ProgressRings
 import com.example.edu_ai.ui.components.RingProgress
 import com.example.edu_ai.ui.theme.TraceTheme
 import kotlinx.coroutines.launch
+import androidx.compose.ui.window.Dialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +73,7 @@ fun StudentDashboard(
     var showManageUnitsDialog by remember { mutableStateOf(false) }
     var showArchivesDialog by remember { mutableStateOf(false) }
     var unitToDelete by remember { mutableStateOf<UnitEntity?>(null) }
+    var activeBrowserUrl by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(userId) {
         viewModel.refreshDashboard(userId)
@@ -154,8 +158,15 @@ fun StudentDashboard(
             onLaunchModule = onLaunchModule,
             onOpenLibrary = onOpenLibrary,
             onViewUnitOutline = onViewUnitOutline,
-            onOpenConsultations = onOpenConsultations
+            onOpenConsultations = onOpenConsultations,
+            onLinkClick = { activeBrowserUrl = it }
         )
+    }
+
+    activeBrowserUrl?.let { url ->
+        Dialog(onDismissRequest = { activeBrowserUrl = null }) {
+            InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
+        }
     }
 
     // Account Management Dialog
@@ -345,7 +356,8 @@ fun StudentDashboardContent(
     onLaunchModule: (Int?) -> Unit,
     onOpenLibrary: () -> Unit,
     onViewUnitOutline: (Long) -> Unit,
-    onOpenConsultations: () -> Unit
+    onOpenConsultations: () -> Unit,
+    onLinkClick: (String) -> Unit = {}
 ) {
     val viewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
     
@@ -450,10 +462,10 @@ fun StudentDashboardContent(
                                 Text("ZENITH INSIGHT", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                recommendation,
+                            FormattedText(
+                                text = recommendation,
                                 style = MaterialTheme.typography.bodyLarge,
-                                lineHeight = 22.sp
+                                onLinkClick = onLinkClick
                             )
                         }
                     }

@@ -170,8 +170,10 @@ fun ChatInterface(
             }
 
             activeBrowserUrl?.let { url ->
-                Dialog(onDismissRequest = { activeBrowserUrl = null }) {
-                    InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
+                item {
+                    Dialog(onDismissRequest = { activeBrowserUrl = null }) {
+                        InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
+                    }
                 }
             }
         }
