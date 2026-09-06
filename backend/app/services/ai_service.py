@@ -13,6 +13,12 @@ from dotenv import load_dotenv
 load_dotenv()
 logger = logging.getLogger("AI_SERVICE")
 
+MARKDOWN_FORMAT_INSTRUCTION = (
+    "Return the response as Markdown. Use headings, short paragraphs, bullet or numbered "
+    "lists, bold/italic emphasis, tables when useful, fenced code blocks for code, and "
+    "Markdown links where appropriate. Do not return HTML."
+)
+
 # --- Key Loading Logic ---
 GEMINI_API_KEYS = []
 i = 1
@@ -146,6 +152,7 @@ class AiService:
         Generate a rigorous academic multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
         Level: {student_level}. Focus on high-yield medical concepts and pathophysiology.
         Provide deep clinical rationale for each question.
+        Return ONLY the JSON object required by the response schema; do not wrap it in Markdown.
         """
 
         config = types.GenerateContentConfig(
@@ -250,9 +257,10 @@ class AiService:
         Recent Performance: {history_summary}
 
         Provide a concise study recommendation (max 3 sentences).
+        {MARKDOWN_FORMAT_INSTRUCTION}
         """
 
-        return await self.ask(prompt)
+        return await self.ask(prompt, system_instruction=MARKDOWN_FORMAT_INSTRUCTION)
 
     async def generate_learning_content(self, objective_description, username, student_message: str = None, session_context: str = None):
         clean_objective = (objective_description or '').strip()
@@ -280,6 +288,6 @@ class AiService:
             Explain clearly, use Markdown, and keep the explanation focused and coherent.
             End with a 'Check for Understanding' question.
             """
-        return await self.ask(prompt)
+        return await self.ask(prompt, system_instruction=MARKDOWN_FORMAT_INSTRUCTION)
 
 ai_service = AiService()

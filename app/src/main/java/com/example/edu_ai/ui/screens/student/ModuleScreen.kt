@@ -33,6 +33,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.edu_ai.data.local.ChatSessionEntity
 import com.example.edu_ai.data.local.UserEntity
 import com.example.edu_ai.ui.components.FormattedText
+import com.example.edu_ai.ui.components.InAppBrowser
+import androidx.compose.ui.window.Dialog
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -265,6 +267,7 @@ fun ZenithTab(
     val recommendation by progressViewModel.recommendation.collectAsState()
     val progressUiState by progressViewModel.uiState.collectAsState()
     val timetableUiState by timetableViewModel.uiState.collectAsState()
+    var activeBrowserUrl by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         progressViewModel.refreshRecommendations()
@@ -297,7 +300,8 @@ fun ZenithTab(
                     } else {
                         FormattedText(
                             text = recommendation,
-                            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp)
+                            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
+                            onLinkClick = { activeBrowserUrl = it }
                         )
                     }
                     
@@ -310,6 +314,7 @@ fun ZenithTab(
                         Text("REFRESH STRATEGY")
                     }
                 }
+
             }
         }
 
@@ -367,6 +372,11 @@ fun ZenithTab(
         }
         
         item { Spacer(modifier = Modifier.height(24.dp)) }
+    }
+    activeBrowserUrl?.let { url ->
+        Dialog(onDismissRequest = { activeBrowserUrl = null }) {
+            InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
+        }
     }
 }
 

@@ -20,6 +20,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("AI_ENGINE")
 
+MARKDOWN_FORMAT_INSTRUCTION = (
+    "Return the response as Markdown. Use headings, short paragraphs, bullet or numbered "
+    "lists, bold/italic emphasis, tables when useful, fenced code blocks for code, and "
+    "Markdown links where appropriate. Do not return HTML."
+)
+
 # --- 🔐 SECURE KEYCHAIN ---
 GEMINI_API_KEYS = []
 i = 1
@@ -144,6 +150,7 @@ class AiEngine:
         2. Content: Focus on high-yield medical concepts, pathophysiology, and diagnostic criteria relevant to the topic.
         3. Explanations: For each question, the 'explanation' field must provide a deep clinical rationale.
            It should explain the physiological basis for the correct answer and clarify why the distractors are incorrect or less appropriate.
+        4. Return ONLY valid JSON; do not wrap the JSON in Markdown.
 
         Format:
         Return ONLY valid JSON.
@@ -276,8 +283,9 @@ class AiEngine:
 
         Based on the above hierarchy and performance, provide a concise (max 3 sentences) study strategy.
         Act as the assigned AI Persona. Identify exactly which Module or Topic they should focus on next.
+        {MARKDOWN_FORMAT_INSTRUCTION}
         """
 
-        return self.ask(prompt)
+        return self.ask(prompt, system_instruction=MARKDOWN_FORMAT_INSTRUCTION)
 
 ai_engine = AiEngine()

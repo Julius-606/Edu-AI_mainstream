@@ -16,6 +16,8 @@ import com.example.edu_ai.EduAIApplication
 import com.example.edu_ai.data.local.LearningContentEntity
 import com.example.edu_ai.ui.components.DynamicBackground
 import com.example.edu_ai.ui.components.FormattedText
+import com.example.edu_ai.ui.components.InAppBrowser
+import androidx.compose.ui.window.Dialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,6 +29,7 @@ fun LearningRepositoryScreen(
 ) {
     val contents by repository.getSavedLearningContent(subtopicId).collectAsState(initial = emptyList())
     var showObjectives by remember { mutableStateOf(true) }
+    var activeBrowserUrl by remember { mutableStateOf<String?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         DynamicBackground()
@@ -100,12 +103,20 @@ fun LearningRepositoryScreen(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                FormattedText(text = content.content)
+                                FormattedText(
+                                    text = content.content,
+                                    onLinkClick = { activeBrowserUrl = it }
+                                )
                                 HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
                             }
                         }
                     }
                 }
+            }
+        }
+        activeBrowserUrl?.let { url ->
+            Dialog(onDismissRequest = { activeBrowserUrl = null }) {
+                InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
             }
         }
     }

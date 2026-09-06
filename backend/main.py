@@ -18,7 +18,7 @@ import models
 import schemas
 import auth
 import cas
-from ai_engine import ai_engine
+from ai_engine import MARKDOWN_FORMAT_INSTRUCTION, ai_engine
 
 # Create database tables if they don't exist
 Base.metadata.create_all(bind=engine)
@@ -321,7 +321,10 @@ def send_student_report(student_id: int, db: Session = Depends(get_db)):
     context += "Grades: " + ", ".join([f"{q.unit_name}: {q.pnl}%" for q in quizzes])
 
     prompt = f"Create a concise, encouraging progress report for a parent based on this data. Translate technical rubrics into accessible feedback:\n{context}"
-    ai_summary = ai_engine.ask(prompt, system_instruction="You are a pedagogical report assistant.")
+    ai_summary = ai_engine.ask(
+        prompt,
+        system_instruction=f"You are a pedagogical report assistant. {MARKDOWN_FORMAT_INSTRUCTION}"
+    )
 
     # Store this as a 'teacher remark' for the parent portal
     # For now, we'll just return it. In a full system, you'd save this to a 'Reports' table.
@@ -337,7 +340,10 @@ def get_parent_dashboard(student_id: str, db: Session = Depends(get_db)):
     quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == student.id).order_by(models.QuizHistory.id.desc()).limit(5).all()
 
     review_prompt = f"Review progress for parent: {student.username}, Units: {', '.join(student.active_units_list)}, Avg: {sum([q.pnl for q in quizzes])/len(quizzes) if quizzes else 0}%"
-    ai_review = ai_engine.ask(review_prompt, system_instruction="Act as a supportive AI Education Consultant.")
+    ai_review = ai_engine.ask(
+        review_prompt,
+        system_instruction=f"Act as a supportive AI Education Consultant. {MARKDOWN_FORMAT_INSTRUCTION}"
+    )
 
     return schemas.ParentDashboardResponse(
         student_name=student.username,
@@ -527,7 +533,7 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db), current
                          f"The student is at level: {user.semester_status}. " \
                          f"Adopt a professional, academic, and clinical tone. " \
                          f"Prioritize educational depth over interactivity. Provide concise but highly informative " \
-                         f"explanations of medical and academic concepts."
+                         f"explanations of medical and academic concepts. {MARKDOWN_FORMAT_INSTRUCTION}"
     
     history_text = ""
     for msg in request.history:

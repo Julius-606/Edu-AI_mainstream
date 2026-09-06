@@ -1,7 +1,5 @@
 package com.example.edu_ai.ui.screens.student
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,14 +20,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.edu_ai.data.remote.ai.ChatMessage
 import com.example.edu_ai.ui.components.FormattedText
+import com.example.edu_ai.ui.components.InAppBrowser
 import kotlinx.coroutines.delay
 import java.util.regex.Pattern
+import androidx.compose.ui.window.Dialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,9 +39,9 @@ fun ChatInterface(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var inputText by remember { mutableStateOf("") }
-    val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showHistorySheet by remember { mutableStateOf(false) }
+    var activeBrowserUrl by remember { mutableStateOf<String?>(null) }
 
     Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         // Chat Header - Enhanced with Dynamic Title & History Option
@@ -162,11 +161,17 @@ fun ChatInterface(
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
             items(uiState.messages) { message ->
-                ChatBubble(message)
+                ChatBubble(message, onLinkClick = { activeBrowserUrl = it })
             }
             if (uiState.isTyping) {
                 item {
                     TypingIndicator()
+                }
+            }
+
+            activeBrowserUrl?.let { url ->
+                Dialog(onDismissRequest = { activeBrowserUrl = null }) {
+                    InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
                 }
             }
         }
@@ -258,7 +263,7 @@ fun TypingIndicator() {
 }
 
 @Composable
-fun ChatBubble(message: ChatMessage) {
+fun ChatBubble(message: ChatMessage, onLinkClick: (String) -> Unit) {
     val isUser = message.role == "user"
     val alignment = if (isUser) Alignment.End else Alignment.Start
     val containerColor = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
@@ -279,13 +284,14 @@ fun ChatBubble(message: ChatMessage) {
             Column(modifier = Modifier.padding(12.dp)) {
                 FormattedText(
                     text = message.content,
-                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
+                    onLinkClick = onLinkClick
                 )
                 
                 val youtubeUrl = extractYoutubeUrl(message.content)
                 if (youtubeUrl != null) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    VideoRecommendationCard(url = youtubeUrl)
+                    VideoRecommendationCard(url = youtubeUrl, onClick = onLinkClick)
                 }
             }
         }
@@ -293,15 +299,11 @@ fun ChatBubble(message: ChatMessage) {
 }
 
 @Composable
-fun VideoRecommendationCard(url: String) {
-    val context = LocalContext.current
+fun VideoRecommendationCard(url: String, onClick: (String) -> Unit) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
         modifier = Modifier.padding(top = 4.dp),
-        onClick = {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            context.startActivity(intent)
-        }
+        onClick = { onClick(url) }
     ) {
         Row(
             modifier = Modifier.padding(8.dp),

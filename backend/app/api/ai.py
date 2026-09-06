@@ -5,7 +5,7 @@ import time
 from app.db.session import get_db
 from app.models import database_models as models
 from app.schemas import api_schemas as schemas
-from app.services.ai_service import ai_service
+from app.services.ai_service import MARKDOWN_FORMAT_INSTRUCTION, ai_service
 
 router = APIRouter(prefix="/ai", tags=["AI Intelligence"])
 
@@ -34,7 +34,10 @@ async def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
     db.add(user_msg)
     db.commit()
 
-    system_instruction = f"You are {user.ai_persona}. Level: {user.semester_status}."
+    system_instruction = (
+        f"You are {user.ai_persona}. Level: {user.semester_status}. "
+        f"{MARKDOWN_FORMAT_INSTRUCTION}"
+    )
 
     history_text = ""
     for msg in request.history:
