@@ -69,9 +69,9 @@ fun FormattedText(
                     )
                 }
             }
-            linkPreviews.forEach { url ->
-                LinkPreview(url) { onLinkClick?.invoke(url) }
-            }
+        }
+        linkPreviews.forEach { url ->
+            LinkPreview(url) { onLinkClick?.invoke(url) }
         }
     }
 }
