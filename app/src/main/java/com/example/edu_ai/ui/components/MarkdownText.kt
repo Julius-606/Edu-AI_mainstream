@@ -8,6 +8,8 @@ import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -27,6 +29,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 
 @Composable
@@ -39,6 +42,7 @@ fun FormattedText(
     onLinkClick: ((String) -> Unit)? = null
 ) {
     val blocks = remember(text) { splitIntoBlocks(text) }
+    val linkPreviews = remember(text) { extractLinks(text) }
     val resolvedStyle = if (style.color == Color.Unspecified) {
         style.copy(color = MaterialTheme.colorScheme.onSurface)
     } else {
@@ -65,6 +69,9 @@ fun FormattedText(
                     )
                 }
             }
+            linkPreviews.forEach { url ->
+                LinkPreview(url) { onLinkClick?.invoke(url) }
+            }
         }
     }
 }
@@ -78,7 +85,8 @@ private fun sanitizeMarkdownText(text: String): String = text
     .replace("\u200B", "")
     .replace("\u00A0", " ")
     .replace("\uFEFF", "")
-    .replace(Regex("[\\u0000-\\u001F\\u007F]")) { "" }
+    // Keep line feeds and tabs: they are meaningful Markdown structure.
+    .replace(Regex("[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]")) { "" }
     .trim()
 
 fun splitIntoBlocks(text: String): List<MarkdownBlock> {
@@ -120,21 +128,20 @@ fun splitIntoBlocks(text: String): List<MarkdownBlock> {
         } else if (inCodeBlock) {
             codeLines.add(rawLine)
         } else {
+            // Identify images
             val imageMatch = imageRegex.find(trimmed)
-            when {
-                imageMatch != null -> {
-                    flushText()
-                    flushTable()
-                    blocks.add(MarkdownBlock(BlockType.IMAGE, imageMatch.groupValues[2], imageMatch.groupValues[1]))
-                }
-                trimmed.startsWith("|") && trimmed.endsWith("|") -> {
-                    flushText()
-                    tableLines.add(trimmed)
-                }
-                trimmed.isNotBlank() -> {
-                    flushTable()
-                    textLines.add(rawLine)
-                }
+            if (imageMatch != null) {
+                flushText()
+                flushTable()
+                blocks.add(MarkdownBlock(BlockType.IMAGE, imageMatch.groupValues[2], imageMatch.groupValues[1]))
+            } else if (trimmed.count { it == '|' } >= 2) {
+                flushText()
+                tableLines.add(trimmed)
+            } else {
+                // If it's not a table or image, it's text.
+                // We keep the structure.
+                flushTable()
+                textLines.add(rawLine)
             }
         }
     }
@@ -222,6 +229,51 @@ private fun ImageBlock(url: String, alt: String?) {
     }
 }
 
+private fun extractLinks(text: String): List<String> {
+    val markdownLinks = Regex("""\[[^\]]+]\((https?://[^\s)]+)\)""")
+    val bareLinks = Regex("""https?://[^\s)]+""")
+    return (markdownLinks.findAll(text).map { it.groupValues[1] } +
+        bareLinks.findAll(text).map { it.value.trimEnd('.', ',', ';') })
+        .distinct()
+}
+
+@Composable
+private fun LinkPreview(url: String, onClick: () -> Unit) {
+    val host = java.net.URI.create(url).host ?: url
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = if (host.contains("youtube", ignoreCase = true) || host == "youtu.be") {
+                    "YouTube video"
+                } else {
+                    "Recommended resource"
+                },
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(text = host, style = MaterialTheme.typography.bodySmall)
+            Text(
+                text = url,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+data class Token(val range: IntRange, val type: String, val content: String, val url: String? = null)
+data class RenderMarker(
+    val range: IntRange,
+    val type: String,
+    val content: String,
+    val url: String? = null
+)
+
 fun parseMarkdown(text: String): AnnotatedString {
     val sanitized = sanitizeMarkdownText(text)
     if (sanitized.isBlank()) return AnnotatedString("")
@@ -237,11 +289,16 @@ fun parseMarkdown(text: String): AnnotatedString {
         val orderedListRegex = Regex("""(?m)^\s*(\d+)[.)]\s+(.*)$""")
 
         val processedText = sanitized
-            .replace(headerRegex) { it.groupValues[1].trim() }
-            .replace(unorderedListRegex) { "• ${it.groupValues[1].trim()}" }
-            .replace(orderedListRegex) { "${it.groupValues[1]}. ${it.groupValues[2].trim()}" }
-            .replace(Regex("""(?m)^\s*---+\s*$"""), "")
-
+            .replace(Regex("""(?m)(-{3,})\s*(#{1,6})"""), "\n$2")
+            .replace(Regex("""(?m)^\s*-{3,}\s*$"""), "")
+            .replace(Regex("""(?m)^\s*>\s?"""), "")
+            .replace(Regex("""(?i)<br\s*/?>"""), "\n")
+            .replace(headerRegex) { match ->
+                val level = match.value.takeWhile { it == '#' }.length
+                "\n" + "HEADER_LVL_${level}_START" + match.groupValues[1].trim() + "HEADER_END" + "\n"
+            }
+            .replace(unorderedListRegex) { "\n  • ${it.groupValues[1].trim()}" }
+            .replace(orderedListRegex) { "\n  ${it.groupValues[1]}. ${it.groupValues[2].trim()}" }
         val tokens = mutableListOf<Token>()
         boldRegex.findAll(processedText).forEach { tokens.add(Token(it.range, "bold", it.groupValues[1])) }
         italicRegex.findAll(processedText).forEach { match ->
@@ -254,25 +311,43 @@ fun parseMarkdown(text: String): AnnotatedString {
         linkRegex.findAll(processedText).forEach { tokens.add(Token(it.range, "link", it.groupValues[1], it.groupValues[2])) }
         tokens.sortBy { it.range.first }
 
-        var lastIndex = 0
-        for (token in tokens) {
-            if (token.range.first < lastIndex) continue
-            if (token.range.first > lastIndex) append(processedText.substring(lastIndex, token.range.first))
-            when (token.type) {
-                "bold" -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(token.content) }
-                "italic" -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(token.content) }
-                "strike" -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { append(token.content) }
-                "code" -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color.LightGray.copy(alpha = 0.25f))) { append(token.content) }
-                "link" -> {
-                    pushStringAnnotation("URL", token.url.orEmpty())
-                    withStyle(SpanStyle(color = Color(0xFF2563EB), fontWeight = FontWeight.Bold)) { append(token.content) }
+        val headerMatchRegex = Regex("""HEADER_LVL_(\d)_START(.+?)HEADER_END""")
+        val allMarkers = mutableListOf<RenderMarker>()
+        tokens.forEach { allMarkers.add(RenderMarker(it.range, it.type, it.content, it.url)) }
+        headerMatchRegex.findAll(processedText).forEach {
+            allMarkers.add(RenderMarker(it.range, "header_${it.groupValues[1]}", it.groupValues[2]))
+        }
+        allMarkers.sortBy { it.range.first }
+        
+        var currentPos = 0
+        for (marker in allMarkers) {
+            if (marker.range.first < currentPos) continue
+            if (marker.range.first > currentPos) {
+                append(processedText.substring(currentPos, marker.range.first))
+            }
+            
+            when {
+                marker.type == "bold" -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(marker.content) }
+                marker.type == "italic" -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(marker.content) }
+                marker.type.startsWith("header_") -> {
+                    val level = marker.type.substringAfter("_").toIntOrNull() ?: 1
+                    val size = when(level) {
+                        1 -> 24.sp
+                        2 -> 20.sp
+                        else -> 18.sp
+                    }
+                    withStyle(SpanStyle(fontSize = size, fontWeight = FontWeight.ExtraBold)) { append(marker.content) }
+                }
+                marker.type == "link" -> {
+                    pushStringAnnotation("URL", marker.url ?: "")
+                    withStyle(SpanStyle(color = Color(0xFF2563EB), textDecoration = TextDecoration.Underline)) { append(marker.content) }
                     pop()
                 }
+                marker.type == "code" -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color.LightGray.copy(alpha = 0.25f))) { append(marker.content) }
+                marker.type == "strike" -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { append(marker.content) }
             }
-            lastIndex = token.range.last + 1
+            currentPos = marker.range.last + 1
         }
-        if (lastIndex < processedText.length) append(processedText.substring(lastIndex))
+        if (currentPos < processedText.length) append(processedText.substring(currentPos))
     }
 }
-
-data class Token(val range: IntRange, val type: String, val content: String, val url: String? = null)
