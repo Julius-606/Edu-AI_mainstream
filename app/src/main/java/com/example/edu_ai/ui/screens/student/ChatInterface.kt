@@ -169,6 +169,55 @@ fun ChatInterface(
                 }
             }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             activeBrowserUrl?.let { url ->
                 item {
                     Dialog(onDismissRequest = { activeBrowserUrl = null }) {

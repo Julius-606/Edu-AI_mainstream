@@ -232,8 +232,8 @@ private fun ImageBlock(url: String, alt: String?) {
 private fun extractLinks(text: String): List<String> {
     val markdownLinks = Regex("""\[[^\]]+]\((https?://[^\s)]+)\)""")
     val bareLinks = Regex("""https?://[^\s)]+""")
-    return (markdownLinks.findAll(text).map { it.groupValues[1] } +
-        bareLinks.findAll(text).map { it.value.trimEnd('.', ',', ';') })
+    return (markdownLinks.findAll(text).map { it.groupValues[1] }.toList() +
+        bareLinks.findAll(text).map { it.value.trimEnd('.', ',', ';') }.toList())
         .distinct()
 }
 

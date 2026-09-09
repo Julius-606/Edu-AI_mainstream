@@ -61,10 +61,11 @@ class StudentViewModel(private val repository: EduAIRepository, private val dao:
     )
 
     private var lastRefreshTime = 0L
+    private val DAILY_REFRESH_INTERVAL = 24 * 60 * 60 * 1000L // 24 hours
 
     fun refreshDashboard(userId: String, force: Boolean = false) {
         val now = System.currentTimeMillis()
-        if (!force && (now - lastRefreshTime) < 300_000) { // 5 minute cache
+        if (!force && (now - lastRefreshTime) < DAILY_REFRESH_INTERVAL) { // 24 hour cache
             return
         }
 
