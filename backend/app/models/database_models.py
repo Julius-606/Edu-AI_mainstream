@@ -35,6 +35,8 @@ class Unit(Base):
     name = Column(String(200), index=True)
     is_active = Column(Boolean, default=True)
     category = Column(String(100), default="General")
+    course = Column(String(200), default="General")
+    unit_group = Column(String(200), nullable=True)
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="units")

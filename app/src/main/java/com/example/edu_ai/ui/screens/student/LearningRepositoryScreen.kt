@@ -18,6 +18,7 @@ import com.example.edu_ai.ui.components.DynamicBackground
 import com.example.edu_ai.ui.components.FormattedText
 import com.example.edu_ai.ui.components.InAppBrowser
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,7 +116,13 @@ fun LearningRepositoryScreen(
             }
         }
         activeBrowserUrl?.let { url ->
-            Dialog(onDismissRequest = { activeBrowserUrl = null }) {
+            Dialog(
+                onDismissRequest = { activeBrowserUrl = null },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false
+                )
+            ) {
                 InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
             }
         }

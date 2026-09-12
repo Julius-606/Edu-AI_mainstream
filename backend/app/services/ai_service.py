@@ -150,8 +150,8 @@ class AiService:
 
         prompt = f"""
         Generate a rigorous academic multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
-        Level: {student_level}. Focus on high-yield medical concepts and pathophysiology.
-        Provide deep clinical rationale for each question.
+        Level: {student_level}. Moderate, half of the questions to be conceptual and half to be application medical concepts and pathophysiology.
+        Provide deep rationale for each question.
         Return ONLY the JSON object required by the response schema; do not wrap it in Markdown.
         """
 
@@ -275,7 +275,7 @@ class AiService:
             Prior context: {clean_context if clean_context else 'No prior context.'}
 
             Teach this objective in a friendly, concise way. Use Markdown and keep the session coherent with the student's question.
-            Start with a single brief greeting only when the student is just beginning the objective; otherwise continue directly with the explanation.
+            If Prior context, exists do not start with salutations; otherwise continue directly with the explanation.
             End with a 'Check for Understanding' question.
             """
         else:

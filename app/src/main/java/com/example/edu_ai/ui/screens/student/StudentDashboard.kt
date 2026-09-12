@@ -44,6 +44,7 @@ import com.example.edu_ai.ui.components.RingProgress
 import com.example.edu_ai.ui.theme.TraceTheme
 import kotlinx.coroutines.launch
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -164,7 +165,13 @@ fun StudentDashboard(
     }
 
     activeBrowserUrl?.let { url ->
-        Dialog(onDismissRequest = { activeBrowserUrl = null }) {
+        Dialog(
+            onDismissRequest = { activeBrowserUrl = null },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
             InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
         }
     }

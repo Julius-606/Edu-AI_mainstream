@@ -1,5 +1,5 @@
 import pytest
-from ingestion_engine import parse_syllabus_markdown
+from ingestion_engine import normalize_unit_group, parse_syllabus_markdown
 
 def test_parse_syllabus_hierarchy():
     markdown = """
@@ -37,3 +37,23 @@ def test_empty_parsing():
     result = parse_syllabus_markdown("")
     assert result["syllabus_title"] == "General Syllabus"
     assert len(result["units"]) == 0
+
+
+def test_parse_syllabus_includes_field_course_and_unit_group():
+    result = parse_syllabus_markdown(
+        "## General Pathology\n## Clinical Pathology I\n## Pathology II",
+        field="Medicine",
+        course="MBChB",
+    )
+
+    assert result["field"] == "Medicine"
+    assert result["course"] == "MBChB"
+    assert [unit["unit_group"] for unit in result["units"]] == [
+        "Pathology",
+        "Pathology",
+        "Pathology",
+    ]
+
+
+def test_normalize_unit_group_preserves_distinct_unit_names():
+    assert normalize_unit_group("Information Technology") == "Information Technology"

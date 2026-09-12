@@ -35,6 +35,7 @@ import com.example.edu_ai.data.local.UserEntity
 import com.example.edu_ai.ui.components.FormattedText
 import com.example.edu_ai.ui.components.InAppBrowser
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -374,7 +375,13 @@ fun ZenithTab(
         item { Spacer(modifier = Modifier.height(24.dp)) }
     }
     activeBrowserUrl?.let { url ->
-        Dialog(onDismissRequest = { activeBrowserUrl = null }) {
+        Dialog(
+            onDismissRequest = { activeBrowserUrl = null },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
             InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
         }
     }

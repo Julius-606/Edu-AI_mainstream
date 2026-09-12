@@ -29,6 +29,7 @@ import com.example.edu_ai.ui.components.InAppBrowser
 import kotlinx.coroutines.delay
 import java.util.regex.Pattern
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -220,7 +221,13 @@ fun ChatInterface(
 
             activeBrowserUrl?.let { url ->
                 item {
-                    Dialog(onDismissRequest = { activeBrowserUrl = null }) {
+                    Dialog(
+                        onDismissRequest = { activeBrowserUrl = null },
+                        properties = DialogProperties(
+                            usePlatformDefaultWidth = false,
+                            decorFitsSystemWindows = false
+                        )
+                    ) {
                         InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
                     }
                 }

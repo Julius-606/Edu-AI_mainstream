@@ -1,5 +1,4 @@
 import re
-import json
 from sqlalchemy.orm import Session
 import logging
 
@@ -7,13 +6,23 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def parse_syllabus_markdown(text):
+def normalize_unit_group(name):
+    """Return the common parent name for unit variants such as General Pathology."""
+    group = re.sub(r"^\s*unit(?:\s+\d+(?:\.\d+)*)?\s*[:.-]?\s*", "", name, flags=re.IGNORECASE)
+    group = re.sub(r"^\s*(?:general|clinical|basic|advanced)\s+", "", group, flags=re.IGNORECASE)
+    group = re.sub(r"\s+(?:[IVXLCDM]+|\d+)\s*$", "", group, flags=re.IGNORECASE)
+    return group.strip() or name.strip()
+
+
+def parse_syllabus_markdown(text, field="General", course="General"):
     """
     Parses a markdown string into a structured 5-level syllabus JSON.
     """
     lines = text.split('\n')
     syllabus = {
         "syllabus_title": "General Syllabus",
+        "field": field.strip() or "General",
+        "course": course.strip() or "General",
         "units": []
     }
 
@@ -33,6 +42,7 @@ def parse_syllabus_markdown(text):
             elif line.startswith('## '):
                 current_unit = {
                     "unit_title": line[3:].strip(),
+                    "unit_group": normalize_unit_group(line[3:].strip()),
                     "modules": []
                 }
                 syllabus["units"].append(current_unit)
@@ -80,7 +90,9 @@ def save_syllabus_to_db(db: Session, syllabus_data: dict, owner_id=None):
             db_unit = models.Unit(
                 name=unit_data["unit_title"],
                 owner_id=owner_id,
-                category="Global" if owner_id is None else "Personal"
+                category=syllabus_data.get("field", "General") if owner_id is None else "Personal",
+                course=syllabus_data.get("course", "General"),
+                unit_group=unit_data.get("unit_group") or normalize_unit_group(unit_data["unit_title"])
             )
             db.add(db_unit)
             db.commit() # Commit each unit to get ID and ensure persistence
@@ -119,6 +131,34 @@ def get_global_units(db: Session):
     from app.models import database_models as models
     return db.query(models.Unit).filter(models.Unit.owner_id == None).all()
 
+
+def get_global_unit_catalog(db: Session):
+    """Build the ingestion page's field -> course -> unit group catalog."""
+    catalog = {}
+    for unit in get_global_units(db):
+        field = unit.category or "General"
+        course = getattr(unit, "course", None) or "General"
+        group_name = getattr(unit, "unit_group", None) or normalize_unit_group(unit.name)
+        course_entry = catalog.setdefault(field, {}).setdefault(course, {})
+        course_entry.setdefault(group_name, []).append(unit)
+
+    return [
+        {
+            "name": field,
+            "courses": [
+                {
+                    "name": course,
+                    "unit_groups": [
+                        {"name": group, "units": units}
+                        for group, units in sorted(groups.items(), key=lambda item: item[0].lower())
+                    ],
+                }
+                for course, groups in sorted(courses.items(), key=lambda item: item[0].lower())
+            ],
+        }
+        for field, courses in sorted(catalog.items(), key=lambda item: item[0].lower())
+    ]
+
 def delete_unit(db: Session, unit_id: int):
     from app.models import database_models as models
     unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
@@ -133,6 +173,7 @@ def update_unit(db: Session, unit_id: int, name: str):
     unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
     if unit:
         unit.name = name
+        unit.unit_group = normalize_unit_group(name)
         db.commit()
         return True
     return False
@@ -152,7 +193,9 @@ def clone_unit_to_user(db: Session, unit_id: int, user_id: int):
         new_unit = models.Unit(
             name=global_unit.name,
             owner_id=user_id,
-            category="Ongoing"
+            category="Ongoing",
+            course=getattr(global_unit, "course", None),
+            unit_group=getattr(global_unit, "unit_group", None),
         )
         db.add(new_unit)
         db.commit()

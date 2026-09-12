@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy import inspect, text
 from app.db.session import engine, Base, get_db
 from app.api import auth, users, ai, learning, sync
 from app.core import security
@@ -34,6 +35,13 @@ templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / 
 
 # Create database tables defined in models
 Base.metadata.create_all(bind=engine)
+
+# Keep existing deployments usable when the ingestion hierarchy columns are added.
+with engine.begin() as connection:
+    columns = {column["name"] for column in inspect(connection).get_columns("units")}
+    for column_name, definition in (("course", "VARCHAR(200)"), ("unit_group", "VARCHAR(200)")):
+        if column_name not in columns:
+            connection.execute(text(f"ALTER TABLE units ADD COLUMN {column_name} {definition}"))
 
 # Instantiate main FastAPI app
 app = FastAPI(title="Trace Modular API", version="3.0.0")
@@ -116,12 +124,18 @@ def root(request: Request, db: Session = Depends(get_db)):
     :param db: SQLAlchemy Session dependency.
     :return: HTMLResponse rendering 'ingestion.html' with current global units.
     """
-    units = ingestion_engine.get_global_units(db)
-    return templates.TemplateResponse("ingestion.html", {"request": request, "units": units})
+    catalog = ingestion_engine.get_global_unit_catalog(db)
+    return templates.TemplateResponse("ingestion.html", {"request": request, "catalog": catalog})
 
 
 @app.post("/ingest", response_class=HTMLResponse)
-async def handle_ingestion(request: Request, markdown: str = Form(...), db: Session = Depends(get_db)):
+async def handle_ingestion(
+    request: Request,
+    markdown: str = Form(...),
+    field: str = Form(...),
+    course: str = Form(...),
+    db: Session = Depends(get_db),
+):
     """
     Processes markdown syllabus content for content ingestion and unit creation.
 
@@ -131,10 +145,10 @@ async def handle_ingestion(request: Request, markdown: str = Form(...), db: Sess
     :return: Updated ingestion HTML page or HTTP 500 HTML error page on failure.
     """
     try:
-        syllabus_data = ingestion_engine.parse_syllabus_markdown(markdown)
+        syllabus_data = ingestion_engine.parse_syllabus_markdown(markdown, field, course)
         ingestion_engine.save_syllabus_to_db(db, syllabus_data)
-        units = ingestion_engine.get_global_units(db)
-        return templates.TemplateResponse("ingestion.html", {"request": request, "units": units})
+        catalog = ingestion_engine.get_global_unit_catalog(db)
+        return templates.TemplateResponse("ingestion.html", {"request": request, "catalog": catalog})
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
         return HTMLResponse(content=f"<h1>Internal Server Error</h1><p>{str(e)}</p>", status_code=500)
@@ -151,8 +165,8 @@ async def handle_delete_unit(request: Request, unit_id: int, db: Session = Depen
     :return: HTMLResponse rendering 'ingestion.html'.
     """
     ingestion_engine.delete_unit(db, unit_id)
-    units = ingestion_engine.get_global_units(db)
-    return templates.TemplateResponse("ingestion.html", {"request": request, "units": units})
+    catalog = ingestion_engine.get_global_unit_catalog(db)
+    return templates.TemplateResponse("ingestion.html", {"request": request, "catalog": catalog})
 
 
 @app.post("/update-unit/{unit_id}", response_class=HTMLResponse)
@@ -167,8 +181,8 @@ async def handle_update_unit(request: Request, unit_id: int, name: str = Form(..
     :return: HTMLResponse rendering 'ingestion.html'.
     """
     ingestion_engine.update_unit(db, unit_id, name)
-    units = ingestion_engine.get_global_units(db)
-    return templates.TemplateResponse("ingestion.html", {"request": request, "units": units})
+    catalog = ingestion_engine.get_global_unit_catalog(db)
+    return templates.TemplateResponse("ingestion.html", {"request": request, "catalog": catalog})
 
 
 @app.post("/api/units/library/add/{unit_id}")
