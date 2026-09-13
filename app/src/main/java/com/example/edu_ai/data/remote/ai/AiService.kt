@@ -16,7 +16,8 @@ class GeminiAiService : AiService {
     override suspend fun getChatResponse(
         prompt: String,
         userContext: UserEntity,
-        history: List<ChatMessage>
+        history: List<ChatMessage>,
+        sessionId: Int? = null
     ): String {
         return try {
             val apiHistory = history.map { ApiChatMessage(role = it.role, content = it.content) }
@@ -24,7 +25,8 @@ class GeminiAiService : AiService {
                 ChatRequest(
                     prompt = prompt,
                     user_id = userContext.id,
-                    history = apiHistory
+                    history = apiHistory,
+                    clientSessionId = sessionId?.toString()
                 )
             )
             response.response
@@ -91,7 +93,7 @@ class GeminiAiService : AiService {
 }
 
 interface AiService {
-    suspend fun getChatResponse(prompt: String, userContext: UserEntity, history: List<ChatMessage> = emptyList()): String
+    suspend fun getChatResponse(prompt: String, userContext: UserEntity, history: List<ChatMessage> = emptyList(), sessionId: Int? = null): String
     suspend fun generateQuiz(unitName: String, userContext: UserEntity, topic: String? = null): QuizResponse?
     suspend fun recordQuizResult(unitName: String, score: Int, total: Int, userContext: UserEntity)
     suspend fun getRecommendations(userContext: UserEntity): String

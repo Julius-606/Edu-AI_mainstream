@@ -73,6 +73,7 @@ class DashboardResponse(BaseModel):
     quiz_history: List[QuizHistoryResponse]
     chat_history: List[ChatMessageResponse]
     last_point: str = "Start your journey"
+    unit_progress: List[dict] = []
 
 class ChaosRequest(BaseModel):
     unit: str
@@ -170,9 +171,12 @@ class ChatRequest(BaseModel):
     prompt: str
     user_id: str
     history: List[ChatMessage] = []
+    session_id: Optional[int] = None
+    client_session_id: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
+    session_id: Optional[int] = None
 
 class QuizRequest(BaseModel):
     unit_name: str
@@ -187,6 +191,12 @@ class QuizQuestion(BaseModel):
 class QuizResponse(BaseModel):
     quiz_title: str
     questions: List[QuizQuestion]
+    quiz_id: Optional[int] = None
+
+class LearningContentCreate(BaseModel):
+    objective_id: int
+    user_id: str
+    content: str
 
 class QuizRecordRequest(BaseModel):
     unit_name: str
@@ -194,6 +204,10 @@ class QuizRecordRequest(BaseModel):
     total: int
     user_id: str
     timestamp: Any
+    quiz_id: Optional[int] = None
+    quiz_title: Optional[str] = None
+    topic: Optional[str] = None
+    questions: List[QuizQuestion] = []
 
 class LoginRequest(BaseModel):
     email: str

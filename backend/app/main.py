@@ -10,6 +10,9 @@ import os
 import time
 import json
 import hmac
+import base64
+import urllib.request
+import urllib.error
 from datetime import datetime
 from pathlib import Path
 from app.core.config import load_runtime_environment
@@ -38,6 +41,77 @@ logger = logging.getLogger(__name__)
 # Template engine configuration for server-rendered HTML pages
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
 ARCHIVES_DIR = Path(__file__).resolve().parents[2] / "Archives"
+ARCHIVE_MANIFEST = ARCHIVES_DIR / "archives.json"
+
+def read_archive_manifest():
+    if not ARCHIVE_MANIFEST.exists():
+        return {"releases": [], "assets": {}}
+    with ARCHIVE_MANIFEST.open("r", encoding="utf-8") as manifest_file:
+        data = json.load(manifest_file)
+    return {
+        "releases": data.get("releases", []),
+        "assets": data.get("assets", {}),
+    }
+
+def write_archive_manifest(manifest):
+    ARCHIVES_DIR.mkdir(parents=True, exist_ok=True)
+    with ARCHIVE_MANIFEST.open("w", encoding="utf-8") as manifest_file:
+        json.dump(manifest, manifest_file, indent=2)
+        manifest_file.write("\n")
+    push_archive_manifest()
+
+def push_archive_manifest():
+    token = os.getenv("GITHUB_TOKEN")
+    repository = os.getenv("GITHUB_REPOSITORY")
+    if not token or not repository:
+        logger.info("Archives manifest saved locally; GitHub push is not configured.")
+        return
+    branch = os.getenv("GITHUB_ARCHIVES_BRANCH", "main")
+    api_url = f"https://api.github.com/repos/{repository}/contents/Archives/archives.json"
+    try:
+        with ARCHIVE_MANIFEST.open("rb") as manifest_file:
+            content = base64.b64encode(manifest_file.read()).decode("ascii")
+        request = urllib.request.Request(
+            api_url,
+            data=json.dumps({
+                "message": "Update Archives manifest",
+                "content": content,
+                "branch": branch,
+            }).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "Content-Type": "application/json",
+                "User-Agent": "Edu-AI-admin",
+            },
+            method="PUT",
+        )
+        with urllib.request.urlopen(request, timeout=10):
+            return
+    except urllib.error.HTTPError as error:
+        if error.code != 422:
+            raise
+        with urllib.request.urlopen(
+            urllib.request.Request(api_url, headers={"Authorization": f"Bearer {token}", "User-Agent": "Edu-AI-admin"}),
+            timeout=10,
+        ) as response:
+            current = json.loads(response.read().decode("utf-8"))
+        request_data = json.dumps({
+            "message": "Update Archives manifest",
+            "content": content,
+            "branch": branch,
+            "sha": current["sha"],
+        }).encode("utf-8")
+        with urllib.request.urlopen(
+            urllib.request.Request(api_url, data=request_data, headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "Content-Type": "application/json",
+                "User-Agent": "Edu-AI-admin",
+            }, method="PUT"),
+            timeout=10,
+        ):
+            return
 
 # Create database tables defined in models
 Base.metadata.create_all(bind=engine)
@@ -48,9 +122,21 @@ with engine.begin() as connection:
     for column_name, definition in (("course", "VARCHAR(200)"), ("unit_group", "VARCHAR(200)")):
         if column_name not in columns:
             connection.execute(text(f"ALTER TABLE units ADD COLUMN {column_name} {definition}"))
+    migrations = {
+        "chat_sessions": {
+            "transcript_json": "JSON NOT NULL DEFAULT '[]'",
+            "client_session_id": "VARCHAR(100)",
+        },
+        "quiz_history": {"quiz_id": "INTEGER", "correct_answers": "INTEGER"},
+    }
+    for table_name, table_columns in migrations.items():
+        existing = {column["name"] for column in inspect(connection).get_columns(table_name)}
+        for column_name, definition in table_columns.items():
+            if column_name not in existing:
+                connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"))
 
 # Instantiate main FastAPI app
-BACKEND_VERSION = "3.1.5"
+BACKEND_VERSION = "3.1.6"
 app = FastAPI(title="Trace Modular API", version=BACKEND_VERSION)
 
 INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "DEVELOPMENT_KEY")
@@ -66,7 +152,9 @@ DATABASE_BROWSER_MODELS = (
     ("Topics", models.Topic),
     ("Subtopics", models.Subtopic),
     ("Learning objectives", models.LearningObjective),
+    ("Learning content", models.LearningContent),
     ("User syllabus progress", models.UserSyllabusProgress),
+    ("Quizzes", models.Quiz),
     ("Quiz history", models.QuizHistory),
     ("Chat sessions", models.ChatSession),
     ("Chat messages", models.ChatMessage),
@@ -223,20 +311,19 @@ def database_column_value(model, column_name, value):
 def render_admin(request: Request, db: Session, section="overview", **context):
     users = db.query(models.User).order_by(models.User.id.desc()).all()
     units = ingestion_engine.get_global_units(db)
-    releases = db.query(models.ReleaseArchive).order_by(models.ReleaseArchive.released_at.desc()).all()
+    manifest = read_archive_manifest()
+    releases = manifest["releases"]
     archive_files = []
     if ARCHIVES_DIR.is_dir():
         for path in sorted(ARCHIVES_DIR.iterdir(), key=lambda item: item.stat().st_mtime, reverse=True):
-            if path.is_file():
-                metadata = db.query(models.ArchiveAsset).filter(
-                    models.ArchiveAsset.file_name == path.name
-                ).first()
+            if path.is_file() and path.name != ARCHIVE_MANIFEST.name:
+                metadata = manifest["assets"].get(path.name, {})
                 stat = path.stat()
                 archive_files.append({
                     "file_name": path.name,
-                    "display_name": metadata.display_name if metadata and metadata.display_name else path.stem,
-                    "artifact_type": metadata.artifact_type if metadata else "Trace Mobile App",
-                    "release_notes": metadata.release_notes if metadata else None,
+                    "display_name": metadata.get("display_name") or path.stem,
+                    "artifact_type": metadata.get("artifact_type") or "Trace Mobile App",
+                    "release_notes": metadata.get("release_notes"),
                     "size": stat.st_size,
                     "modified_at": datetime.fromtimestamp(stat.st_mtime),
                 })
@@ -522,6 +609,13 @@ def update_archive_asset(
     asset.artifact_type = artifact_type.strip()
     asset.release_notes = release_notes.strip() or None
     db.commit()
+    manifest = read_archive_manifest()
+    manifest["assets"][file_name] = {
+        "display_name": display_name.strip(),
+        "artifact_type": artifact_type.strip(),
+        "release_notes": release_notes.strip() or None,
+    }
+    write_archive_manifest(manifest)
     return HTMLResponse(status_code=303, headers={"Location": "/admin/releases"})
 
 
@@ -568,6 +662,16 @@ def create_release(
     )
     db.add(release)
     db.commit()
+    manifest = read_archive_manifest()
+    manifest["releases"].append({
+        "version": version.strip(),
+        "artifact_type": artifact_type.strip(),
+        "download_url": download_url.strip() or None,
+        "release_notes": release_notes.strip() or None,
+        "released_at": time.time(),
+        "is_current": is_current,
+    })
+    write_archive_manifest(manifest)
     return HTMLResponse(status_code=303, headers={"Location": "/admin/releases"})
 
 
@@ -579,36 +683,27 @@ def delete_release(release_id: int, request: Request, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Release not found")
     db.delete(release)
     db.commit()
+    manifest = read_archive_manifest()
+    manifest["releases"] = [
+        item for item in manifest["releases"]
+        if item.get("version") != release.version
+    ]
+    write_archive_manifest(manifest)
     return HTMLResponse(status_code=303, headers={"Location": "/admin/releases"})
 
 
 @app.get("/api/releases/archive")
 def release_archive(db: Session = Depends(get_db)):
-    releases = db.query(models.ReleaseArchive).order_by(
-        models.ReleaseArchive.released_at.desc()
-    ).all()
-    releases = [
-        {
-            "version": release.version,
-            "artifact_type": release.artifact_type,
-            "download_url": release.download_url,
-            "release_notes": release.release_notes,
-            "released_at": release.released_at,
-            "is_current": release.is_current,
-        }
-        for release in releases
-    ]
+    releases = read_archive_manifest()["releases"]
     if ARCHIVES_DIR.is_dir():
         for path in sorted(ARCHIVES_DIR.iterdir(), key=lambda item: item.stat().st_mtime, reverse=True):
-            if path.is_file():
-                metadata = db.query(models.ArchiveAsset).filter(
-                    models.ArchiveAsset.file_name == path.name
-                ).first()
+            if path.is_file() and path.name != ARCHIVE_MANIFEST.name:
+                metadata = read_archive_manifest()["assets"].get(path.name, {})
                 releases.append({
-                    "version": metadata.display_name if metadata and metadata.display_name else path.stem,
-                    "artifact_type": metadata.artifact_type if metadata else "Trace Mobile App",
+                    "version": metadata.get("display_name") or path.stem,
+                    "artifact_type": metadata.get("artifact_type") or "Trace Mobile App",
                     "download_url": f"/api/releases/archive/{path.name}",
-                    "release_notes": metadata.release_notes if metadata else None,
+                    "release_notes": metadata.get("release_notes"),
                     "released_at": path.stat().st_mtime,
                     "is_current": False,
                     "file_name": path.name,

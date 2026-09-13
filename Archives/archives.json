@@ -1,0 +1,30 @@
+{
+  "releases": [],
+  "assets": {
+    "Trace_v1.apk": {
+      "display_name": "Trace v1",
+      "artifact_type": "Trace Mobile App",
+      "release_notes": null
+    },
+    "Trace_V2.0.apk": {
+      "display_name": "Trace V2.0",
+      "artifact_type": "Trace Mobile App",
+      "release_notes": null
+    },
+    "Trace_V3.apk": {
+      "display_name": "Trace V3",
+      "artifact_type": "Trace Mobile App",
+      "release_notes": null
+    },
+    "Trace V2.0.1.apk": {
+      "display_name": "Trace V2.0.1",
+      "artifact_type": "Trace Mobile App",
+      "release_notes": null
+    },
+    "Trace V3.0.1.apk": {
+      "display_name": "Trace V3.0.1",
+      "artifact_type": "Trace Mobile App",
+      "release_notes": null
+    }
+  }
+}

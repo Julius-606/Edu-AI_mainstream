@@ -20,8 +20,8 @@ android {
         applicationId = "com.example.edu_ai"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
         buildConfigField("String", "FALLBACK_BACKEND_BASE_URL", "\"$fallbackBackendBaseUrl\"")

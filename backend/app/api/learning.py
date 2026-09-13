@@ -9,6 +9,64 @@ import time
 
 router = APIRouter(prefix="/learning", tags=["Learning Trace"])
 
+def resolve_user(user_id: str, db: Session):
+    return db.query(models.User).filter(
+        (models.User.id == (int(user_id) if user_id.isdigit() else -1))
+        | (models.User.username == user_id)
+    ).first()
+
+def unit_progress_snapshot(unit: models.Unit, user: models.User, db: Session):
+    subtopics = [
+        subtopic
+        for module in unit.modules
+        for topic in module.topics
+        for subtopic in topic.subtopics
+    ]
+    node_ids = [subtopic.id for subtopic in subtopics]
+    completed = {
+        progress.node_id
+        for progress in db.query(models.UserSyllabusProgress).filter(
+            models.UserSyllabusProgress.user_id == user.id,
+            models.UserSyllabusProgress.node_type == "subtopic",
+            models.UserSyllabusProgress.node_id.in_(node_ids or [-1]),
+            models.UserSyllabusProgress.status == "Completed",
+        ).all()
+    }
+    completed_count = len(completed)
+    return {
+        "unit_id": unit.id,
+        "unit_name": unit.name,
+        "completed_subtopics": completed_count,
+        "total_subtopics": len(subtopics),
+        "percentage": round((completed_count / len(subtopics) * 100) if subtopics else 0.0, 2),
+    }
+
+@router.get("/progress/unit/{unit_id}")
+def get_unit_progress(unit_id: int, user_id: str, db: Session = Depends(get_db)):
+    user = resolve_user(user_id, db)
+    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
+    if not user or not unit:
+        raise HTTPException(status_code=404, detail="User or unit not found")
+    return unit_progress_snapshot(unit, user, db)
+
+@router.post("/content")
+def save_learning_content(request: schemas.LearningContentCreate, db: Session = Depends(get_db)):
+    user = resolve_user(request.user_id, db)
+    objective = db.query(models.LearningObjective).filter(
+        models.LearningObjective.id == request.objective_id
+    ).first()
+    if not user or not objective:
+        raise HTTPException(status_code=404, detail="User or learning objective not found")
+    saved = models.LearningContent(
+        objective_id=objective.id,
+        user_id=user.id,
+        content=request.content,
+    )
+    db.add(saved)
+    db.commit()
+    db.refresh(saved)
+    return {"id": saved.id, "objective_id": saved.objective_id, "content": saved.content}
+
 @router.get("/session/{subtopic_id}")
 async def get_learning_session(subtopic_id: int, user_id: str, db: Session = Depends(get_db), student_message: Optional[str] = Query(None)):
     # 1. Find the subtopic and its objectives
@@ -22,14 +80,15 @@ async def get_learning_session(subtopic_id: int, user_id: str, db: Session = Dep
 
     # 2. Find where the user is
     # Using the user_id (username or ID)
-    user = db.query(models.User).filter((models.User.id == (int(user_id) if user_id.isdigit() else -1)) | (models.User.username == user_id)).first()
+    user = resolve_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     current_progress = db.query(models.UserSyllabusProgress).filter(
         models.UserSyllabusProgress.user_id == user.id,
         models.UserSyllabusProgress.node_type == "objective",
-        models.UserSyllabusProgress.status == "In_Progress"
+        models.UserSyllabusProgress.status == "In_Progress",
+        models.UserSyllabusProgress.node_id.in_([objective.id for objective in objectives])
     ).first()
 
     current_objective = None
@@ -68,7 +127,7 @@ async def get_learning_session(subtopic_id: int, user_id: str, db: Session = Dep
 
 @router.post("/next/{subtopic_id}")
 async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(get_db), student_message: Optional[str] = Query(None)):
-    user = db.query(models.User).filter((models.User.id == (int(user_id) if user_id.isdigit() else -1)) | (models.User.username == user_id)).first()
+    user = resolve_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -78,14 +137,13 @@ async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(g
 
     objectives = subtopic.learning_objectives
     if not objectives:
-        subtopic.is_completed = True
-        db.commit()
         return {"status": "subtopic_completed", "trigger_quiz": True}
 
     current_progress = db.query(models.UserSyllabusProgress).filter(
         models.UserSyllabusProgress.user_id == user.id,
         models.UserSyllabusProgress.node_type == "objective",
-        models.UserSyllabusProgress.status == "In_Progress"
+        models.UserSyllabusProgress.status == "In_Progress",
+        models.UserSyllabusProgress.node_id.in_([objective.id for objective in objectives])
     ).first()
 
     if not current_progress:
@@ -98,8 +156,6 @@ async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(g
         ).all()
         completed_ids = {p.node_id for p in completed_progress}
         if completed_ids and all(o.id in completed_ids for o in objectives):
-            subtopic.is_completed = True
-            db.commit()
             return {"status": "subtopic_completed", "trigger_quiz": True}
 
         return await get_learning_session(subtopic_id, user_id, db, student_message=student_message)
@@ -128,7 +184,6 @@ async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(g
         return await get_learning_session(subtopic_id, user_id, db, student_message=student_message)
     else:
         # End of subtopic - Mark subtopic completed and return subtopic_completed
-        subtopic.is_completed = True
         subtopic_progress = db.query(models.UserSyllabusProgress).filter(
             models.UserSyllabusProgress.user_id == user.id,
             models.UserSyllabusProgress.node_id == subtopic.id,
@@ -154,7 +209,7 @@ async def next_objective(subtopic_id: int, user_id: str, db: Session = Depends(g
 
 @router.post("/previous/{subtopic_id}")
 async def previous_objective(subtopic_id: int, user_id: str, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter((models.User.id == (int(user_id) if user_id.isdigit() else -1)) | (models.User.username == user_id)).first()
+    user = resolve_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -169,7 +224,8 @@ async def previous_objective(subtopic_id: int, user_id: str, db: Session = Depen
     current_progress = db.query(models.UserSyllabusProgress).filter(
         models.UserSyllabusProgress.user_id == user.id,
         models.UserSyllabusProgress.node_type == "objective",
-        models.UserSyllabusProgress.status == "In_Progress"
+        models.UserSyllabusProgress.status == "In_Progress",
+        models.UserSyllabusProgress.node_id.in_([objective.id for objective in objectives])
     ).first()
 
     if not current_progress:

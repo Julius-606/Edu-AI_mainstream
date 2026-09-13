@@ -30,9 +30,29 @@ async def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user_msg = models.ChatMessage(role="user", content=request.prompt, owner_id=user.id)
-    db.add(user_msg)
-    db.commit()
+    session = None
+    if request.session_id is not None:
+        session = db.query(models.ChatSession).filter(
+            models.ChatSession.id == request.session_id,
+            models.ChatSession.owner_id == user.id,
+        ).first()
+        if not session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+    elif request.client_session_id:
+        session = db.query(models.ChatSession).filter(
+            models.ChatSession.owner_id == user.id,
+            models.ChatSession.client_session_id == request.client_session_id,
+        ).first()
+    if session is None:
+        session = models.ChatSession(
+            owner_id=user.id,
+            title=request.prompt[:80] or "New Consultation",
+            timestamp=time.time(),
+            client_session_id=request.client_session_id,
+            transcript_json=[],
+        )
+        db.add(session)
+        db.flush()
 
     system_instruction = (
         f"You are {user.ai_persona}. Level: {user.semester_status}. "
@@ -51,11 +71,16 @@ async def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
     if not response_text:
         raise HTTPException(status_code=500, detail="AI engine is currently unavailable.")
 
-    ai_msg = models.ChatMessage(role="model", content=response_text, owner_id=user.id)
-    db.add(ai_msg)
+    transcript = list(session.transcript_json or [])
+    transcript.extend([
+        {"role": "user", "content": request.prompt, "timestamp": time.time()},
+        {"role": "model", "content": response_text, "timestamp": time.time()},
+    ])
+    session.transcript_json = transcript
+    session.timestamp = time.time()
     db.commit()
 
-    return schemas.ChatResponse(response=response_text)
+    return schemas.ChatResponse(response=response_text, session_id=session.id)
 
 @router.post("/quiz", response_model=schemas.QuizResponse)
 async def generate_quiz(
@@ -75,7 +100,58 @@ async def generate_quiz(
     )
     if not quiz_data:
         raise HTTPException(status_code=500, detail="Failed to ignite the Quiz Engine.")
-    return quiz_data
+    quiz = models.Quiz(
+        title=quiz_data["quiz_title"],
+        unit_name=request.unit_name,
+        topic=topic,
+        questions_json=quiz_data["questions"],
+        owner_id=user.id,
+    )
+    db.add(quiz)
+    db.commit()
+    db.refresh(quiz)
+    return {**quiz_data, "quiz_id": quiz.id}
+
+
+@router.post("/quiz/record")
+async def record_quiz(request: schemas.QuizRecordRequest, db: Session = Depends(get_db)):
+    user = find_user(str(request.user_id), db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    quiz = db.query(models.Quiz).filter(
+        models.Quiz.id == request.quiz_id,
+        models.Quiz.owner_id == user.id,
+    ).first() if request.quiz_id else db.query(models.Quiz).filter(
+        models.Quiz.owner_id == user.id,
+        models.Quiz.unit_name == request.unit_name,
+    ).order_by(models.Quiz.created_at.desc()).first()
+    if quiz is None:
+        quiz = models.Quiz(
+            title=request.quiz_title or request.unit_name,
+            unit_name=request.unit_name,
+            topic=request.topic,
+            questions_json=[question.model_dump() for question in request.questions],
+            owner_id=user.id,
+        )
+        db.add(quiz)
+        db.flush()
+
+    total = max(request.total, 0)
+    score = max(min(request.score, total), 0)
+    history = models.QuizHistory(
+        unit_name=request.unit_name,
+        score=score,
+        total=total,
+        pnl=(score / total * 100) if total else 0.0,
+        timestamp=str(request.timestamp),
+        quiz_id=quiz.id,
+        correct_answers=score,
+        owner_id=user.id,
+    )
+    db.add(history)
+    db.commit()
+    return {"status": "recorded", "quiz_id": str(quiz.id), "history_id": str(history.id)}
 
 @router.get("/recommendations/{user_id}", response_model=schemas.RecommendationResponse)
 async def get_recommendations(user_id: str, db: Session = Depends(get_db)):

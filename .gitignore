@@ -14,6 +14,7 @@ venv/
 
 bot_memory_*.json
 *.json
+!Archives/archives.json
 credentials.json
 config.json
 google-services.json
@@ -40,4 +41,3 @@ logs.txt
 .externalNativeBuild
 .cxx
 local.properties
-

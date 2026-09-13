@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.models import database_models as models
 from app.schemas import api_schemas as schemas
 from app.services.ai_service import ai_service
+from app.api.learning import unit_progress_snapshot
 # from app.core.security import get_current_user # To be implemented in core
 
 router = APIRouter(prefix="/users", tags=["User Management"])
@@ -70,7 +71,18 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
     total_quizzes = len(quizzes)
     average_pnl = sum([q.pnl for q in quizzes]) / total_quizzes if total_quizzes > 0 else 0.0
-    chat_messages = db.query(models.ChatMessage).filter(models.ChatMessage.owner_id == user.id).order_by(models.ChatMessage.id.asc()).all()
+    chat_sessions = db.query(models.ChatSession).filter(
+        models.ChatSession.owner_id == user.id
+    ).order_by(models.ChatSession.timestamp.asc()).all()
+    chat_history = [
+        schemas.ChatMessageResponse(
+            role=message.get("role", ""),
+            content=message.get("content", ""),
+            timestamp=str(message.get("timestamp", "")),
+        )
+        for session in chat_sessions
+        for message in (session.transcript_json or [])
+    ]
 
     return schemas.DashboardResponse(
         username=user.username,
@@ -83,8 +95,9 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         average_pnl=round(average_pnl, 2),
         total_quizzes=total_quizzes,
         quiz_history=[schemas.QuizHistoryResponse(unit_name=q.unit_name, pnl=q.pnl, timestamp=q.timestamp) for q in quizzes],
-        chat_history=[schemas.ChatMessageResponse(role=c.role, content=c.content, timestamp=c.timestamp or "") for c in chat_messages],
-        last_point=last_point
+        chat_history=chat_history,
+        last_point=last_point,
+        unit_progress=[unit_progress_snapshot(unit, user, db) for unit in active_units],
     )
 
 @router.get("/{user_id}/timetable", response_model=schemas.TimetableResponse)

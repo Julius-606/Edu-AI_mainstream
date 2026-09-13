@@ -94,6 +94,9 @@ interface EduAIApi {
         @Query("user_id") userId: String
     ): Map<String, Any>
 
+    @POST("api/learning/content")
+    suspend fun saveLearningContent(@Body request: LearningContentRequest): Map<String, Any>
+
     @PATCH("/api/v1/progress/subtopic/{subtopic_id}")
     suspend fun updateSubtopicProgress(
         @Path("subtopic_id") subtopicId: Int,

@@ -20,8 +20,9 @@ class User(Base):
     # Relationships
     units = relationship("Unit", back_populates="owner", cascade="all, delete-orphan")
     quiz_history = relationship("QuizHistory", back_populates="owner", cascade="all, delete-orphan")
-    chat_messages = relationship("ChatMessage", back_populates="owner", cascade="all, delete-orphan")
     chat_sessions = relationship("ChatSession", back_populates="owner", cascade="all, delete-orphan")
+    learning_content = relationship("LearningContent", back_populates="owner", cascade="all, delete-orphan")
+    quizzes = relationship("Quiz", back_populates="owner", cascade="all, delete-orphan")
     performance_logs = relationship("PerformanceLog", back_populates="owner", cascade="all, delete-orphan")
     timetables = relationship("Timetable", back_populates="owner", cascade="all, delete-orphan")
 
@@ -113,6 +114,19 @@ class LearningObjective(Base):
     subtopic_id = Column(Integer, ForeignKey("subtopics.id"))
     subtopic = relationship("Subtopic", back_populates="learning_objectives")
 
+
+class LearningContent(Base):
+    __tablename__ = "learning_content"
+
+    id = Column(Integer, primary_key=True, index=True)
+    objective_id = Column(Integer, ForeignKey("learning_objectives.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(Float, default=lambda: datetime.utcnow().timestamp())
+
+    objective = relationship("LearningObjective")
+    owner = relationship("User", back_populates="learning_content")
+
 class UserSyllabusProgress(Base):
     __tablename__ = "user_syllabus_progress"
 
@@ -134,9 +148,27 @@ class QuizHistory(Base):
     total = Column(Integer)
     pnl = Column(Float)
     timestamp = Column(String(100))
+    quiz_id = Column(Integer, ForeignKey("quizzes.id"), nullable=True, index=True)
+    correct_answers = Column(Integer, nullable=True)
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="quiz_history")
+    quiz = relationship("Quiz", back_populates="history")
+
+
+class Quiz(Base):
+    __tablename__ = "quizzes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), nullable=False)
+    unit_name = Column(String(200), nullable=False)
+    topic = Column(String(200), nullable=True)
+    questions_json = Column(JSON, nullable=False)
+    created_at = Column(Float, default=lambda: datetime.utcnow().timestamp())
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    owner = relationship("User", back_populates="quizzes")
+    history = relationship("QuizHistory", back_populates="quiz")
 
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
@@ -144,26 +176,25 @@ class ChatSession(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(200), default="New Consultation")
     description = Column(Text, nullable=True)
+    client_session_id = Column(String(100), nullable=True, index=True)
+    transcript_json = Column(JSON, default=list, nullable=False)
     timestamp = Column(Float)
     is_archived = Column(Boolean, default=False)
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="chat_sessions")
-    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+
 
 class ChatMessage(Base):
+    """Legacy table kept readable for existing databases; new chats use ChatSession.transcript_json."""
     __tablename__ = "chat_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    role = Column(String(20)) # "user" or "model"
+    role = Column(String(20))
     content = Column(Text)
     timestamp = Column(String(100))
-
     owner_id = Column(Integer, ForeignKey("users.id"), index=True)
-    owner = relationship("User", back_populates="chat_messages")
-
     session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=True, index=True)
-    session = relationship("ChatSession", back_populates="messages")
 
 class PerformanceLog(Base):
     __tablename__ = "performance_logs"

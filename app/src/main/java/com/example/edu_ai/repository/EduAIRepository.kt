@@ -232,7 +232,16 @@ class EduAIRepository(
     suspend fun nextObjective(subtopicId: Int, userId: String, userMessage: String? = null) = api.nextObjective(subtopicId, userId, userMessage)
     suspend fun previousObjective(subtopicId: Int, userId: String) = api.previousObjective(subtopicId, userId)
 
-    suspend fun saveLearningContent(content: LearningContentEntity) = dao.insertLearningContent(content)
+    suspend fun saveLearningContent(content: LearningContentEntity, userId: String, objectiveId: Int) {
+        dao.insertLearningContent(content)
+        api.saveLearningContent(
+            com.example.edu_ai.data.remote.LearningContentRequest(
+                objectiveId = objectiveId,
+                userId = userId,
+                content = content.content
+            )
+        )
+    }
     fun getSavedLearningContent(subtopicId: Long) = dao.getLearningContentForSubtopic(subtopicId)
     suspend fun updateSubtopicProgress(subtopicId: Long, isCompleted: Boolean) {
         dao.updateSubtopicStatus(subtopicId, isCompleted)

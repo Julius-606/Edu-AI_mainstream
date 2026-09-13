@@ -44,8 +44,6 @@ async def sync_operations(request: SyncRequestSchema, db: Session = Depends(get_
                 subtopic = db.query(models.Subtopic).filter(models.Subtopic.id == op.entityId).first()
                 if subtopic:
                     is_completed = op.payload.get("is_completed", op.payload.get("isCompleted", True))
-                    subtopic.is_completed = bool(is_completed)
-
                     if user:
                         progress = db.query(models.UserSyllabusProgress).filter(
                             models.UserSyllabusProgress.user_id == user.id,
@@ -68,7 +66,6 @@ async def sync_operations(request: SyncRequestSchema, db: Session = Depends(get_
 
                         if is_completed:
                             for obj in subtopic.learning_objectives:
-                                obj.is_completed = True
                                 obj_progress = db.query(models.UserSyllabusProgress).filter(
                                     models.UserSyllabusProgress.user_id == user.id,
                                     models.UserSyllabusProgress.node_id == obj.id,
@@ -85,6 +82,27 @@ async def sync_operations(request: SyncRequestSchema, db: Session = Depends(get_
                                         last_studied_at=time.time()
                                     ))
 
+                applied_ids.append(op.operationId)
+            elif op.entityType == "objective_progress" and user:
+                objective = db.query(models.LearningObjective).filter(
+                    models.LearningObjective.id == op.entityId
+                ).first()
+                if objective:
+                    is_completed = bool(op.payload.get("is_completed", True))
+                    progress = db.query(models.UserSyllabusProgress).filter(
+                        models.UserSyllabusProgress.user_id == user.id,
+                        models.UserSyllabusProgress.node_id == objective.id,
+                        models.UserSyllabusProgress.node_type == "objective",
+                    ).first()
+                    if not progress:
+                        progress = models.UserSyllabusProgress(
+                            user_id=user.id,
+                            node_id=objective.id,
+                            node_type="objective",
+                        )
+                        db.add(progress)
+                    progress.status = "Completed" if is_completed else "In_Progress"
+                    progress.last_studied_at = time.time()
                 applied_ids.append(op.operationId)
             else:
                 applied_ids.append(op.operationId)

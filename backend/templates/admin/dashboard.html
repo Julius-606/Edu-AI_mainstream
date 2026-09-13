@@ -27,7 +27,7 @@
         <form method="post" action="/admin/logout" class="mt-10"><button class="text-sm text-slate-400 hover:text-white">Sign out</button></form>
     </aside>
     <main class="min-w-0 flex-1 p-6 md:p-10 max-w-7xl">
-        <button type="button" aria-label="Toggle admin navigation" onclick="document.getElementById('admin-sidebar').classList.toggle('sidebar-collapsed')" class="mb-5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-300 hover:text-white">☰ <span class="ml-1 text-sm">Navigation</span></button>
+        <button id="admin-nav-toggle" type="button" aria-label="Toggle admin navigation" aria-expanded="true" class="mb-5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-300 hover:text-white">☰ <span class="ml-1 text-sm">Navigation</span></button>
         <div class="mb-8">
             <p class="text-sm text-indigo-400 uppercase tracking-widest">Backend management</p>
             <h1 class="text-3xl font-bold mt-2">
@@ -117,11 +117,28 @@
                     <textarea name="release_notes" rows="2" placeholder="Archive notes" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">{{ asset.release_notes or '' }}</textarea>
                     <button class="rounded-lg bg-slate-700 px-3 py-2 text-xs">Save archive details</button>
                 </form>{% else %}<p class="text-slate-500">No files found in Archives/.</p>{% endfor %}
-                {% for release in releases %}<div class="rounded-xl border border-slate-800 bg-slate-900 p-4"><div class="flex justify-between"><b>v{{ release.version }}</b><span class="text-xs text-slate-500">{{ release.artifact_type }}</span></div>{% if release.download_url %}<a class="text-sm text-indigo-400 hover:underline" href="{{ release.download_url }}" target="_blank" rel="noopener">Download</a>{% endif %}<p class="text-sm text-slate-400 mt-2">{{ release.release_notes or 'No release notes.' }}</p><details class="mt-3"><summary class="cursor-pointer text-xs text-slate-500">Danger zone</summary><form method="post" action="/admin/releases/{{ release.id }}/delete" class="mt-2" onsubmit="return confirm('Delete this release from the archive?')"><button class="text-xs text-red-400 hover:text-red-300">Delete release</button></form></details></div>{% endfor %}
+                {% for release in releases %}<div class="rounded-xl border border-slate-800 bg-slate-900 p-4"><div class="flex justify-between"><b>v{{ release.version }}</b><span class="text-xs text-slate-500">{{ release.artifact_type }}</span></div>{% if release.download_url %}<a class="text-sm text-indigo-400 hover:underline" href="{{ release.download_url }}" target="_blank" rel="noopener">Download</a>{% endif %}<p class="text-sm text-slate-400 mt-2">{{ release.release_notes or 'No release notes.' }}</p></div>{% endfor %}
             </div>
         </div>
         {% endif %}
     </main>
 </div>
+<script>
+    (() => {
+        const sidebar = document.getElementById("admin-sidebar");
+        const toggle = document.getElementById("admin-nav-toggle");
+        const key = "trace-admin-sidebar-collapsed";
+        const setCollapsed = (collapsed) => {
+            sidebar.classList.toggle("sidebar-collapsed", collapsed);
+            toggle.setAttribute("aria-expanded", String(!collapsed));
+        };
+        setCollapsed(window.localStorage.getItem(key) === "true");
+        toggle.addEventListener("click", () => {
+            const collapsed = !sidebar.classList.contains("sidebar-collapsed");
+            setCollapsed(collapsed);
+            window.localStorage.setItem(key, String(collapsed));
+        });
+    })();
+</script>
 </body>
 </html>

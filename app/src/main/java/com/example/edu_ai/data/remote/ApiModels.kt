@@ -31,7 +31,16 @@ data class DashboardResponse(
     @SerializedName("total_quizzes") val totalQuizzes: Int? = null,
     @SerializedName("quiz_history") val quizHistory: List<ApiQuizHistory>? = null,
     @SerializedName("chat_history") val chatHistory: List<ApiChatHistory>? = null,
-    @SerializedName("last_point") val lastPoint: String? = null
+    @SerializedName("last_point") val lastPoint: String? = null,
+    @SerializedName("unit_progress") val unitProgress: List<ApiUnitProgress>? = null
+)
+
+data class ApiUnitProgress(
+    @SerializedName("unit_id") val unitId: Int,
+    @SerializedName("unit_name") val unitName: String,
+    @SerializedName("completed_subtopics") val completedSubtopics: Int,
+    @SerializedName("total_subtopics") val totalSubtopics: Int,
+    val percentage: Double
 )
 
 data class ApiUnit(
@@ -137,7 +146,8 @@ data class ChatMessage(
 data class ChatRequest(
     @SerializedName("prompt") val prompt: String,
     @SerializedName("user_id") val user_id: String,
-    @SerializedName("history") val history: List<ChatMessage> = emptyList()
+    @SerializedName("history") val history: List<ChatMessage> = emptyList(),
+    @SerializedName("client_session_id") val clientSessionId: String? = null
 )
 
 data class ChatResponse(
@@ -158,6 +168,7 @@ data class ApiQuizQuestion(
 
 data class ApiQuizResponse(
     @SerializedName("quiz_title") val quiz_title: String,
+    @SerializedName("quiz_id") val quiz_id: Int? = null,
     @SerializedName("questions") val questions: List<ApiQuizQuestion>
 )
 
@@ -177,4 +188,10 @@ data class LibraryUnit(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
     @SerializedName("category") val category: String
+)
+
+data class LearningContentRequest(
+    @SerializedName("objective_id") val objectiveId: Int,
+    @SerializedName("user_id") val userId: String,
+    val content: String
 )

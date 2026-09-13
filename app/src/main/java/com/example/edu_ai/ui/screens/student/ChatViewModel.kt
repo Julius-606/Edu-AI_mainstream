@@ -109,7 +109,8 @@ class ChatViewModel(
                 val response = aiService.getChatResponse(
                     prompt = text,
                     userContext = user,
-                    history = history
+                    history = history,
+                    sessionId = currentSession.id
                 )
                 
                 // 4. Save AI response to Local DB
