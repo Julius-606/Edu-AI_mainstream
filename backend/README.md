@@ -105,6 +105,13 @@ The release archive is available to authenticated clients at `GET /api/releases/
 `GET /api/releases/archive/{file_name}`. Files placed in the repository-level `Archives/` folder are discovered
 automatically and can be annotated from the admin Archives page.
 
+### Local and Hugging Face configuration
+
+The modular app detects Hugging Face Spaces through `SPACE_ID`, `HF_SPACE_ID`, or `SPACE_HOST`.
+On Spaces it uses the injected Space secrets directly and does not load a `.env` file. During local
+development it loads `backend/.env`; this is where `DATABASE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
+`JWT_SECRET_KEY`, and API keys can be configured.
+
 ---
 
 ## 📊 Database Migration

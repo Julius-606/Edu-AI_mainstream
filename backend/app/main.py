@@ -12,10 +12,11 @@ import json
 import hmac
 from datetime import datetime
 from pathlib import Path
-from dotenv import load_dotenv
+from app.core.config import load_runtime_environment
 
-# Load .env BEFORE any other app imports to ensure environment variables are available
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+# Local development reads backend/.env; Space secrets remain the source of truth
+# when Hugging Face deployment markers are present.
+load_runtime_environment()
 
 from fastapi import FastAPI, Request, Depends, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware

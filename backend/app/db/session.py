@@ -3,9 +3,9 @@ import logging
 from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
-from dotenv import load_dotenv
+from app.core.config import load_runtime_environment
 
-load_dotenv()
+load_runtime_environment()
 logger = logging.getLogger("DATABASE")
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]

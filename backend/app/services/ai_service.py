@@ -8,9 +8,9 @@ import os
 import asyncio
 from datetime import datetime
 from typing import List, Optional
-from dotenv import load_dotenv
+from app.core.config import load_runtime_environment
 
-load_dotenv()
+load_runtime_environment()
 logger = logging.getLogger("AI_SERVICE")
 
 MARKDOWN_FORMAT_INSTRUCTION = (
