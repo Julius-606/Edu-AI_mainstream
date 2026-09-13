@@ -57,3 +57,15 @@ def test_parse_syllabus_includes_field_course_and_unit_group():
 
 def test_normalize_unit_group_preserves_distinct_unit_names():
     assert normalize_unit_group("Information Technology") == "Information Technology"
+
+
+def test_optional_unit_name_is_used_when_markdown_has_no_unit_heading():
+    result = parse_syllabus_markdown(
+        "### Module content",
+        field="Medicine",
+        course="MBChB",
+        unit_name="Pathology",
+    )
+
+    assert len(result["units"]) == 1
+    assert result["units"][0]["unit_title"] == "Pathology"

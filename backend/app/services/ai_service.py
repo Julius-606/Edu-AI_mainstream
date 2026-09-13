@@ -19,6 +19,16 @@ MARKDOWN_FORMAT_INSTRUCTION = (
     "Markdown links where appropriate. Do not return HTML."
 )
 
+LEARNING_RESOURCE_INSTRUCTION = (
+    "When useful for this exact objective and learner context, finish with a "
+    "'Further Learning' section containing 1-3 relevant Markdown links. Prefer "
+    "authoritative educational sources such as universities, government health agencies, "
+    "WHO, CDC, NCBI, or OpenStax. Only include URLs you are confident are real and "
+    "relevant; do not invent deep links, paper identifiers, or page paths. If you are "
+    "not confident in a direct page URL, link to a trustworthy site search using a "
+    "properly URL-encoded query instead. Do not add links just to fill space."
+)
+
 # --- Key Loading Logic ---
 GEMINI_API_KEYS = []
 i = 1
@@ -67,13 +77,14 @@ class AiService:
         self.key_index = 0
         self.lock = asyncio.Lock() # Async lock for safe rotation
 
-        # Models updated as per migration plan to prevent 404s
+        # Keep the backend pinned to the model that is confirmed to work in
+        # this environment before falling back to other variants.
         self.model_variants = [
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
             "gemini-2.0-flash",
             "gemini-1.5-flash",
-            "gemini-1.5-pro",
-            "gemini-3.5-flash",
-            "gemini-3.5-flash-lite"
+            "gemini-1.5-pro"
         ]
         self.logs = []
         logger.info(f"🔑 Configured {len(self.clients)} Gemini Clients for rotation.")
@@ -275,7 +286,8 @@ class AiService:
             Prior context: {clean_context if clean_context else 'No prior context.'}
 
             Teach this objective in a friendly, concise way. Use Markdown and keep the session coherent with the student's question.
-            If Prior context, exists do not start with salutations; otherwise continue directly with the explanation.
+            If prior context exists, do not start with salutations; otherwise continue directly with the explanation.
+            {LEARNING_RESOURCE_INSTRUCTION}
             End with a 'Check for Understanding' question.
             """
         else:
@@ -286,8 +298,12 @@ class AiService:
 
             Generate an interactive learning session for this objective.
             Explain clearly, use Markdown, and keep the explanation focused and coherent.
+            {LEARNING_RESOURCE_INSTRUCTION}
             End with a 'Check for Understanding' question.
             """
-        return await self.ask(prompt, system_instruction=MARKDOWN_FORMAT_INSTRUCTION)
+        return await self.ask(
+            prompt,
+            system_instruction=f"{MARKDOWN_FORMAT_INSTRUCTION} {LEARNING_RESOURCE_INSTRUCTION}"
+        )
 
 ai_service = AiService()

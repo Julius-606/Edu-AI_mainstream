@@ -52,7 +52,11 @@ class AiEngine:
         self.key_index = 0
         self.lock = threading.Lock()
         # Recommended sure-bet models
+        # Production-safe model order: the active Gemini API reports that
+        # gemini-3.5-flash is the only variant returning 200s in this env.
         self.model_variants = [
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
             "gemini-2.0-flash",
             "gemini-2.5-flash",
             "gemini-1.5-flash",

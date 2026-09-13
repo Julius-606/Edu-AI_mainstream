@@ -14,7 +14,7 @@ def normalize_unit_group(name):
     return group.strip() or name.strip()
 
 
-def parse_syllabus_markdown(text, field="General", course="General"):
+def parse_syllabus_markdown(text, field="General", course="General", unit_name=None):
     """
     Parses a markdown string into a structured 5-level syllabus JSON.
     """
@@ -77,6 +77,13 @@ def parse_syllabus_markdown(text, field="General", course="General"):
             logger.error(f"Error parsing line: {line}. Error: {e}")
             continue
 
+    if unit_name and not syllabus["units"]:
+        syllabus["units"].append({
+            "unit_title": unit_name.strip(),
+            "unit_group": normalize_unit_group(unit_name),
+            "modules": []
+        })
+
     return syllabus
 
 def save_syllabus_to_db(db: Session, syllabus_data: dict, owner_id=None):
@@ -133,7 +140,7 @@ def get_global_units(db: Session):
 
 
 def get_global_unit_catalog(db: Session):
-    """Build the ingestion page's field -> course -> unit group catalog."""
+    """Build a JSON-serializable field -> course -> unit group catalog."""
     catalog = {}
     for unit in get_global_units(db):
         field = unit.category or "General"
@@ -142,22 +149,35 @@ def get_global_unit_catalog(db: Session):
         course_entry = catalog.setdefault(field, {}).setdefault(course, {})
         course_entry.setdefault(group_name, []).append(unit)
 
-    return [
-        {
-            "name": field,
-            "courses": [
-                {
-                    "name": course,
-                    "unit_groups": [
-                        {"name": group, "units": units}
-                        for group, units in sorted(groups.items(), key=lambda item: item[0].lower())
+    results = []
+    for field, courses in sorted(catalog.items(), key=lambda item: item[0].lower()):
+        field_groups = []
+        for course, groups in sorted(courses.items(), key=lambda item: item[0].lower()):
+            unit_groups = []
+            for group, units in sorted(groups.items(), key=lambda item: item[0].lower()):
+                unit_groups.append({
+                    "name": group,
+                    "units": [
+                        {
+                            "id": unit.id,
+                            "name": unit.name,
+                            "category": unit.category,
+                            "course": getattr(unit, "course", None) or "General",
+                            "unit_group": getattr(unit, "unit_group", None) or normalize_unit_group(unit.name),
+                            "modules": [{"id": module.id, "name": module.name} for module in unit.modules],
+                        }
+                        for unit in units
                     ],
-                }
-                for course, groups in sorted(courses.items(), key=lambda item: item[0].lower())
-            ],
-        }
-        for field, courses in sorted(catalog.items(), key=lambda item: item[0].lower())
-    ]
+                })
+            field_groups.append({
+                "name": course,
+                "unit_groups": unit_groups,
+            })
+        results.append({
+            "name": field,
+            "courses": field_groups,
+        })
+    return results
 
 def delete_unit(db: Session, unit_id: int):
     from app.models import database_models as models

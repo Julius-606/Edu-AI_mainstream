@@ -134,6 +134,7 @@ async def handle_ingestion(
     markdown: str = Form(...),
     field: str = Form(...),
     course: str = Form(...),
+    unit: str = Form(""),
     db: Session = Depends(get_db),
 ):
     """
@@ -145,7 +146,7 @@ async def handle_ingestion(
     :return: Updated ingestion HTML page or HTTP 500 HTML error page on failure.
     """
     try:
-        syllabus_data = ingestion_engine.parse_syllabus_markdown(markdown, field, course)
+        syllabus_data = ingestion_engine.parse_syllabus_markdown(markdown, field, course, unit or None)
         ingestion_engine.save_syllabus_to_db(db, syllabus_data)
         catalog = ingestion_engine.get_global_unit_catalog(db)
         return templates.TemplateResponse("ingestion.html", {"request": request, "catalog": catalog})
