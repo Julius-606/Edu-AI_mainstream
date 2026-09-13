@@ -35,6 +35,10 @@ This backend is designed to be hosted on **Hugging Face Spaces** using Docker, p
 - **Performance Analytics:** Tracks student "PnL" (Performance & Learning) and provides strategic recommendations.
 - **Unit Management:** Allows students to organize their curriculum and focus areas.
 - **Fault Tolerance:** Built-in Gemini API key rotation to handle rate limits and quotas automatically.
+- **Admin Dashboard:** Browser-based admin login at `/admin` with separate ingestion and curriculum catalogue views.
+- **Curriculum Editing:** Inspect a complete unit hierarchy and add, edit, or remove modules, topics, subtopics, and learning objectives.
+- **User and Release Management:** Review user data, update user preferences, remove user records, and maintain a versioned archive for mobile and future artifacts.
+- **Database Browser:** Inspect the backend tables from the admin sidebar in a read-only view; sensitive password hashes are masked.
 
 ---
 
@@ -49,6 +53,8 @@ To run this project, you must configure the following secrets/environment variab
 | `GEMINI_API_KEY_1` | Primary Google Gemini API Key. |
 | `GEMINI_API_KEY_2` | Secondary Key (for rotation/failover). |
 | `GEMINI_API_KEY_N` | Additional keys as needed. |
+| `ADMIN_EMAIL` | Email used for the browser-based backend admin login. |
+| `ADMIN_PASSWORD` | Password used for the browser-based backend admin login. |
 
 ---
 
@@ -73,8 +79,31 @@ To run this project, you must configure the following secrets/environment variab
 
 4. **Run the Server:**
    ```bash
-   uvicorn main:app --reload
+   uvicorn app.main:app --reload
    ```
+
+The backend management dashboard is available at `/admin` (or the root URL).
+It requires `ADMIN_EMAIL` and `ADMIN_PASSWORD` to be configured.
+
+The dashboard sidebar separates ingestion from the Curriculum Catalogue. Existing units are edited from the
+catalogue, and unit trees remain collapsed until explicitly opened. Destructive actions are grouped under
+explicit danger-zone disclosures.
+
+### Template organization
+
+Browser templates are grouped by feature under `templates/admin/`, `templates/curriculum/`,
+`templates/users/`, and `templates/public/`. Add future pages to the matching feature folder and reference
+them with that relative path in `Jinja2Templates`.
+
+### Protected database editing
+
+The admin Database browser exposes editable model columns while keeping primary keys and password hashes
+protected. A row update is accepted only when the submitted original snapshot still matches the database
+(optimistic conflict check), and the admin must enter `ADMIN_PASSWORD` again immediately before commit.
+
+The release archive is available to authenticated clients at `GET /api/releases/archive`, with artifact downloads at
+`GET /api/releases/archive/{file_name}`. Files placed in the repository-level `Archives/` folder are discovered
+automatically and can be annotated from the admin Archives page.
 
 ---
 

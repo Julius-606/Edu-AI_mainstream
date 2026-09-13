@@ -97,7 +97,7 @@ def read_root():
 
 @app.get("/signup", response_class=HTMLResponse)
 async def signup_page(request: Request):
-    return templates.TemplateResponse("signup.html", {"request": request})
+    return templates.TemplateResponse("public/signup.html", {"request": request})
 
 @app.post("/signup", response_class=HTMLResponse)
 async def handle_signup(

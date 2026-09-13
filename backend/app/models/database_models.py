@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, JSON, Text
 from sqlalchemy.orm import relationship
 from app.db.session import Base
+from datetime import datetime
 
 class User(Base):
     __tablename__ = "users"
@@ -27,6 +28,27 @@ class User(Base):
     @property
     def active_units_list(self):
         return [u.name for u in self.units if u.is_active]
+
+
+class ReleaseArchive(Base):
+    __tablename__ = "release_archive"
+
+    id = Column(Integer, primary_key=True, index=True)
+    version = Column(String(50), unique=True, nullable=False, index=True)
+    artifact_type = Column(String(50), default="Trace Mobile App")
+    download_url = Column(String(500), nullable=True)
+    release_notes = Column(Text, nullable=True)
+    released_at = Column(Float, default=lambda: datetime.utcnow().timestamp())
+    is_current = Column(Boolean, default=False)
+
+class ArchiveAsset(Base):
+    __tablename__ = "archive_assets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    file_name = Column(String(255), unique=True, nullable=False, index=True)
+    display_name = Column(String(255), nullable=True)
+    artifact_type = Column(String(100), default="Trace Mobile App")
+    release_notes = Column(Text, nullable=True)
 
 class Unit(Base):
     __tablename__ = "units"

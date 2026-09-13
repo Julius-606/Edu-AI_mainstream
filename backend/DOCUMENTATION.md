@@ -82,5 +82,5 @@ The project is containerized for seamless deployment on **Hugging Face Spaces** 
 ---
 
 ## 📈 Versioning
-- **Backend Version**: 3.0.0 (Modular Stability Upgrade)
-- **API Version**: v1beta / v3.0.0
+- **Backend Version**: 3.1.7 (Admin Dashboard and Curriculum Management)
+- **API Version**: v1beta / v3.1.7
