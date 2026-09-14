@@ -27,18 +27,26 @@ MARKDOWN_FORMAT_INSTRUCTION = (
 )
 
 # --- 🔐 SECURE KEYCHAIN ---
-GEMINI_API_KEYS = []
-i = 1
-while True:
-    key = os.getenv(f"GEMINI_API_KEY_{i}")
-    if not key:
-        if i == 1:
-            key = os.getenv("GEMINI_API_KEY")
-            if key:
-                GEMINI_API_KEYS.append(key)
-        break
-    GEMINI_API_KEYS.append(key)
-    i += 1
+def load_gemini_api_keys():
+    keys = [
+        key.strip()
+        for key in os.getenv("GEMINI_API_KEYS", "").split(",")
+        if key.strip()
+    ]
+    index = 1
+    while True:
+        key = os.getenv(f"GEMINI_API_KEY_{index}")
+        if not key:
+            break
+        if key.strip():
+            keys.append(key.strip())
+        index += 1
+    single_key = os.getenv("GEMINI_API_KEY")
+    if single_key and single_key.strip():
+        keys.append(single_key.strip())
+    return list(dict.fromkeys(keys))
+
+GEMINI_API_KEYS = load_gemini_api_keys()
 
 # Fallback keys if none found (Safety Net)
 if not GEMINI_API_KEYS:

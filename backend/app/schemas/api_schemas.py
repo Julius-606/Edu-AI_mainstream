@@ -62,6 +62,7 @@ class ChatMessageResponse(BaseModel):
 
 class DashboardResponse(BaseModel):
     username: str
+    email: Optional[str] = None
     role: str
     semester_status: str
     difficulty: str
@@ -96,6 +97,8 @@ class UserCreate(BaseModel):
     active_units: List[str] = []
 
 class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[str] = None
     role: Optional[str] = None
     difficulty: Optional[str] = None
     ai_persona: Optional[str] = None
@@ -103,9 +106,23 @@ class UserUpdate(BaseModel):
     interests: Optional[List[str]] = None
     active_units: Optional[List[str]] = None
 
+class ConnectionMessageCreate(BaseModel):
+    recipient_id: int
+    content: str
+
+class ConnectionMessageResponse(BaseModel):
+    id: int
+    sender_id: int
+    recipient_id: int
+    content: str
+    created_at: float
+    class Config:
+        from_attributes = True
+
 class UserResponseSchema(BaseModel):
     id: int
     username: str
+    email: Optional[str] = None
     role: str
     difficulty: str
     ai_persona: str

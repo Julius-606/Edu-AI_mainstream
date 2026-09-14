@@ -17,7 +17,7 @@ class GeminiAiService : AiService {
         prompt: String,
         userContext: UserEntity,
         history: List<ChatMessage>,
-        sessionId: Int? = null
+        sessionId: Int?
     ): String {
         return try {
             val apiHistory = history.map { ApiChatMessage(role = it.role, content = it.content) }
@@ -54,7 +54,7 @@ class GeminiAiService : AiService {
                     QuizQuestion(q.question_text, q.options, q.correct_option_index, q.explanation)
                 }
             )
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -75,7 +75,7 @@ class GeminiAiService : AiService {
                     timestamp = System.currentTimeMillis()
                 )
             )
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Log error
         }
     }
@@ -86,7 +86,7 @@ class GeminiAiService : AiService {
         return try {
             val response = RetrofitClient.instance.getRecommendations(userContext.id)
             response.recommendation
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             "Keep focusing on your active units! Your personalized strategy is being updated."
         }
     }

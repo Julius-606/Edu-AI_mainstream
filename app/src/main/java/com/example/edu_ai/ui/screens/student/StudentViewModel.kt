@@ -99,9 +99,11 @@ class StudentViewModel(private val repository: EduAIRepository, private val dao:
         }
     }
 
-    fun updateUserProfile(difficulty: String, aiPersona: String, semesterStatus: String) {
+    fun updateUserProfile(username: String, email: String, difficulty: String, aiPersona: String, semesterStatus: String) {
         val currentUser = uiState.value.user ?: return
         val updatedUser = currentUser.copy(
+            username = username,
+            email = email,
             difficulty = difficulty,
             aiPersona = aiPersona,
             semesterStatus = semesterStatus

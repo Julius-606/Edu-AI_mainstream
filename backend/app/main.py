@@ -157,6 +157,7 @@ DATABASE_BROWSER_MODELS = (
     ("Quizzes", models.Quiz),
     ("Quiz history", models.QuizHistory),
     ("Chat sessions", models.ChatSession),
+    ("Connection messages", models.ConnectionMessage),
     ("Chat messages", models.ChatMessage),
     ("Performance logs", models.PerformanceLog),
     ("Timetables", models.Timetable),

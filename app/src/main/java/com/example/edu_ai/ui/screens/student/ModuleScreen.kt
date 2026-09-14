@@ -29,6 +29,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import com.example.edu_ai.EduAIApplication
+import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.edu_ai.data.local.ChatSessionEntity
 import com.example.edu_ai.data.local.UserEntity
@@ -53,11 +56,11 @@ fun ModuleScreen(
         studentViewModel.refreshDashboard(userId)
     }
     
-    val tabs = listOf("Chat", "Notes", "Vault", "Quiz")
+    val tabs = listOf("Chat", "Browser", "Connect", "Quiz")
     val icons = listOf(
         Icons.AutoMirrored.Filled.Chat,
-        Icons.Default.StickyNote2,
-        Icons.Default.History,
+        Icons.Default.AutoAwesome,
+        Icons.Default.AccountCircle,
         Icons.Default.LocalFireDepartment
     )
 
@@ -104,26 +107,9 @@ fun ModuleScreen(
                 }
             } else {
                 when (selectedTab) {
-                    0 -> ChatTabWrapper(uiState.user, onNavigateToHistory = { selectedTab = 2 })
-                    1 -> {
-                        if (uiState.user != null) {
-                            val notesViewModel: NotesViewModel = viewModel(
-                                factory = NotesViewModel.provideFactory(uiState.user!!)
-                            )
-                            NotesTab(viewModel = notesViewModel)
-                        }
-                    }
-                    2 -> {
-                        if (uiState.user != null) {
-                             val chatViewModel: ChatViewModel = viewModel(
-                                factory = ChatViewModel.provideFactory(uiState.user!!)
-                            )
-                             ChatHistoryTab(
-                                 viewModel = chatViewModel,
-                                 onSessionSelected = { selectedTab = 0 }
-                             )
-                        }
-                    }
+                    0 -> ChatTabWrapper(uiState.user, onNavigateToHistory = { selectedTab = 0 })
+                    1 -> BrowserTab()
+                    2 -> ConnectTab(userId)
                     3 -> {
                         if (uiState.user != null) {
                             val quizViewModel: QuizViewModel = viewModel(
@@ -154,6 +140,118 @@ fun ChatTabWrapper(user: UserEntity?, onNavigateToHistory: () -> Unit) {
         )
     }
 }
+
+@Composable
+private fun BrowserTab() {
+        var address by remember { mutableStateOf("https://www.google.com") }
+        var activeUrl by remember { mutableStateOf<String?>(null) }
+        val history = remember { mutableStateListOf<String>() }
+
+        if (activeUrl == null) {
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Browser", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = address,
+                        onValueChange = { address = it },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        label = { Text("Web address") }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = {
+                        val target = if (address.startsWith("http")) address else "https://$address"
+                        address = target
+                        history.remove(target)
+                        history.add(0, target)
+                        activeUrl = target
+                    }) { Text("GO") }
+                }
+                Text("Recent pages", style = MaterialTheme.typography.titleMedium)
+                history.forEach { url ->
+                    TextButton(onClick = { address = url; activeUrl = url }) { Text(url, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+            }
+        } else {
+            InAppBrowser(
+                url = activeUrl!!,
+                onClose = { activeUrl = null },
+                onNavigate = { navigated -> if (!history.contains(navigated)) history.add(0, navigated) }
+            )
+        }
+    }
+
+@Composable
+private fun ConnectTab(userId: String) {
+        val context = LocalContext.current
+        val repository = (context.applicationContext as EduAIApplication).repository
+        val scope = rememberCoroutineScope()
+        var recipientId by remember { mutableStateOf("") }
+        var message by remember { mutableStateOf("") }
+        var status by remember { mutableStateOf<String?>(null) }
+        val messages = remember { mutableStateListOf<com.example.edu_ai.data.remote.ConnectionMessage>() }
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Connect", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Connect and communicate with people in the Trace Environment.")
+            OutlinedTextField(
+                value = recipientId,
+                onValueChange = { recipientId = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Recipient user ID") }
+            )
+            OutlinedTextField(
+                value = message,
+                onValueChange = { message = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Message") }
+            )
+            Button(
+                onClick = {
+                    val recipient = recipientId.toIntOrNull()
+                    if (recipient == null || message.isBlank()) {
+                        status = "Enter a valid recipient ID and message."
+                    } else {
+                        scope.launch {
+                            status = try {
+                                repository.sendConnectionMessage(userId, recipient, message)
+                                message = ""
+                                "Message sent."
+                            } catch (error: Exception) {
+                                error.message ?: "Unable to send message."
+                            }
+                        }
+                    }
+                }
+            ) { Text("SEND") }
+            OutlinedButton(onClick = {
+                val recipient = recipientId.toIntOrNull()
+                if (recipient == null) {
+                    status = "Enter a valid recipient ID to load messages."
+                } else {
+                    scope.launch {
+                        runCatching { repository.getConnectionMessages(userId, recipient) }
+                            .onSuccess {
+                                messages.clear()
+                                messages.addAll(it)
+                                status = "${it.size} messages loaded."
+                            }
+                            .onFailure { status = it.message ?: "Unable to load messages." }
+                    }
+                }
+            }) { Text("LOAD CONVERSATION") }
+            messages.forEach { item ->
+                Text(
+                    text = "${item.senderId}: ${item.content}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            Text("Your conversations are kept separate from AI consultations.", style = MaterialTheme.typography.bodySmall)
+        }
+    }
 
 @Composable
 fun ChatHistoryTab(

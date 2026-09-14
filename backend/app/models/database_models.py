@@ -23,6 +23,8 @@ class User(Base):
     chat_sessions = relationship("ChatSession", back_populates="owner", cascade="all, delete-orphan")
     learning_content = relationship("LearningContent", back_populates="owner", cascade="all, delete-orphan")
     quizzes = relationship("Quiz", back_populates="owner", cascade="all, delete-orphan")
+    messages_sent = relationship("ConnectionMessage", foreign_keys="ConnectionMessage.sender_id", cascade="all, delete-orphan")
+    messages_received = relationship("ConnectionMessage", foreign_keys="ConnectionMessage.recipient_id", cascade="all, delete-orphan")
     performance_logs = relationship("PerformanceLog", back_populates="owner", cascade="all, delete-orphan")
     timetables = relationship("Timetable", back_populates="owner", cascade="all, delete-orphan")
 
@@ -183,6 +185,16 @@ class ChatSession(Base):
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="chat_sessions")
+
+
+class ConnectionMessage(Base):
+    __tablename__ = "connection_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    recipient_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    content = Column(Text, nullable=False)
+    created_at = Column(Float, default=lambda: datetime.utcnow().timestamp())
 
 
 class ChatMessage(Base):

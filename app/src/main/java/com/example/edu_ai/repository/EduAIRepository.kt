@@ -54,7 +54,7 @@ class EduAIRepository(
                 semesterStatus = response.semesterStatus ?: "Active",
                 difficulty = response.difficulty ?: "Medium (Standard)",
                 aiPersona = response.aiPersona ?: "Socratic Mentor",
-                email = existingUser?.email ?: "",
+                email = response.email ?: existingUser?.email ?: "",
                 passwordHash = existingUser?.passwordHash ?: ""
             )
             dao.insertUser(userEntity)
@@ -150,7 +150,7 @@ class EduAIRepository(
             semesterStatus = response.semesterStatus ?: "Active",
             difficulty = response.difficulty ?: "Medium (Standard)",
             aiPersona = response.aiPersona ?: "Socratic Mentor",
-            email = email.ifBlank { existingUser?.email ?: "" },
+            email = response.email ?: email.ifBlank { existingUser?.email ?: "" },
             passwordHash = passwordHash.ifBlank { existingUser?.passwordHash ?: "" }
         )
         dao.insertUser(userEntity)
@@ -162,6 +162,8 @@ class EduAIRepository(
             api.updateStudentProfile(
                 userId = user.id,
                 updates = mapOf(
+                    "username" to user.username,
+                    "email" to user.email,
                     "difficulty" to user.difficulty,
                     "ai_persona" to user.aiPersona,
                     "semester_status" to user.semesterStatus
@@ -215,6 +217,10 @@ class EduAIRepository(
     suspend fun generateClassReport(): ClassReportResponse = api.generateClassReport()
     suspend fun updateStudentProfile(userId: String, updates: Map<String, Any?>) = api.updateStudentProfile(userId, updates)
     suspend fun sendProgressReport(studentId: String) = api.sendProgressReport(studentId)
+    suspend fun getConnectionMessages(userId: String, withUserId: Int) =
+        api.getConnectionMessages(userId, withUserId)
+    suspend fun sendConnectionMessage(userId: String, recipientId: Int, content: String) =
+        api.sendConnectionMessage(userId, com.example.edu_ai.data.remote.ConnectionMessageRequest(recipientId, content))
 
     // --- Parent Portal Methods ---
     suspend fun getParentDashboard(studentId: String) = api.getParentDashboard(studentId)
@@ -263,17 +269,8 @@ class EduAIRepository(
     fun getAllUnitsWithModulesIncludeArchived(userId: String): Flow<List<UnitWithModules>> = dao.getAllUnitsWithModulesIncludeArchived(userId)
 
     suspend fun deleteUnit(unitId: Long, userId: String) {
+        api.deleteUserUnit(userId, unitId)
         dao.deleteUnit(unitId)
-        dao.enqueueSyncOperation(
-            SyncOperationEntity(
-                operationId = UUID.randomUUID().toString(),
-                userId = userId,
-                entityType = "unit_delete",
-                entityId = unitId,
-                payload = gson.toJson(mapOf("unit_id" to unitId))
-            )
-        )
-        syncPendingChanges(userId)
     }
 
     suspend fun archiveUnit(unitId: Long, isActive: Boolean, userId: String) {

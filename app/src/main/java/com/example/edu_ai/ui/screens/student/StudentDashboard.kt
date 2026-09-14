@@ -178,6 +178,8 @@ fun StudentDashboard(
 
     // Account Management Dialog
     if (showAccountDialog) {
+        var username by remember { mutableStateOf(user.username) }
+        var email by remember { mutableStateOf(user.email) }
         var difficulty by remember { mutableStateOf(user.difficulty) }
         var aiPersona by remember { mutableStateOf(user.aiPersona) }
         var semesterStatus by remember { mutableStateOf(user.semesterStatus) }
@@ -187,10 +189,8 @@ fun StudentDashboard(
             title = { Text("Account Management") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("User: ${user.username}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    if (user.email.isNotEmpty()) {
-                        Text("Email: ${user.email}", style = MaterialTheme.typography.bodySmall)
-                    }
+                    OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
                     
                     OutlinedTextField(
                         value = semesterStatus,
@@ -231,7 +231,7 @@ fun StudentDashboard(
             },
             confirmButton = {
                 Button(onClick = {
-                    viewModel.updateUserProfile(difficulty, aiPersona, semesterStatus)
+                    viewModel.updateUserProfile(username, email, difficulty, aiPersona, semesterStatus)
                     showAccountDialog = false
                 }) {
                     Text("SAVE CHANGES")

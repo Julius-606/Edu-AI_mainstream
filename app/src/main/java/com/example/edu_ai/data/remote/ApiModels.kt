@@ -21,6 +21,7 @@ data class SyncResponse(
 
 data class DashboardResponse(
     @SerializedName("username") val username: String? = null,
+    @SerializedName("email") val email: String? = null,
     @SerializedName("role") val role: String? = null,
     @SerializedName("semester_status") val semesterStatus: String? = null,
     @SerializedName("difficulty") val difficulty: String? = null,
@@ -188,6 +189,19 @@ data class LibraryUnit(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
     @SerializedName("category") val category: String
+)
+
+data class ConnectionMessageRequest(
+    @SerializedName("recipient_id") val recipientId: Int,
+    val content: String
+)
+
+data class ConnectionMessage(
+    val id: Int,
+    @SerializedName("sender_id") val senderId: Int,
+    @SerializedName("recipient_id") val recipientId: Int,
+    val content: String,
+    @SerializedName("created_at") val createdAt: Double
 )
 
 data class LearningContentRequest(

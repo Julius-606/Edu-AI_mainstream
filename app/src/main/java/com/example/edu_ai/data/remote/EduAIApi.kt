@@ -2,6 +2,7 @@
 package com.example.edu_ai.data.remote
 
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -53,6 +54,24 @@ interface EduAIApi {
         @Path("user_id") userId: String,
         @Body updates: Map<String, Any?>
     ): Map<String, Any?>
+
+    @DELETE("api/users/{user_id}/units/{unit_id}")
+    suspend fun deleteUserUnit(
+        @Path("user_id") userId: String,
+        @Path("unit_id") unitId: Long
+    ): Map<String, Any>
+
+    @GET("api/users/{user_id}/connect/messages")
+    suspend fun getConnectionMessages(
+        @Path("user_id") userId: String,
+        @Query("with_user_id") withUserId: Int
+    ): List<ConnectionMessage>
+
+    @POST("api/users/{user_id}/connect/messages")
+    suspend fun sendConnectionMessage(
+        @Path("user_id") userId: String,
+        @Body request: ConnectionMessageRequest
+    ): ConnectionMessage
 
     @POST("api/teacher/send-report/{student_id}")
     suspend fun sendProgressReport(@Path("student_id") studentId: String): Map<String, Any?>

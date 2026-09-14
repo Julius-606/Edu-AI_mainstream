@@ -24,6 +24,7 @@ def user_response(user: models.User) -> schemas.UserResponseSchema:
     return schemas.UserResponseSchema(
         id=user.id,
         username=user.username,
+        email=user.email,
         role=user.role,
         difficulty=user.difficulty,
         ai_persona=user.ai_persona,
@@ -86,6 +87,7 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
 
     return schemas.DashboardResponse(
         username=user.username,
+        email=user.email,
         role=user.role,
         semester_status=user.semester_status,
         difficulty=user.difficulty,
@@ -138,6 +140,18 @@ def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Dep
         raise HTTPException(status_code=404, detail="User not found")
 
     update_data = user_update.dict(exclude_unset=True)
+    for field in ("username", "email"):
+        if field in update_data:
+            value = update_data[field].strip() if update_data[field] else None
+            if field == "username" and not value:
+                raise HTTPException(status_code=422, detail="Username cannot be empty")
+            conflict = db.query(models.User).filter(
+                getattr(models.User, field) == value,
+                models.User.id != user.id,
+            ).first()
+            if conflict:
+                raise HTTPException(status_code=409, detail=f"{field.title()} is already in use")
+            update_data[field] = value
 
     if "active_units" in update_data:
         new_unit_names = update_data.pop("active_units")
@@ -156,3 +170,51 @@ def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Dep
     db.refresh(user)
 
     return user_response(user)
+
+
+@router.delete("/{user_id}/units/{unit_id}")
+def delete_user_unit(user_id: str, unit_id: int, db: Session = Depends(get_db)):
+    user = find_user(user_id, db)
+    unit = db.query(models.Unit).filter(
+        models.Unit.id == unit_id,
+        models.Unit.owner_id == (user.id if user else -1),
+    ).first()
+    if not user or not unit:
+        raise HTTPException(status_code=404, detail="User unit not found")
+    db.delete(unit)
+    db.commit()
+    return {"status": "deleted", "unit_id": unit_id}
+
+
+@router.get("/{user_id}/connect/messages", response_model=List[schemas.ConnectionMessageResponse])
+def get_connection_messages(user_id: str, with_user_id: int, db: Session = Depends(get_db)):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db.query(models.ConnectionMessage).filter(
+        ((models.ConnectionMessage.sender_id == user.id) & (models.ConnectionMessage.recipient_id == with_user_id))
+        | ((models.ConnectionMessage.sender_id == with_user_id) & (models.ConnectionMessage.recipient_id == user.id))
+    ).order_by(models.ConnectionMessage.created_at.asc()).all()
+
+
+@router.post("/{user_id}/connect/messages", response_model=schemas.ConnectionMessageResponse)
+def send_connection_message(
+    user_id: str,
+    message: schemas.ConnectionMessageCreate,
+    db: Session = Depends(get_db),
+):
+    user = find_user(user_id, db)
+    recipient = db.query(models.User).filter(models.User.id == message.recipient_id).first()
+    if not user or not recipient:
+        raise HTTPException(status_code=404, detail="User or recipient not found")
+    if not message.content.strip():
+        raise HTTPException(status_code=422, detail="Message cannot be empty")
+    saved = models.ConnectionMessage(
+        sender_id=user.id,
+        recipient_id=recipient.id,
+        content=message.content.strip(),
+    )
+    db.add(saved)
+    db.commit()
+    db.refresh(saved)
+    return saved
