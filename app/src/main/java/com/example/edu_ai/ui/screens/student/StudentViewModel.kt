@@ -99,6 +99,18 @@ class StudentViewModel(private val repository: EduAIRepository, private val dao:
         }
     }
 
+    fun syncNow(userId: String) {
+        viewModelScope.launch {
+            repository.syncPendingChanges(userId)
+            refreshDashboard(userId, force = true)
+        }
+    }
+
+    suspend fun restoreSnapshot(userId: String): Int {
+        val snapshot = repository.restoreAccountSnapshot(userId)
+        return (snapshot["units"] as? List<*>)?.size ?: 0
+    }
+
     fun updateUserProfile(username: String, email: String, difficulty: String, aiPersona: String, semesterStatus: String) {
         val currentUser = uiState.value.user ?: return
         val updatedUser = currentUser.copy(

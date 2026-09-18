@@ -15,6 +15,9 @@ interface EduAIApi {
     @POST("api/sync")
     suspend fun sync(@Body request: SyncRequest): SyncResponse
 
+    @GET("api/sync/{user_id}/restore")
+    suspend fun restoreUserData(@Path("user_id") userId: String): Map<String, Any?>
+
     @GET("api/users/{user_id}/dashboard")
     suspend fun getDashboard(@Path("user_id") userId: String): DashboardResponse
 

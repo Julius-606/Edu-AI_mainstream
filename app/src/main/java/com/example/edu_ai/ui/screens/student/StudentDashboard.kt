@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -63,6 +65,7 @@ fun StudentDashboard(
 
     val progressViewModel: ProgressViewModel = viewModel(factory = ProgressViewModel.provideFactory(user))
     val recommendation by progressViewModel.recommendation.collectAsState()
+    val progressState by progressViewModel.uiState.collectAsState()
     
     val timetableViewModel: TimetableViewModel = viewModel(factory = TimetableViewModel.provideFactory(user))
     val timetableUiState by timetableViewModel.uiState.collectAsState()
@@ -75,9 +78,11 @@ fun StudentDashboard(
     var showArchivesDialog by remember { mutableStateOf(false) }
     var unitToDelete by remember { mutableStateOf<UnitEntity?>(null) }
     var activeBrowserUrl by remember { mutableStateOf<String?>(null) }
+    var showSyncDialog by remember { mutableStateOf(false) }
+    var syncStatus by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(userId) {
-        viewModel.refreshDashboard(userId)
+        viewModel.refreshDashboard(userId, force = true)
         progressViewModel.refreshRecommendations()
     }
 
@@ -145,6 +150,26 @@ fun StudentDashboard(
                             onOpenConsultations()
                         }
                     )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Public, contentDescription = null) },
+                        label = { Text("Trace Browser") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            activeBrowserUrl = ""
+                        }
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                        label = { Text("Settings & Sync") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            showSyncDialog = true
+                        }
+                    )
                 }
             }
         }
@@ -173,6 +198,43 @@ fun StudentDashboard(
             )
         ) {
             InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
+        }
+
+        if (showSyncDialog) {
+            AlertDialog(
+                onDismissRequest = { showSyncDialog = false },
+                title = { Text("Trace Sync") },
+                text = {
+                    Column {
+                        Text("Back up your local learning trail, compare it with the account, or restore the latest account snapshot. Sync keeps updated active units visible before you continue.")
+                        syncStatus?.let {
+                            Spacer(Modifier.height(12.dp))
+                            Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        scope.launch {
+                            syncStatus = "Syncing local changes..."
+                            viewModel.syncNow(userId)
+                            syncStatus = "Sync complete. Active units and progress are up to date."
+                        }
+                    }) { Text("SYNC NOW") }
+                },
+                dismissButton = {
+                    Row {
+                        TextButton(onClick = {
+                            scope.launch {
+                                syncStatus = "Preparing account restore..."
+                                val unitCount = viewModel.restoreSnapshot(userId)
+                                syncStatus = "Restore snapshot ready: $unitCount units available."
+                            }
+                        }) { Text("RESTORE") }
+                        TextButton(onClick = { showSyncDialog = false }) { Text("CLOSE") }
+                    }
+                }
+            )
         }
     }
 
@@ -314,40 +376,77 @@ fun StudentDashboard(
 
     // Archives Dialog
     if (showArchivesDialog) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = { showArchivesDialog = false },
-            title = { Text("Archived & Completed Units") },
-            text = {
-                Column {
-                    Text("Access completed unit content and quizzes:", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(8.dp))
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Archives", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
+                            Text("Completed units and their assessment trail", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        TextButton(onClick = { showArchivesDialog = false }) { Text("CLOSE") }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
                     if (uiState.archivedUnits.isEmpty()) {
-                        Text("No archived units yet.")
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No archived units yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     } else {
-                        uiState.archivedUnits.forEach { unit ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(unit.unitName, modifier = Modifier.weight(1f))
-                                TextButton(onClick = {
-                                    showArchivesDialog = false
-                                    onViewUnitOutline(unit.localId)
-                                }) {
-                                    Text("VIEW")
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            items(uiState.archivedUnits.sortedBy { it.unitName.lowercase() }) { unit ->
+                                val attempts = progressState.quizHistory
+                                    .filter { it.unitName.equals(unit.unitName, ignoreCase = true) }
+                                    .sortedByDescending { it.timestamp }
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                                ) {
+                                    Column(Modifier.padding(16.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Archive, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                            Spacer(Modifier.width(12.dp))
+                                            Text(unit.unitName, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                            TextButton(onClick = { viewModel.archiveUnit(unit.localId, true) }) { Text("RESTORE") }
+                                        }
+                                        Spacer(Modifier.height(8.dp))
+                                        if (attempts.isEmpty()) {
+                                            Text("No quiz attempts saved for this unit.", style = MaterialTheme.typography.bodySmall)
+                                        } else {
+                                            Text("Quiz history", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                                            attempts.take(5).forEach { attempt ->
+                                                Row(
+                                                    Modifier.fillMaxWidth().padding(top = 6.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(
+                                                        java.text.SimpleDateFormat("MMM dd, yyyy HH:mm", java.util.Locale.getDefault())
+                                                            .format(java.util.Date(attempt.timestamp)),
+                                                        style = MaterialTheme.typography.bodySmall
+                                                    )
+                                                    Text("${attempt.pnlScore.toInt()}%", fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                        Spacer(Modifier.height(8.dp))
+                                        OutlinedButton(onClick = {
+                                            showArchivesDialog = false
+                                            onViewUnitOutline(unit.localId)
+                                        }) { Text("VIEW UNIT") }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showArchivesDialog = false }) {
-                    Text("CLOSE")
-                }
             }
-        )
+        }
     }
 }
 
@@ -634,7 +733,10 @@ fun StudentDashboardContent(
                 }
 
                 val today = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault()).format(java.util.Date())
-                val todaysSlots = timetableUiState.weeklyPlan.filter { it.day.equals(today, ignoreCase = true) }
+                val todaysSlots = timetableUiState.weeklyPlan.filter {
+                    it.day.equals(today, ignoreCase = true) ||
+                        it.day.take(3).equals(today.take(3), ignoreCase = true)
+                }.sortedBy { it.time }
 
                 if (todaysSlots.isEmpty()) {
                     item {
@@ -683,7 +785,10 @@ fun StudentDashboardContent(
                 if (timetableUiState.weeklyPlan.isNotEmpty()) {
                     val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
                     items(days) { day ->
-                        val slotsForDay = timetableUiState.weeklyPlan.filter { it.day.equals(day, ignoreCase = true) }
+                        val slotsForDay = timetableUiState.weeklyPlan.filter {
+                            it.day.equals(day, ignoreCase = true) ||
+                                it.day.take(3).equals(day.take(3), ignoreCase = true)
+                        }.sortedBy { it.time }
                         if (slotsForDay.isNotEmpty()) {
                             Column(modifier = Modifier.padding(vertical = 4.dp)) {
                                 Text(day, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)

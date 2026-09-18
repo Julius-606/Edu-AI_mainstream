@@ -86,7 +86,25 @@ fun LibraryScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(uiState.availableUnits) { unit ->
+                    val groupedUnits = uiState.availableUnits
+                        .sortedWith(compareBy({ it.category.lowercase() }, { it.name.lowercase() }))
+                        .groupBy { it.category.ifBlank { "General" } }
+                    groupedUnits.forEach { (category, units) ->
+                        item {
+                            Text(
+                                category,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                            )
+                            Text(
+                                "${units.size} curated unit${if (units.size == 1) "" else "s"}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        items(units) { unit ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -128,6 +146,7 @@ fun LibraryScreen(
                                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("ADD")
+                                }
                                 }
                             }
                         }

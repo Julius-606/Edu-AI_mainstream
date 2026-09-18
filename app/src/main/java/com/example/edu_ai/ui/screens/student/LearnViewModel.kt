@@ -20,6 +20,8 @@ data class LearnUiState(
     val isFirst: Boolean = true,
     val subtopicCompleted: Boolean = false,
     val userMessage: String = "",
+    val interactionResponse: String? = null,
+    val interactionSatisfied: Boolean = false,
     val error: String? = null
 )
 
@@ -51,11 +53,13 @@ class LearnViewModel(private val repository: EduAIRepository) : ViewModel() {
             _uiState.update { it.copy(isLoading = true, userMessage = "") }
             try {
                 val response = repository.nextObjective(subtopicId, userId, message)
-                if (response["status"] == "subtopic_completed") {
-                    repository.updateSubtopicProgress(subtopicId.toLong(), true)
-                    _uiState.update { it.copy(subtopicCompleted = true, isLoading = false) }
-                } else {
-                    updateStateWithResponse(response, subtopicId.toLong(), userId)
+                val responseText = response["content"] as? String
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        interactionResponse = responseText,
+                        interactionSatisfied = true
+                    )
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = e.message) }
@@ -108,7 +112,9 @@ class LearnViewModel(private val repository: EduAIRepository) : ViewModel() {
             content = content,
             isLast = isLast,
             isFirst = isFirst,
-            isLoading = false
+            isLoading = false,
+            interactionResponse = null,
+            interactionSatisfied = false
         ) }
 
         // Save to repository

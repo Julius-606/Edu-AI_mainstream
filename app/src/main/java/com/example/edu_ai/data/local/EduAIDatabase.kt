@@ -19,6 +19,21 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
         db.execSQL("ALTER TABLE quiz_history ADD COLUMN quizJsonHash TEXT NOT NULL DEFAULT ''")
         db.execSQL("ALTER TABLE learning_content ADD COLUMN contentHash TEXT NOT NULL DEFAULT ''")
     }
+
+}
+
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS bookmarks (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "userId TEXT NOT NULL, " +
+                "subtopicId INTEGER NOT NULL, " +
+                "objectiveDescription TEXT NOT NULL, " +
+                "excerpt TEXT NOT NULL, " +
+                "createdAt INTEGER NOT NULL)"
+        )
+    }
 }
 
 @Database(
@@ -33,12 +48,13 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
         ChatSessionEntity::class,
         TimetableEntity::class,
         NoteEntity::class,
+        BookmarkEntity::class,
         LearningContentEntity::class,
         SyncOperationEntity::class,
         CasBlobEntity::class,
         CommitLogEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class EduAIDatabase : RoomDatabase() {

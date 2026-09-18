@@ -132,7 +132,8 @@ fun AppNavigation() {
                 onBack = { navController.popBackStack() },
                 onUnitAdded = { 
                     navController.popBackStack()
-                }
+                },
+                onViewUnitOutline = { unitId -> navController.navigate("unit_outline/$unitId") }
             )
         }
 

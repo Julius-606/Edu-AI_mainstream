@@ -16,6 +16,9 @@ interface EduAIDao {
     @Query("SELECT * FROM users LIMIT 1")
     fun getUser(): Flow<UserEntity?>
 
+    @Query("SELECT * FROM users WHERE id = :userId LIMIT 1")
+    fun getUser(userId: String): Flow<UserEntity?>
+
     @Query("SELECT * FROM users WHERE email = :email LIMIT 1")
     suspend fun getUserByEmail(email: String): UserEntity?
     
@@ -165,6 +168,16 @@ interface EduAIDao {
 
     @Query("DELETE FROM learning_content")
     suspend fun clearAllLearningContent()
+
+    // Learning bookmarks
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBookmark(bookmark: BookmarkEntity)
+
+    @Query("SELECT * FROM bookmarks WHERE userId = :userId ORDER BY createdAt DESC")
+    fun getBookmarks(userId: String): Flow<List<BookmarkEntity>>
+
+    @Query("DELETE FROM bookmarks WHERE id = :bookmarkId")
+    suspend fun deleteBookmark(bookmarkId: Long)
 
     // Sync Operations
     @Insert(onConflict = OnConflictStrategy.REPLACE)

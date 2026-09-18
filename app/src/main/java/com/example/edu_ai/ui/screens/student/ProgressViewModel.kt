@@ -45,7 +45,7 @@ class ProgressViewModel(
 
     init {
         viewModelScope.launch {
-            dao.getUser().collect { freshUser ->
+            dao.getUser(user.id).collect { freshUser ->
                 if (freshUser != null && freshUser.lastRecommendationText.isNotEmpty()) {
                     _recommendation.value = freshUser.lastRecommendationText
                 }

@@ -26,6 +26,7 @@ def parse_syllabus_markdown(text, field="General", course="General", unit_name=N
         "units": []
     }
 
+    selected_group = unit_name.strip() if unit_name and unit_name.strip() else None
     current_unit = None
     current_module = None
     current_topic = None
@@ -40,9 +41,10 @@ def parse_syllabus_markdown(text, field="General", course="General", unit_name=N
             if line.startswith('# '):
                 syllabus["syllabus_title"] = line[2:].strip()
             elif line.startswith('## '):
+                unit_title = line[3:].strip()
                 current_unit = {
-                    "unit_title": line[3:].strip(),
-                    "unit_group": normalize_unit_group(line[3:].strip()),
+                    "unit_title": unit_title,
+                    "unit_group": selected_group or normalize_unit_group(unit_title),
                     "modules": []
                 }
                 syllabus["units"].append(current_unit)

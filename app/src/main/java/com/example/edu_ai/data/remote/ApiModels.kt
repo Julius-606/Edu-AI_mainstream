@@ -16,7 +16,8 @@ data class SyncOperation(
 )
 
 data class SyncResponse(
-    val appliedOperationIds: List<String> = emptyList()
+    val appliedOperationIds: List<String> = emptyList(),
+    val failedOperationIds: List<String> = emptyList()
 )
 
 data class DashboardResponse(

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.room.Room
 import com.example.edu_ai.data.local.EduAIDatabase
 import com.example.edu_ai.data.local.MIGRATION_12_13
+import com.example.edu_ai.data.local.MIGRATION_13_14
 import com.example.edu_ai.data.remote.RetrofitClient
 import com.example.edu_ai.repository.EduAIRepository
 import androidx.room.migration.Migration
@@ -29,7 +30,7 @@ class EduAIApplication : Application() {
             EduAIDatabase::class.java,
             "edu_ai_db"
         )
-        .addMigrations(MIGRATION_11_12, MIGRATION_12_13)
+        .addMigrations(MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
 

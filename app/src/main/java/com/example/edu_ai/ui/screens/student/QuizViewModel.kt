@@ -240,13 +240,17 @@ class QuizViewModel(
                 )
             )
             // Save to backend
-            aiService.recordQuizResult(
-                unitName = state.selectedUnit ?: quiz.title,
-                score = state.score,
-                total = quiz.questions.size,
-                userContext = user
-            )
             _uiState.update { it.copy(isQuizFinished = true) }
+            try {
+                aiService.recordQuizResult(
+                    unitName = state.selectedUnit ?: quiz.title,
+                    score = state.score,
+                    total = quiz.questions.size,
+                    userContext = user
+                )
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Saved locally. We will sync this result when you are online.") }
+            }
         }
     }
 

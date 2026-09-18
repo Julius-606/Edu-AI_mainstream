@@ -103,7 +103,7 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     )
 
 @router.get("/{user_id}/timetable", response_model=schemas.TimetableResponse)
-def get_ai_timetable(user_id: str, db: Session = Depends(get_db)):
+async def get_ai_timetable(user_id: str, db: Session = Depends(get_db)):
     user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -122,7 +122,7 @@ def get_ai_timetable(user_id: str, db: Session = Depends(get_db)):
     chat_titles = [s.title for s in recent_sessions]
 
     user_info = {"username": user.username, "semester_status": user.semester_status}
-    new_timetable_data = ai_service.generate_timetable(user_info, quiz_history, active_units, chat_titles, previous_plan)
+    new_timetable_data = await ai_service.generate_timetable(user_info, quiz_history, active_units, chat_titles, previous_plan)
 
     if not new_timetable_data:
         raise HTTPException(status_code=500, detail="The AI is still drafting your plan. Try again in a moment.")

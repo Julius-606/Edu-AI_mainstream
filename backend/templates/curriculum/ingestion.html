@@ -179,14 +179,15 @@
             unitGroups.forEach(group => unitSelect.appendChild(new Option(group.name, group.name)));
             unitSelect.appendChild(new Option('+ Create new unit group', '__new__'));
             unitSelect.disabled = !course || courseSelect.value === '__new__';
-            newUnit.classList.add('hidden');
             setRequired(newUnit, false);
+            updateUnitInput(); // Call to ensure correct initial visibility
         }
 
         function updateUnitInput() {
             const isNewUnit = unitSelect.value === '__new__';
             newUnit.classList.toggle('hidden', !isNewUnit);
-            setRequired(newUnit, false);
+            newUnit.disabled = !isNewUnit;
+            newUnit.required = false;
         }
 
         ingestionForm.addEventListener('submit', () => {

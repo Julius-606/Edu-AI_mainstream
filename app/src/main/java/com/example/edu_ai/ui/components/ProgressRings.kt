@@ -75,6 +75,16 @@ fun ProgressRings(
                     size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
+                val markerAngle = Math.toRadians((sweepAngle - 90f).toDouble())
+                val markerRadius = radius
+                drawCircle(
+                    color = ring.color,
+                    radius = 3.dp.toPx(),
+                    center = androidx.compose.ui.geometry.Offset(
+                        center.x + (kotlin.math.cos(markerAngle) * markerRadius).toFloat(),
+                        center.y + (kotlin.math.sin(markerAngle) * markerRadius).toFloat()
+                    )
+                )
             }
         }
 
@@ -85,8 +95,15 @@ fun ProgressRings(
                 .padding(4.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Empty box or maybe just the percentage of the outermost ring?
-            // The user said "Instead let the concentric rings just be."
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "${animatedPercentages.firstOrNull()?.value?.toInt() ?: 0}%",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text("TRACE", fontSize = 9.sp, letterSpacing = 1.5.sp, color = MaterialTheme.colorScheme.outline)
+            }
         }
     }
 }

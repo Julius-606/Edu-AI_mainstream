@@ -332,5 +332,10 @@ class EduAIRepository(
         } catch (e: Exception) {
             // Keep the operation queued for the next synchronization attempt.
         }
+
+    }
+
+    suspend fun restoreAccountSnapshot(userId: String): Map<String, Any?> {
+        return api.restoreUserData(userId)
     }
 }
