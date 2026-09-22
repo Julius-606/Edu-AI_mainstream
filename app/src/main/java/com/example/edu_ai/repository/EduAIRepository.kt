@@ -8,6 +8,7 @@ import com.example.edu_ai.data.remote.ClassReportResponse
 import com.example.edu_ai.data.remote.ApiTimetableResponse
 import com.example.edu_ai.utils.PreferenceManager
 import android.content.Context
+import android.util.Log
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -249,16 +250,29 @@ class EduAIRepository(
         )
     }
     fun getSavedLearningContent(subtopicId: Long) = dao.getLearningContentForSubtopic(subtopicId)
-    suspend fun updateSubtopicProgress(subtopicId: Long, isCompleted: Boolean) {
-        dao.updateSubtopicStatus(subtopicId, isCompleted)
+    suspend fun updateSubtopicProgress(subtopicId: Long, isCompleted: Boolean, objectiveId: String) {
         val userId = dao.getUser().first()?.id ?: return
+
+        dao.insertContentCompletion(
+            ContentCompletionEntity(
+                userId = userId,
+                objectiveId = objectiveId,
+                contentId = subtopicId.toString(),
+                isCompleted = isCompleted
+            )
+        )
+
         dao.enqueueSyncOperation(
             SyncOperationEntity(
                 operationId = UUID.randomUUID().toString(),
                 userId = userId,
-                entityType = "subtopic_progress",
-                entityId = subtopicId,
-                payload = gson.toJson(mapOf("is_completed" to isCompleted))
+                entityType = "content_completion",
+                entityId = 0, // Not directly mapping to a single entity ID anymore
+                payload = gson.toJson(mapOf(
+                    "objective_id" to objectiveId,
+                    "content_id" to subtopicId.toString(),
+                    "is_completed" to isCompleted
+                ))
             )
         )
         syncPendingChanges(userId)
@@ -319,17 +333,42 @@ class EduAIRepository(
                 com.example.edu_ai.data.remote.SyncRequest(
                     userId = userId,
                     operations = pending.map {
-                        com.example.edu_ai.data.remote.SyncOperation(
-                            operationId = it.operationId,
-                            entityType = it.entityType,
-                            entityId = it.entityId,
-                            payload = gson.fromJson(it.payload, Map::class.java) as Map<String, Any?>
-                        )
+                        when (it.entityType) {
+                            "subtopic_progress" -> {
+                                val oldPayload = gson.fromJson(it.payload, Map::class.java) as Map<String, Any?>
+                                com.example.edu_ai.data.remote.SyncOperation(
+                                    operationId = it.operationId,
+                                    entityType = it.entityType,
+                                    entityId = it.entityId,
+                                    payload = oldPayload
+                                )
+                            }
+                            "content_completion" -> {
+                                val completionPayload = gson.fromJson(it.payload, Map::class.java) as Map<String, Any?>
+                                com.example.edu_ai.data.remote.SyncOperation(
+                                    operationId = it.operationId,
+                                    entityType = it.entityType,
+                                    entityId = it.entityId,
+                                    payload = completionPayload
+                                )
+                            }
+                            else -> com.example.edu_ai.data.remote.SyncOperation(
+                                operationId = it.operationId,
+                                entityType = it.entityType,
+                                entityId = it.entityId,
+                                payload = gson.fromJson(it.payload, Map::class.java) as Map<String, Any?>
+                            )
+                        }
                     }
                 )
             )
             response.appliedOperationIds.forEach { dao.deleteSyncOperation(it) }
+            response.failedOperationIds.forEach { operationId ->
+                Log.e("EduAIRepository", "Failed to sync operation: $operationId")
+                // Optionally, mark as failed in local DB or retry later with exponential backoff
+            }
         } catch (e: Exception) {
+            Log.e("EduAIRepository", "Error during synchronization", e)
             // Keep the operation queued for the next synchronization attempt.
         }
 
@@ -338,4 +377,19 @@ class EduAIRepository(
     suspend fun restoreAccountSnapshot(userId: String): Map<String, Any?> {
         return api.restoreUserData(userId)
     }
+    suspend fun getAiGeneratedContent(objectiveId: String, userId: String): com.example.edu_ai.data.remote.AiGeneratedContentResponse {
+        return api.getAiGeneratedContent(
+            com.example.edu_ai.data.remote.CourseObjectiveRequest(
+                userId = userId,
+                objectiveId = objectiveId
+            )
+        )
+    }
+
+    // New methods to get progress for objectives
+    fun getCompletedContentCountForObjective(userId: String, objectiveId: String): Flow<Int> =
+        dao.getCompletedContentCountForObjective(userId, objectiveId)
+
+    fun getTotalContentCountForObjective(userId: String, objectiveId: String): Flow<Int> =
+        dao.getTotalContentCountForObjective(userId, objectiveId)
 }

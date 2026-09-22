@@ -79,8 +79,20 @@ interface EduAIDao {
     @Query("SELECT * FROM subtopics WHERE topicId = :topicId")
     fun getSubtopicsForTopic(topicId: Long): Flow<List<SubtopicEntity>>
 
-    @Query("UPDATE subtopics SET isCompleted = :isCompleted WHERE subtopicId = :subtopicId")
-    suspend fun updateSubtopicStatus(subtopicId: Long, isCompleted: Boolean)
+
+
+    // Content Completion
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContentCompletion(completion: ContentCompletionEntity)
+
+    @Query("SELECT * FROM content_completion WHERE userId = :userId AND objectiveId = :objectiveId AND contentId = :contentId LIMIT 1")
+    suspend fun getContentCompletion(userId: String, objectiveId: String, contentId: String): ContentCompletionEntity?
+
+    @Query("SELECT COUNT(DISTINCT contentId) FROM content_completion WHERE userId = :userId AND objectiveId = :objectiveId AND isCompleted = 1")
+    fun getCompletedContentCountForObjective(userId: String, objectiveId: String): Flow<Int>
+
+    @Query("SELECT COUNT(DISTINCT contentId) FROM content_completion WHERE userId = :userId AND objectiveId = :objectiveId")
+    fun getTotalContentCountForObjective(userId: String, objectiveId: String): Flow<Int>
 
     // Quiz History
     @Insert(onConflict = OnConflictStrategy.REPLACE)

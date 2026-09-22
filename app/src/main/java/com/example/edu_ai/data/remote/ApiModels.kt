@@ -138,6 +138,36 @@ data class ApiTimetableResponse(
     @SerializedName("ai_brief") val aiBrief: String
 )
 
+// --- AI Content Generation & Objectives ---
+data class CourseObjectiveRequest(
+    @SerializedName("user_id") val userId: String,
+    @SerializedName("objective_id") val objectiveId: String
+)
+
+data class AiGeneratedContentResponse(
+    @SerializedName("objective_id") val objectiveId: String,
+    @SerializedName("content_title") val contentTitle: String,
+    @SerializedName("generated_text") val generatedText: String,
+    @SerializedName("related_content_ids") val relatedContentIds: List<String> = emptyList() // IDs of granular content pieces
+)
+
+data class ContentCompletionSyncRequest(
+    @SerializedName("user_id") val userId: String,
+    val completions: List<ContentCompletionDto>
+)
+
+data class ContentCompletionDto(
+    @SerializedName("objective_id") val objectiveId: String,
+    @SerializedName("content_id") val contentId: String,
+    @SerializedName("is_completed") val isCompleted: Boolean,
+    @SerializedName("last_updated") val lastUpdated: Long
+)
+
+data class ContentCompletionSyncResponse(
+    @SerializedName("applied_completion_ids") val appliedCompletionIds: List<String> = emptyList(),
+    @SerializedName("failed_completion_ids") val failedCompletionIds: List<String> = emptyList()
+)
+
 // --- AI Models ---
 
 data class ChatMessage(

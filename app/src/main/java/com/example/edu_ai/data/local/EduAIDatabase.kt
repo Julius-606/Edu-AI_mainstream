@@ -52,7 +52,8 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
         LearningContentEntity::class,
         SyncOperationEntity::class,
         CasBlobEntity::class,
-        CommitLogEntity::class
+        CommitLogEntity::class,
+        ContentCompletionEntity::class
     ],
     version = 14,
     exportSchema = false
