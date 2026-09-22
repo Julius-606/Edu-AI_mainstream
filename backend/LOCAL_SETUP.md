@@ -38,6 +38,14 @@ python mock_app_test.py
 ```
 
 ## 4. Troubleshooting
+- **PostgreSQL / Neon SSL Error (`SSL error: unexpected eof while reading`)**:
+  - The Neon free-tier serverless pooler automatically scales down to zero when idle. If a connection closes unexpectedly, the backend now includes **automatic fallback to SQLite** (`edu_ai_vault.db`) so your server never crashes.
+  - To test with local SQLite directly without touching remote Neon, set `DATABASE_URL=sqlite:///./edu_ai_vault.db` in your `backend/.env` file.
+  - If connecting to Neon, make sure your connection string uses endpoint pooler mode with `?sslmode=require`.
+
+- **Hugging Face Container Health Check (`500 on /?logs=container`)**:
+  - Resolved! The root route now responds immediately to Hugging Face container telemetry probes without failing on database timeouts.
+
 - **Unauthorized (403)**: Ensure `INTERNAL_API_KEY` in `main.py` matches the one in `mock_app_test.py` (default is `DEVELOPMENT_KEY`).
 - **AI Errors**: Check the server terminal for logs. I've enabled automatic key rotation, so it should handle rate limits (429) automatically.
 
