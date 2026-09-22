@@ -12,7 +12,9 @@ import {
   Bookmark,
   Users,
   Search,
-  Bell
+  Bell,
+  ShieldAlert,
+  Laptop
 } from 'lucide-react';
 import { User, Unit, UserRole } from './types';
 import { TraceStore } from './lib/store';
@@ -41,6 +43,15 @@ export const App: React.FC = () => {
   const [user, setUser] = useState<User>(TraceStore.getUser());
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [units, setUnits] = useState<Unit[]>(TraceStore.getUnits());
+
+  // Dedicated / Standalone Admin Isolation Mode (via URL query param ?view=admin or superuser mode)
+  const [isStandaloneAdmin, setIsStandaloneAdmin] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('view') === 'admin' || params.get('mode') === 'admin';
+    }
+    return false;
+  });
 
   // Screen Routing
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
@@ -112,6 +123,79 @@ export const App: React.FC = () => {
 
   const activeUnit = units.find((u) => u.id === activeUnitId) || units[0];
 
+  if (isStandaloneAdmin) {
+    const adminUser: User = {
+      id: '4',
+      username: 'Superuser Admin',
+      email: 'admin@trace.edu',
+      role: 'Admin',
+      difficulty: 'Superuser',
+      semesterStatus: 'System Administration & Oversight',
+      aiPersona: 'System Architect & Lead Consultant',
+      sensoryMode: 'Standard',
+      activeUnits: ['Biochemistry II', 'General Surgery', 'Internal Medicine']
+    };
+
+    return (
+      <div className="min-h-screen text-slate-100 bg-slate-950 font-sans selection:bg-indigo-500/30 selection:text-indigo-200 relative">
+        <DynamicBackground />
+        
+        {/* Dedicated Admin Header */}
+        <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/80">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-red-600/20 border border-red-500/40 flex items-center justify-center text-red-400 font-black text-sm shadow-sm">
+                <ShieldAlert className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-base font-extrabold text-white tracking-tight">
+                  Trace Backend Control & Telemetry
+                </span>
+                <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-red-500/20 text-red-300 border border-red-500/30">
+                  Isolated Admin Preview
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setIsStandaloneAdmin(false);
+                  if (typeof window !== 'undefined') {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('view');
+                    url.searchParams.delete('mode');
+                    window.history.replaceState({}, '', url.pathname);
+                  }
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-white border border-indigo-500/30 text-xs font-bold transition-all shadow-sm"
+              >
+                <span>Switch to Student App Preview</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
+          <AdminDashboard
+            currentUser={adminUser}
+            isStandalone={true}
+            onExitStandalone={() => {
+              setIsStandaloneAdmin(false);
+              if (typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('view');
+                url.searchParams.delete('mode');
+                window.history.replaceState({}, '', url.pathname);
+              }
+            }}
+            onRefreshData={() => setUnits(TraceStore.getUnits())}
+          />
+        </main>
+      </div>
+    );
+  }
+
   if (!isLoggedIn) {
     return (
       <div className="relative min-h-screen text-slate-100 bg-slate-950 font-sans">
@@ -145,6 +229,14 @@ export const App: React.FC = () => {
         onOpenBrowser={(url) => setBrowserUrl(url || 'https://en.wikipedia.org/wiki/Medicine')}
         onChangeRole={handleChangeRole}
         onLogout={() => setIsLoggedIn(false)}
+        onOpenAdminConsole={() => {
+          setIsStandaloneAdmin(true);
+          if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.set('view', 'admin');
+            window.history.replaceState({}, '', url.pathname + '?' + url.searchParams.toString());
+          }
+        }}
       />
 
       {/* Top Application Header Bar */}
@@ -251,6 +343,22 @@ export const App: React.FC = () => {
               title="Settings & Sync"
             >
               <Settings className="w-4 h-4" />
+            </button>
+
+            {/* Direct Shortcut to Isolated Superuser Dashboard */}
+            <button
+              onClick={() => {
+                setIsStandaloneAdmin(true);
+                if (typeof window !== 'undefined') {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('view', 'admin');
+                  window.history.replaceState({}, '', url.pathname + '?' + url.searchParams.toString());
+                }
+              }}
+              className="p-2 rounded-xl bg-red-950/40 border border-red-800/50 text-red-400 hover:text-red-200 hover:bg-red-900/50 transition-colors"
+              title="Open Isolated Admin & Backend Telemetry Dashboard (?view=admin)"
+            >
+              <ShieldAlert className="w-4 h-4" />
             </button>
 
             <button

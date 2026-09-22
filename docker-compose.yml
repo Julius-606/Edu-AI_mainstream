@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  # Python FastAPI Backend with SQLAlchemy and Gemini AI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trace-backend
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./trace_learning.db}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-64923e4d8f1a2c5b9e0f3d7a6c5b9eX0f3d7a6c5b9e0f3d7a}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-secret-key-3.0.0}
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+    restart: unless-stopped
+
+  # Frontend Web Client & Node Proxy Orchestrator
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trace-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - BACKEND_API_URL=http://backend:8001
+    depends_on:
+      - backend
+    restart: unless-stopped

@@ -32,7 +32,11 @@ import {
   ChevronDown,
   ChevronRight,
   Zap,
-  Play
+  Play,
+  ArrowLeft,
+  Server,
+  ExternalLink,
+  Laptop
 } from 'lucide-react';
 import { User, Unit, SystemLogEntry } from '../types';
 import { TraceStore } from '../lib/store';
@@ -41,14 +45,18 @@ interface AdminDashboardProps {
   currentUser: User;
   onNavigateToTab?: (tab: string) => void;
   onRefreshData?: () => void;
+  isStandalone?: boolean;
+  onExitStandalone?: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   currentUser,
   onNavigateToTab,
-  onRefreshData
+  onRefreshData,
+  isStandalone,
+  onExitStandalone
 }) => {
-  const [activeTab, setActiveTab] = useState<'analytics' | 'logs' | 'ingestion' | 'units' | 'users' | 'database'>('logs');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'logs' | 'ingestion' | 'units' | 'users' | 'database' | 'deployment'>('logs');
   const [units, setUnits] = useState<Unit[]>(TraceStore.getUnits());
   const [allUsers, setAllUsers] = useState<User[]>(TraceStore.getAllUsers());
   const [quizHistory, setQuizHistory] = useState(TraceStore.getQuizHistory());
@@ -352,6 +360,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {isStandalone && onExitStandalone && (
+              <button
+                onClick={onExitStandalone}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition-all text-xs font-semibold border border-slate-700 shadow-md"
+                title="Return to Student Learning Application"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Return to Main App</span>
+              </button>
+            )}
             <a
               href="/docs"
               target="_blank"
@@ -453,7 +471,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             { id: 'ingestion', label: 'Curriculum Ingestion Engine', icon: FileCode },
             { id: 'units', label: 'Global Units Management', icon: BookOpen },
             { id: 'users', label: 'Superuser User Administration', icon: Users },
-            { id: 'database', label: 'Direct Database Schema', icon: Database }
+            { id: 'database', label: 'Direct Database Schema', icon: Database },
+            { id: 'deployment', label: 'Local Backend & Docker Setup', icon: Laptop }
           ] as const
         ).map((t) => {
           const Icon = t.icon;
@@ -1322,6 +1341,165 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">Subtopic learning objectives saved for rapid clinical review.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: LOCAL BACKEND & DOCKER DEPLOYMENT */}
+      {activeTab === 'deployment' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800/80 shadow-xl space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Laptop className="w-5 h-5 text-indigo-400" />
+                  <span>Local Machine & Backend Deployment Architecture</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Run the Python backend and web app independently on your local workstation with isolated preview environments.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Docker & Shell Ready
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Status Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-400">Frontend Port</span>
+                  <span className="text-[10px] font-mono bg-indigo-500/10 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/20">
+                    PORT 3000
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 font-mono">http://localhost:3000</p>
+                <p className="text-[11px] text-slate-500">React + Vite SPA with Node API Proxy orchestrator.</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-400">Python Backend Port</span>
+                  <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/20">
+                    PORT 8001
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 font-mono">http://localhost:8001</p>
+                <p className="text-[11px] text-slate-500">FastAPI Modular Engine (SQLAlchemy, AI Chat, Neon/SQLite).</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-400">Dedicated Admin URL</span>
+                  <span className="text-[10px] font-mono bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded border border-amber-500/20">
+                    ISOLATED
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 font-mono">http://localhost:3000/?view=admin</p>
+                <p className="text-[11px] text-slate-500">Direct superuser window without mixing student sessions.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Deployment Methods Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Method 1: Docker Compose */}
+            <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800/80 shadow-xl space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                  <Server className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Method 1: Docker Compose (All-in-One)</h4>
+                  <p className="text-xs text-slate-400">Recommended for clean containerized local deployment</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                A pre-configured <code className="text-indigo-300 bg-slate-950 px-1 py-0.5 rounded">docker-compose.yml</code> file coordinates both containers (Python FastAPI on port 8001 and Node/React on port 3000).
+              </p>
+
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-slate-300 space-y-2">
+                <div className="text-slate-500"># 1. Start all multi-service containers</div>
+                <div className="text-emerald-400">docker-compose up --build</div>
+                <div className="text-slate-500 mt-2"># 2. Stop all running containers</div>
+                <div className="text-indigo-400">docker-compose down</div>
+              </div>
+
+              <div className="text-xs text-slate-400 space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Runs backend and frontend in isolated container networks</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Pre-binds PostgreSQL/SQLite storage and JWT tokens</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Method 2: Native Shell Launcher */}
+            <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800/80 shadow-xl space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <Terminal className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Method 2: One-Click Shell Script</h4>
+                  <p className="text-xs text-slate-400">Run directly on Linux, macOS, or Windows WSL</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Use the automated launcher script <code className="text-indigo-300 bg-slate-950 px-1 py-0.5 rounded">./start-local.sh</code> to spin up both processes side-by-side with hot reload.
+              </p>
+
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-slate-300 space-y-2">
+                <div className="text-slate-500"># Run the unified launcher script</div>
+                <div className="text-emerald-400">./start-local.sh</div>
+                <div className="text-slate-500 mt-2"># Or run python backend manually</div>
+                <div className="text-indigo-400">cd backend && python run_modular.py</div>
+              </div>
+
+              <div className="text-xs text-slate-400 space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Captures stdout and stderr from both processes</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Graceful Ctrl+C process termination hook</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Configuration File & API Reference Card */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800/80 shadow-xl space-y-3">
+            <h4 className="text-sm font-bold text-white flex items-center gap-2">
+              <FileCode className="w-4 h-4 text-indigo-400" />
+              <span>Full Setup Documentation & File References</span>
+            </h4>
+            <p className="text-xs text-slate-400">
+              Review detailed instructions and environment variable specs in the generated repository documentation:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <div className="font-mono text-xs font-bold text-slate-200">LOCAL_DEPLOYMENT.md</div>
+                <p className="text-[11px] text-slate-400 mt-1">Complete step-by-step terminal & Docker instructions.</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <div className="font-mono text-xs font-bold text-slate-200">docker-compose.yml</div>
+                <p className="text-[11px] text-slate-400 mt-1">Multi-service manifest with port mappings 8001 & 3000.</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <div className="font-mono text-xs font-bold text-slate-200">start-local.sh</div>
+                <p className="text-[11px] text-slate-400 mt-1">Bash launcher with automated background PID management.</p>
+              </div>
             </div>
           </div>
         </div>
