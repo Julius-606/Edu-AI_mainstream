@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.data.remote.ai
 
 import com.google.gson.annotations.SerializedName
@@ -13,3 +14,5 @@ data class QuizQuestion(
     @SerializedName("correct_option_index") val correctIndex: Int,
     @SerializedName("explanation") val explanation: String
 )
+
+

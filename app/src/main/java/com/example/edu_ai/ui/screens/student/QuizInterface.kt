@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.ui.screens.student
 
 import androidx.compose.animation.AnimatedVisibility
@@ -8,7 +9,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -53,7 +53,6 @@ fun QuizTabWrapper(
             selectedUnit = uiState.selectedUnit,
             onUnitClicked = { viewModel.selectUnit(it) },
             onStartQuiz = { unit, topic -> viewModel.startQuiz(unit, topic) },
-            onRetake = { viewModel.retakeQuiz(it) },
             isLoading = uiState.isLoading,
             error = uiState.error
         )
@@ -62,7 +61,7 @@ fun QuizTabWrapper(
             score = uiState.score,
             total = uiState.quiz?.questions?.size ?: 0,
             onReview = { viewModel.enterReviewMode() },
-            onRetake = { viewModel.retakeCurrentQuiz() },
+            onRetake = { viewModel.startQuiz(uiState.quiz?.title ?: "") },
             onTakeNew = { viewModel.resetQuizSelection() },
             onGoBack = { viewModel.resetQuizSelection() }
         )
@@ -81,7 +80,6 @@ fun UnitSelectionScreen(
     selectedUnit: String?,
     onUnitClicked: (String) -> Unit,
     onStartQuiz: (String, String?) -> Unit,
-    onRetake: (QuizHistoryEntity) -> Unit,
     isLoading: Boolean,
     error: String?
 ) {
@@ -168,94 +166,48 @@ fun UnitSelectionScreen(
 
                 if (history.isNotEmpty()) {
                     item {
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Assessment History", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("Recent Trades (Performance)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
                     }
 
-                    val groupedHistory = history.groupBy { "${it.unitName}|${it.topic ?: ""}" }
-                    items(groupedHistory.keys.toList()) { key ->
-                        val parts = key.split("|")
-                        val unitName = parts[0]
-                        val topic = parts[1].ifBlank { null }
-                        val attempts = groupedHistory[key] ?: emptyList()
-                        
-                        QuizBubble(
-                            title = unitName,
-                            topic = topic,
-                            attempts = attempts,
-                            onRetake = { onRetake(it) }
-                        )
+                    items(history) { record ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(record.unitName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text(
+                                        SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(record.timestamp)),
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                
+                                val pnlColor = if (record.pnlScore >= 70) Color(0xFF4CAF50) else Color(0xFFF44336)
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        "${record.pnlScore.toInt()}%",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 18.sp,
+                                        color = pnlColor
+                                    )
+                                    Text("PnL", fontSize = 10.sp, color = pnlColor)
+                                }
+                            }
+                        }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun QuizBubble(
-    title: String,
-    topic: String?,
-    attempts: List<QuizHistoryEntity>,
-    onRetake: (QuizHistoryEntity) -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        ),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
-            topic?.let {
-                Text("Focus: $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            attempts.take(5).forEach { attempt ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onRetake(attempt) }
-                        .padding(vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.outline)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(attempt.timestamp)),
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    val pnlColor = if (attempt.pnlScore >= 70) Color(0xFF4CAF50) else Color(0xFFF44336)
-                    Text(
-                        "${attempt.pnlScore.toInt()}% PnL",
-                        fontWeight = FontWeight.Bold,
-                        color = pnlColor,
-                        fontSize = 14.sp
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = { onRetake(attempts.first()) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-            ) {
-                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("RETAKE ASSESSMENT", fontSize = 12.sp)
             }
         }
     }
@@ -483,3 +435,5 @@ fun QuizResultScreen(
         }
     }
 }
+
+

@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.ui.screens.student
 
 import androidx.compose.animation.*
@@ -180,3 +181,5 @@ fun TimetableSlotItem(slot: ApiTimetableSlot) {
         }
     }
 }
+
+

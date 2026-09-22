@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.ui.screens.student
 
 import androidx.lifecycle.ViewModel
@@ -109,8 +110,7 @@ class ChatViewModel(
                 val response = aiService.getChatResponse(
                     prompt = text,
                     userContext = user,
-                    history = history,
-                    sessionId = currentSession.id
+                    history = history
                 )
                 
                 // 4. Save AI response to Local DB
@@ -278,3 +278,5 @@ class ChatViewModel(
         }
     }
 }
+
+

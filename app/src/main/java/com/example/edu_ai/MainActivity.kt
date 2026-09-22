@@ -1,3 +1,4 @@
+
 // #file app/src/main/java/com/example/edu_ai/MainActivity.kt
 // #version 1.0.1
 // #The absolute entry point of the app that boots up the navigation UI.
@@ -31,3 +32,5 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+

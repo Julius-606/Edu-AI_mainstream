@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.data.local
 
 import androidx.room.Entity
@@ -10,3 +11,5 @@ data class TimetableEntity(
     val aiBrief: String,
     val timestamp: Long = System.currentTimeMillis()
 )
+
+

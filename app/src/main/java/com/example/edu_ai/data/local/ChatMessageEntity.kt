@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.data.local
 
 import androidx.room.Entity
@@ -23,6 +24,7 @@ data class ChatMessageEntity(
     val userId: String,
     val role: String, // "user" or "model"
     val content: String,
-    val contentHash: String = "",
     val timestamp: Long = System.currentTimeMillis()
 )
+
+

@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.ui.components
 
 import androidx.compose.animation.Crossfade
@@ -76,3 +77,5 @@ fun DynamicBackground(modifier: Modifier = Modifier) {
         }
     }
 }
+
+

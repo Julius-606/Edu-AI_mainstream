@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.data.local
 
 import androidx.room.Embedded
@@ -31,3 +32,5 @@ data class UnitWithModules(
     )
     val modules: List<ModuleWithTopics>
 )
+
+

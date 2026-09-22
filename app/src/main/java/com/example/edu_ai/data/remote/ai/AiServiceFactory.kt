@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.data.remote.ai
 
 /**
@@ -13,3 +14,5 @@ class AiServiceFactory {
         return GeminiAiService()
     }
 }
+
+

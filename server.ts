@@ -23,6 +23,30 @@ function getGemini(): GoogleGenAI | null {
   return geminiClient;
 }
 
+// Safe Gemini AI caller with model fallback and non-crashing error handling
+async function callGeminiSafe(prompt: string, config?: any): Promise<string | null> {
+  const ai = getGemini();
+  if (!ai) return null;
+
+  const modelsToTry = ["gemini-3.8-flash", "gemini-3.1-flash-lite"];
+  for (const model of modelsToTry) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        config
+      });
+      if (response && response.text) {
+        return response.text;
+      }
+    } catch (e: any) {
+      const status = e?.status || e?.code || "busy";
+      console.log(`[AI Engine] ${model} temporary state (${status}), evaluating fallback.`);
+    }
+  }
+  return null;
+}
+
 // ==========================================
 // API ROUTES
 // ==========================================
@@ -79,31 +103,17 @@ app.post("/api/chat/message", async (req, res) => {
     return res.status(400).json({ error: "Message is required" });
   }
 
-  const ai = getGemini();
-  if (ai) {
-    try {
-      const systemInstruction = `You are an elite academic and medical AI consultant for the Trace Learning System.
+  const systemInstruction = `You are an elite academic and medical AI consultant for the Trace Learning System.
 Current Persona: ${persona}.
 Role: Provide rigorous, clinical, evidence-based, or conceptual guidance. Use Socratic questioning, differential diagnosis frameworks, or high-yield physiological explanations as appropriate.
 Formatting: Use Markdown with clear headings, bolding for key clinical terms, and structured bullet points.`;
 
-      const promptContext = history.slice(-6).map((m: any) => `${m.sender.toUpperCase()}: ${m.text}`).join("\n");
-      const fullPrompt = `${promptContext}\nUSER: ${message}\nASSISTANT:`;
+  const promptContext = history.slice(-6).map((m: any) => `${m.sender.toUpperCase()}: ${m.text}`).join("\n");
+  const fullPrompt = `${promptContext}\nUSER: ${message}\nASSISTANT:`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: fullPrompt,
-        config: {
-          systemInstruction
-        }
-      });
-
-      if (response && response.text) {
-        return res.json({ text: response.text });
-      }
-    } catch (e: any) {
-      console.warn("Gemini chat error, falling back to local clinical knowledge engine:", e?.message);
-    }
+  const aiText = await callGeminiSafe(fullPrompt, { systemInstruction });
+  if (aiText) {
+    return res.json({ text: aiText });
   }
 
   // Fallback intelligent responses tailored to medical/academic learning
@@ -133,11 +143,7 @@ Formatting: Use Markdown with clear headings, bolding for key clinical terms, an
 // AI Quiz Generator Endpoint
 app.post("/api/quiz/generate", async (req, res) => {
   const { unitName, topicName, studentLevel = "Year 4 Clinical" } = req.body;
-  const ai = getGemini();
-
-  if (ai) {
-    try {
-      const prompt = `Generate 4 rigorous, clinical or academic multiple-choice questions for unit "${unitName}", topic "${topicName || 'General'}".
+  const prompt = `Generate 4 rigorous, clinical or academic multiple-choice questions for unit "${unitName}", topic "${topicName || 'General'}".
 Student level: ${studentLevel}.
 Format: Return strictly JSON matching this structure:
 {
@@ -152,31 +158,24 @@ Format: Return strictly JSON matching this structure:
   ]
 }`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json"
-        }
-      });
-
-      if (response && response.text) {
-        const parsed = JSON.parse(response.text);
-        if (parsed.questions && parsed.questions.length > 0) {
-          const formatted = parsed.questions.map((q: any, i: number) => ({
-            id: `ai-q-${Date.now()}-${i}`,
-            unitName,
-            topicName: topicName || unitName,
-            question: q.question,
-            options: q.options,
-            correctIndex: typeof q.correctIndex === "number" ? q.correctIndex : 0,
-            explanation: q.explanation || "Clinical rationale confirmed."
-          }));
-          return res.json({ questions: formatted });
-        }
+  const aiText = await callGeminiSafe(prompt, { responseMimeType: "application/json" });
+  if (aiText) {
+    try {
+      const parsed = JSON.parse(aiText);
+      if (parsed.questions && parsed.questions.length > 0) {
+        const formatted = parsed.questions.map((q: any, i: number) => ({
+          id: `ai-q-${Date.now()}-${i}`,
+          unitName,
+          topicName: topicName || unitName,
+          question: q.question,
+          options: q.options,
+          correctIndex: typeof q.correctIndex === "number" ? q.correctIndex : 0,
+          explanation: q.explanation || "Clinical rationale confirmed."
+        }));
+        return res.json({ questions: formatted });
       }
-    } catch (e: any) {
-      console.warn("Gemini quiz generation error, using curated syllabus quiz:", e?.message);
+    } catch {
+      // Non-fatal parse failure
     }
   }
 
@@ -232,26 +231,14 @@ Format: Return strictly JSON matching this structure:
 // AI Zenith Insight Endpoint
 app.post("/api/zenith/insight", async (req, res) => {
   const { username = "Student", activeUnits = [], recentScores = [] } = req.body;
-  const ai = getGemini();
-
-  if (ai) {
-    try {
-      const prompt = `Provide a concise, 2-3 sentence personalized learning trajectory insight and strategic advice for student "${username}".
+  const prompt = `Provide a concise, 2-3 sentence personalized learning trajectory insight and strategic advice for student "${username}".
 Active Units: ${activeUnits.join(", ")}.
 Recent Quiz Performance: ${JSON.stringify(recentScores)}.
 Tone: Professional, inspiring, clinically grounded. Focus on strengths and immediate high-yield next steps.`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: prompt
-      });
-
-      if (response && response.text) {
-        return res.json({ insight: response.text });
-      }
-    } catch (e) {
-      console.warn("Gemini insight error:", e);
-    }
+  const aiText = await callGeminiSafe(prompt);
+  if (aiText) {
+    return res.json({ insight: aiText });
   }
 
   const avg = recentScores.length > 0
@@ -266,26 +253,14 @@ Tone: Professional, inspiring, clinically grounded. Focus on strengths and immed
 // Teacher Report Generator
 app.post("/api/teacher/report/:studentId", async (req, res) => {
   const { studentName, semesterStatus, activeUnits = [], avgScore = 75 } = req.body;
-  const ai = getGemini();
-
-  if (ai) {
-    try {
-      const prompt = `Create a concise, encouraging, and pedagogically sound progress report for ${studentName} (${semesterStatus}).
+  const prompt = `Create a concise, encouraging, and pedagogically sound progress report for ${studentName} (${semesterStatus}).
 Enrolled Units: ${activeUnits.join(", ")}.
 Current average assessment score: ${avgScore}%.
 Translate technical performance rubrics into supportive guidance for student and academic advisors.`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
-        contents: prompt
-      });
-
-      if (response && response.text) {
-        return res.json({ report: response.text });
-      }
-    } catch (e) {
-      console.warn("Gemini teacher report error:", e);
-    }
+  const aiText = await callGeminiSafe(prompt);
+  if (aiText) {
+    return res.json({ report: aiText });
   }
 
   return res.json({

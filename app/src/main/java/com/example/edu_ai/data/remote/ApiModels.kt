@@ -1,29 +1,13 @@
+
 // IDENTITY: data/remote/ApiModels.kt
 package com.example.edu_ai.data.remote
 
 import com.google.gson.annotations.SerializedName
 
-data class SyncRequest(
-    val userId: String,
-    val operations: List<SyncOperation>
-)
-
-data class SyncOperation(
-    val operationId: String,
-    val entityType: String,
-    val entityId: Long,
-    val payload: Map<String, Any?>
-)
-
-data class SyncResponse(
-    val appliedOperationIds: List<String> = emptyList(),
-    val failedOperationIds: List<String> = emptyList()
-)
-
 data class DashboardResponse(
     @SerializedName("username") val username: String? = null,
-    @SerializedName("email") val email: String? = null,
     @SerializedName("role") val role: String? = null,
+    @SerializedName("sensory_mode") val sensoryMode: String? = null,
     @SerializedName("semester_status") val semesterStatus: String? = null,
     @SerializedName("difficulty") val difficulty: String? = null,
     @SerializedName("ai_persona") val aiPersona: String? = null,
@@ -32,17 +16,7 @@ data class DashboardResponse(
     @SerializedName("average_pnl") val averagePnl: Double? = null,
     @SerializedName("total_quizzes") val totalQuizzes: Int? = null,
     @SerializedName("quiz_history") val quizHistory: List<ApiQuizHistory>? = null,
-    @SerializedName("chat_history") val chatHistory: List<ApiChatHistory>? = null,
-    @SerializedName("last_point") val lastPoint: String? = null,
-    @SerializedName("unit_progress") val unitProgress: List<ApiUnitProgress>? = null
-)
-
-data class ApiUnitProgress(
-    @SerializedName("unit_id") val unitId: Int,
-    @SerializedName("unit_name") val unitName: String,
-    @SerializedName("completed_subtopics") val completedSubtopics: Int,
-    @SerializedName("total_subtopics") val totalSubtopics: Int,
-    val percentage: Double
+    @SerializedName("chat_history") val chatHistory: List<ApiChatHistory>? = null
 )
 
 data class ApiUnit(
@@ -178,8 +152,7 @@ data class ChatMessage(
 data class ChatRequest(
     @SerializedName("prompt") val prompt: String,
     @SerializedName("user_id") val user_id: String,
-    @SerializedName("history") val history: List<ChatMessage> = emptyList(),
-    @SerializedName("client_session_id") val clientSessionId: String? = null
+    @SerializedName("history") val history: List<ChatMessage> = emptyList()
 )
 
 data class ChatResponse(
@@ -200,7 +173,6 @@ data class ApiQuizQuestion(
 
 data class ApiQuizResponse(
     @SerializedName("quiz_title") val quiz_title: String,
-    @SerializedName("quiz_id") val quiz_id: Int? = null,
     @SerializedName("questions") val questions: List<ApiQuizQuestion>
 )
 
@@ -222,21 +194,4 @@ data class LibraryUnit(
     @SerializedName("category") val category: String
 )
 
-data class ConnectionMessageRequest(
-    @SerializedName("recipient_id") val recipientId: Int,
-    val content: String
-)
 
-data class ConnectionMessage(
-    val id: Int,
-    @SerializedName("sender_id") val senderId: Int,
-    @SerializedName("recipient_id") val recipientId: Int,
-    val content: String,
-    @SerializedName("created_at") val createdAt: Double
-)
-
-data class LearningContentRequest(
-    @SerializedName("objective_id") val objectiveId: Int,
-    @SerializedName("user_id") val userId: String,
-    val content: String
-)

@@ -1,9 +1,9 @@
+
 package com.example.edu_ai.ui.screens.student
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -26,8 +26,7 @@ import com.example.edu_ai.ui.components.DynamicBackground
 fun LibraryScreen(
     userId: String,
     onBack: () -> Unit,
-    onUnitAdded: () -> Unit,
-    onViewUnitOutline: (Long) -> Unit = {}
+    onUnitAdded: () -> Unit
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as EduAIApplication
@@ -86,29 +85,9 @@ fun LibraryScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    val groupedUnits = uiState.availableUnits
-                        .sortedWith(compareBy({ it.category.lowercase() }, { it.name.lowercase() }))
-                        .groupBy { it.category.ifBlank { "General" } }
-                    groupedUnits.forEach { (category, units) ->
-                        item {
-                            Text(
-                                category,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
-                            )
-                            Text(
-                                "${units.size} curated unit${if (units.size == 1) "" else "s"}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        items(units) { unit ->
+                    items(uiState.availableUnits) { unit ->
                         Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onViewUnitOutline(unit.id.toLong()) },
+                            modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
                             ),
@@ -147,7 +126,6 @@ fun LibraryScreen(
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("ADD")
                                 }
-                                }
                             }
                         }
                     }
@@ -156,3 +134,5 @@ fun LibraryScreen(
         }
     }
 }
+
+

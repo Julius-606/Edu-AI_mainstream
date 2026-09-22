@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.data.local
 
 import androidx.room.Entity
@@ -12,3 +13,5 @@ data class ChatSessionEntity(
     val timestamp: Long = System.currentTimeMillis(),
     val isArchived: Boolean = false
 )
+
+

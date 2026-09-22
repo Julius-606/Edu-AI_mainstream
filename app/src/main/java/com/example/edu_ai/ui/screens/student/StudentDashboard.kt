@@ -1,23 +1,13 @@
+
 package com.example.edu_ai.ui.screens.student
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Quiz
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,415 +29,44 @@ import com.example.edu_ai.data.local.UnitWithModules
 import com.example.edu_ai.data.local.UserEntity
 import com.example.edu_ai.data.remote.ApiTimetableSlot
 import com.example.edu_ai.ui.components.DynamicBackground
-import com.example.edu_ai.ui.components.FormattedText
-import com.example.edu_ai.ui.components.InAppBrowser
 import com.example.edu_ai.ui.components.ProgressRings
 import com.example.edu_ai.ui.components.RingProgress
 import com.example.edu_ai.ui.theme.TraceTheme
-import kotlinx.coroutines.launch
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudentDashboard(
     userId: String,
     onLogout: () -> Unit,
-    onLaunchModule: (Int?) -> Unit,
+    onLaunchModule: () -> Unit,
     onOpenLibrary: () -> Unit,
-    onViewUnitOutline: (Long) -> Unit,
-    onOpenConsultations: () -> Unit,
     viewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    val user = uiState.user ?: UserEntity(id = userId, username = "Student", role = "student", difficulty = "Medium (Standard)", semesterStatus = "Active", aiPersona = "Helper")
+    // Use the userId directly if user entity is not yet loaded in DAO
+    val user = uiState.user ?: UserEntity(id = userId, username = "Student", role = "student", sensoryMode = "Visual", semesterStatus = "Active", aiPersona = "Helper")
 
     val progressViewModel: ProgressViewModel = viewModel(factory = ProgressViewModel.provideFactory(user))
     val recommendation by progressViewModel.recommendation.collectAsState()
-    val progressState by progressViewModel.uiState.collectAsState()
     
     val timetableViewModel: TimetableViewModel = viewModel(factory = TimetableViewModel.provideFactory(user))
     val timetableUiState by timetableViewModel.uiState.collectAsState()
 
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
-
-    var showAccountDialog by remember { mutableStateOf(false) }
-    var showManageUnitsDialog by remember { mutableStateOf(false) }
-    var showArchivesDialog by remember { mutableStateOf(false) }
-    var unitToDelete by remember { mutableStateOf<UnitEntity?>(null) }
-    var activeBrowserUrl by remember { mutableStateOf<String?>(null) }
-    var showSyncDialog by remember { mutableStateOf(false) }
-    var syncStatus by remember { mutableStateOf<String?>(null) }
-
     LaunchedEffect(userId) {
-        viewModel.refreshDashboard(userId, force = true)
+        viewModel.refreshDashboard(userId)
         progressViewModel.refreshRecommendations()
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp)
-                ) {
-                    Text("Trace Navigation", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(user.username, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                        label = { Text("Account") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            showAccountDialog = true
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Archive, contentDescription = null) },
-                        label = { Text("Archives") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            showArchivesDialog = true
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.School, contentDescription = null) },
-                        label = { Text("Manage Units") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            showManageUnitsDialog = true
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null) },
-                        label = { Text("Consultations") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onOpenConsultations()
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Quiz, contentDescription = null) },
-                        label = { Text("Quizzes") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onOpenConsultations()
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Public, contentDescription = null) },
-                        label = { Text("Trace Browser") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            activeBrowserUrl = ""
-                        }
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                        label = { Text("Settings & Sync") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            showSyncDialog = true
-                        }
-                    )
-                }
-            }
-        }
-    ) {
-        StudentDashboardContent(
-            user = user,
-            uiState = uiState,
-            recommendation = recommendation,
-            timetableUiState = timetableUiState,
-            onOpenDrawer = { scope.launch { drawerState.open() } },
-            onLogout = onLogout,
-            onLaunchModule = onLaunchModule,
-            onOpenLibrary = onOpenLibrary,
-            onViewUnitOutline = onViewUnitOutline,
-            onOpenConsultations = onOpenConsultations,
-            onLinkClick = { activeBrowserUrl = it }
-        )
-    }
-
-    activeBrowserUrl?.let { url ->
-        Dialog(
-            onDismissRequest = { activeBrowserUrl = null },
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false
-            )
-        ) {
-            InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
-        }
-
-        if (showSyncDialog) {
-            AlertDialog(
-                onDismissRequest = { showSyncDialog = false },
-                title = { Text("Trace Sync") },
-                text = {
-                    Column {
-                        Text("Back up your local learning trail, compare it with the account, or restore the latest account snapshot. Sync keeps updated active units visible before you continue.")
-                        syncStatus?.let {
-                            Spacer(Modifier.height(12.dp))
-                            Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        scope.launch {
-                            syncStatus = "Syncing local changes..."
-                            viewModel.syncNow(userId)
-                            syncStatus = "Sync complete. Active units and progress are up to date."
-                        }
-                    }) { Text("SYNC NOW") }
-                },
-                dismissButton = {
-                    Row {
-                        TextButton(onClick = {
-                            scope.launch {
-                                syncStatus = "Preparing account restore..."
-                                val unitCount = viewModel.restoreSnapshot(userId)
-                                syncStatus = "Restore snapshot ready: $unitCount units available."
-                            }
-                        }) { Text("RESTORE") }
-                        TextButton(onClick = { showSyncDialog = false }) { Text("CLOSE") }
-                    }
-                }
-            )
-        }
-    }
-
-    // Account Management Dialog
-    if (showAccountDialog) {
-        var username by remember { mutableStateOf(user.username) }
-        var email by remember { mutableStateOf(user.email) }
-        var difficulty by remember { mutableStateOf(user.difficulty) }
-        var aiPersona by remember { mutableStateOf(user.aiPersona) }
-        var semesterStatus by remember { mutableStateOf(user.semesterStatus) }
-
-        AlertDialog(
-            onDismissRequest = { showAccountDialog = false },
-            title = { Text("Account Management") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
-                    
-                    OutlinedTextField(
-                        value = semesterStatus,
-                        onValueChange = { semesterStatus = it },
-                        label = { Text("Academic Level / Semester") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = difficulty,
-                        onValueChange = { difficulty = it },
-                        label = { Text("Target Difficulty") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = aiPersona,
-                        onValueChange = { aiPersona = it },
-                        label = { Text("AI Persona / Consultant Style") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Button(
-                        onClick = {
-                            showAccountDialog = false
-                            onLogout()
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.ExitToApp, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("SIGN OUT / LOGOUT")
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.updateUserProfile(username, email, difficulty, aiPersona, semesterStatus)
-                    showAccountDialog = false
-                }) {
-                    Text("SAVE CHANGES")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAccountDialog = false }) {
-                    Text("CANCEL")
-                }
-            }
-        )
-    }
-
-    // Manage Units Dialog
-    if (showManageUnitsDialog) {
-        AlertDialog(
-            onDismissRequest = { showManageUnitsDialog = false },
-            title = { Text("Manage Ongoing Units") },
-            text = {
-                Column {
-                    Text("Active Units:", fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    if (uiState.units.isEmpty()) {
-                        Text("No active units. Add units from the library.")
-                    } else {
-                        uiState.units.forEach { unit ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(unit.unitName, modifier = Modifier.weight(1f))
-                                IconButton(onClick = { unitToDelete = unit }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Delete Unit", tint = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    showManageUnitsDialog = false
-                    onOpenLibrary()
-                }) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("ADD UNIT")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showManageUnitsDialog = false }) {
-                    Text("CLOSE")
-                }
-            }
-        )
-    }
-
-    // Delete Unit Confirmation Dialog
-    unitToDelete?.let { unit ->
-        AlertDialog(
-            onDismissRequest = { unitToDelete = null },
-            title = { Text("Delete Unit '${unit.unitName}'?") },
-            text = { Text("This will remove this ongoing unit and its associated progress.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.deleteUnit(unit.localId)
-                    unitToDelete = null
-                }) {
-                    Text("DELETE", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { unitToDelete = null }) {
-                    Text("CANCEL")
-                }
-            }
-        )
-    }
-
-    // Archives Dialog
-    if (showArchivesDialog) {
-        Dialog(
-            onDismissRequest = { showArchivesDialog = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("Archives", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
-                            Text("Completed units and their assessment trail", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        TextButton(onClick = { showArchivesDialog = false }) { Text("CLOSE") }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    if (uiState.archivedUnits.isEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No archived units yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    } else {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(uiState.archivedUnits.sortedBy { it.unitName.lowercase() }) { unit ->
-                                val attempts = progressState.quizHistory
-                                    .filter { it.unitName.equals(unit.unitName, ignoreCase = true) }
-                                    .sortedByDescending { it.timestamp }
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
-                                ) {
-                                    Column(Modifier.padding(16.dp)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.Archive, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                            Spacer(Modifier.width(12.dp))
-                                            Text(unit.unitName, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                            TextButton(onClick = { viewModel.archiveUnit(unit.localId, true) }) { Text("RESTORE") }
-                                        }
-                                        Spacer(Modifier.height(8.dp))
-                                        if (attempts.isEmpty()) {
-                                            Text("No quiz attempts saved for this unit.", style = MaterialTheme.typography.bodySmall)
-                                        } else {
-                                            Text("Quiz history", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
-                                            attempts.take(5).forEach { attempt ->
-                                                Row(
-                                                    Modifier.fillMaxWidth().padding(top = 6.dp),
-                                                    horizontalArrangement = Arrangement.SpaceBetween
-                                                ) {
-                                                    Text(
-                                                        java.text.SimpleDateFormat("MMM dd, yyyy HH:mm", java.util.Locale.getDefault())
-                                                            .format(java.util.Date(attempt.timestamp)),
-                                                        style = MaterialTheme.typography.bodySmall
-                                                    )
-                                                    Text("${attempt.pnlScore.toInt()}%", fontWeight = FontWeight.Bold)
-                                                }
-                                            }
-                                        }
-                                        Spacer(Modifier.height(8.dp))
-                                        OutlinedButton(onClick = {
-                                            showArchivesDialog = false
-                                            onViewUnitOutline(unit.localId)
-                                        }) { Text("VIEW UNIT") }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    StudentDashboardContent(
+        user = user,
+        uiState = uiState,
+        recommendation = recommendation,
+        timetableUiState = timetableUiState,
+        onLogout = onLogout,
+        onLaunchModule = onLaunchModule,
+        onOpenLibrary = onOpenLibrary
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -457,25 +76,10 @@ fun StudentDashboardContent(
     uiState: StudentUiState,
     recommendation: String,
     timetableUiState: TimetableUiState,
-    onOpenDrawer: () -> Unit = {},
     onLogout: () -> Unit,
-    onLaunchModule: (Int?) -> Unit,
-    onOpenLibrary: () -> Unit,
-    onViewUnitOutline: (Long) -> Unit,
-    onOpenConsultations: () -> Unit,
-    onLinkClick: (String) -> Unit = {}
+    onLaunchModule: () -> Unit,
+    onOpenLibrary: () -> Unit
 ) {
-    val viewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
-    
-    LaunchedEffect(uiState.unitsWithModules) {
-        uiState.unitsWithModules.forEach { unitWithModules ->
-            val allSubtopics = unitWithModules.modules.flatMap { it.topics }.flatMap { it.subtopics }
-            if (allSubtopics.isNotEmpty() && allSubtopics.all { it.isCompleted }) {
-                viewModel.archiveUnit(unitWithModules.unit.localId, isActive = false)
-            }
-        }
-    }
-    
     Box(modifier = Modifier.fillMaxSize()) {
         DynamicBackground()
 
@@ -483,11 +87,6 @@ fun StudentDashboardContent(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
-                    navigationIcon = {
-                        IconButton(onClick = onOpenDrawer) {
-                            Icon(Icons.Default.Menu, contentDescription = "Open Sidebar Menu")
-                        }
-                    },
                     title = { 
                         Column {
                             Text("Trace Portal", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
@@ -495,8 +94,8 @@ fun StudentDashboardContent(
                         }
                     },
                     actions = {
-                        IconButton(onClick = onOpenConsultations) {
-                            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Consultations", tint = MaterialTheme.colorScheme.primary)
+                        IconButton(onClick = onLogout) {
+                            Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -535,15 +134,13 @@ fun StudentDashboardContent(
                             )
                         }
                         
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                             FilledTonalButton(
-                                onClick = onOpenLibrary,
-                                shape = MaterialTheme.shapes.medium
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("UNIT")
-                            }
+                        FilledTonalButton(
+                            onClick = onOpenLibrary,
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("ADD UNIT")
                         }
                     }
                 }
@@ -568,10 +165,10 @@ fun StudentDashboardContent(
                                 Text("ZENITH INSIGHT", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.height(12.dp))
-                            FormattedText(
-                                text = recommendation,
+                            Text(
+                                recommendation,
                                 style = MaterialTheme.typography.bodyLarge,
-                                onLinkClick = onLinkClick
+                                lineHeight = 22.sp
                             )
                         }
                     }
@@ -590,13 +187,13 @@ fun StudentDashboardContent(
                         ) {
                             Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    "Your library is empty.", 
+                                    "No course data available yet.", 
                                     style = MaterialTheme.typography.bodyMedium,
                                     textAlign = TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Button(onClick = onOpenLibrary) {
-                                    Text("ADD YOUR FIRST UNIT")
+                                Button(onClick = onLaunchModule) {
+                                    Text("EXPLORE COURSES")
                                 }
                             }
                         }
@@ -604,12 +201,10 @@ fun StudentDashboardContent(
                 }
 
                 // Hierarchical Progress Cards
-                items(uiState.unitsWithModules.filter { unitWithModules ->
-                    val allSubtopics = unitWithModules.modules.flatMap { it.topics }.flatMap { it.subtopics }
-                    allSubtopics.isNotEmpty() && allSubtopics.any { !it.isCompleted }
-                }) { unitWithModules ->
+                items(uiState.unitsWithModules) { unitWithModules ->
                     val unit = unitWithModules.unit
                     
+                    // Calculate hierarchical progress
                     val allTopics = unitWithModules.modules.flatMap { it.topics }
                     val allSubtopics = allTopics.flatMap { it.subtopics }
                     
@@ -617,38 +212,18 @@ fun StudentDashboardContent(
                         (allSubtopics.count { it.isCompleted }.toFloat() / allSubtopics.size) * 100f
                     } else 0f
 
-                    var activeModule: ModuleEntity? = null
-                    var activeTopic: TopicEntity? = null
-                    var activeSubtopic: SubtopicEntity? = null
-
-                    outer@ for (mod in unitWithModules.modules) {
-                        for (top in mod.topics) {
-                            for (sub in top.subtopics) {
-                                if (!sub.isCompleted) {
-                                    activeModule = mod.module
-                                    activeTopic = top.topic
-                                    activeSubtopic = sub
-                                    break@outer
-                                }
-                            }
-                        }
-                    }
-
-                    if (activeSubtopic == null && allSubtopics.isNotEmpty()) {
-                        val lastMod = unitWithModules.modules.lastOrNull()
-                        val lastTop = lastMod?.topics?.lastOrNull()
-                        val lastSub = lastTop?.subtopics?.lastOrNull()
-                        activeModule = lastMod?.module
-                        activeTopic = lastTop?.topic
-                        activeSubtopic = lastSub
-                    }
-
-                    val activeModuleWithTopics = unitWithModules.modules.find { it.module.moduleId == activeModule?.moduleId } ?: unitWithModules.modules.firstOrNull()
-                    val activeModuleSubtopics = activeModuleWithTopics?.topics?.flatMap { it.subtopics } ?: emptyList()
+                    // Example: Current Module (First one)
+                    val currentModule = unitWithModules.modules.firstOrNull()
+                    val currentModuleSubtopics = currentModule?.topics?.flatMap { it.subtopics } ?: emptyList()
                     
-                    val moduleProgress = if (activeModuleSubtopics.isNotEmpty()) {
-                        (activeModuleSubtopics.count { it.isCompleted }.toFloat() / activeModuleSubtopics.size) * 100f
+                    val moduleProgress = if (currentModuleSubtopics.isNotEmpty()) {
+                        (currentModuleSubtopics.count { it.isCompleted }.toFloat() / currentModuleSubtopics.size) * 100f
                     } else 0f
+
+                    // Objectives for the center
+                    val objectives = if (currentModuleSubtopics.isNotEmpty()) {
+                        currentModuleSubtopics.map { it.name }
+                    } else listOf("Explore Unit")
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -662,13 +237,13 @@ fun StudentDashboardContent(
                             val rings = listOf(
                                 RingProgress(unitProgress, MaterialTheme.colorScheme.primary, "Unit"),
                                 RingProgress(moduleProgress, MaterialTheme.colorScheme.secondary, "Module"),
-                                RingProgress(if (activeSubtopic?.isCompleted == true) 100f else 0f, MaterialTheme.colorScheme.tertiary, "Subtopic")
+                                RingProgress(30f, MaterialTheme.colorScheme.tertiary, "Subtopic") // Mock sub-module progress
                             )
                             
                             ProgressRings(
                                 rings = rings,
-                                learningObjectives = emptyList(),
-                                modifier = Modifier.size(120.dp)
+                                learningObjectives = objectives,
+                                modifier = Modifier.size(140.dp)
                             )
                             
                             Spacer(modifier = Modifier.width(20.dp))
@@ -677,46 +252,17 @@ fun StudentDashboardContent(
                                 Text(
                                     unit.unitName, 
                                     fontWeight = FontWeight.ExtraBold, 
-                                    fontSize = 20.sp,
-                                    lineHeight = 24.sp,
-                                    modifier = Modifier.clickable { onViewUnitOutline(unit.localId) }
+                                    fontSize = 22.sp,
+                                    lineHeight = 26.sp
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                if (activeSubtopic != null) {
-                                    if (activeModule != null) {
-                                        Text(
-                                            "Module: ${activeModule.name}", 
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.secondary,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-                                    if (activeTopic != null) {
-                                        Text(
-                                            "Topic: ${activeTopic.name}", 
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    Text(
-                                        "Subtopic: ${activeSubtopic.name}", 
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                } else {
-                                    Text(
-                                        "Unit Completed", 
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    currentModule?.module?.name ?: "No Active Module", 
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
                                 Button(
-                                    onClick = { 
-                                        onLaunchModule(activeSubtopic?.subtopicId?.toInt())
-                                    },
+                                    onClick = onLaunchModule,
                                     shape = MaterialTheme.shapes.medium,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
@@ -733,10 +279,7 @@ fun StudentDashboardContent(
                 }
 
                 val today = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault()).format(java.util.Date())
-                val todaysSlots = timetableUiState.weeklyPlan.filter {
-                    it.day.equals(today, ignoreCase = true) ||
-                        it.day.take(3).equals(today.take(3), ignoreCase = true)
-                }.sortedBy { it.time }
+                val todaysSlots = timetableUiState.weeklyPlan.filter { it.day.equals(today, ignoreCase = true) }
 
                 if (todaysSlots.isEmpty()) {
                     item {
@@ -776,42 +319,73 @@ fun StudentDashboardContent(
                         }
                     }
                 }
-
-                // Full Weekly Timetable
-                item {
-                    Text("Weekly Schedule", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                }
-
-                if (timetableUiState.weeklyPlan.isNotEmpty()) {
-                    val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-                    items(days) { day ->
-                        val slotsForDay = timetableUiState.weeklyPlan.filter {
-                            it.day.equals(day, ignoreCase = true) ||
-                                it.day.take(3).equals(day.take(3), ignoreCase = true)
-                        }.sortedBy { it.time }
-                        if (slotsForDay.isNotEmpty()) {
-                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                                Text(day, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                slotsForDay.forEach { slot ->
-                                    Surface(
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                        shape = MaterialTheme.shapes.small
-                                    ) {
-                                        Row(modifier = Modifier.padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("${slot.time}: ${slot.activity}", style = MaterialTheme.typography.bodySmall)
-                                            Text(slot.type, style = MaterialTheme.typography.labelSmall)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
                 
                 item { Spacer(modifier = Modifier.height(40.dp)) }
             }
         }
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+fun StudentDashboardPreview() {
+    val sampleUser = UserEntity(
+        id = "1",
+        username = "Jay",
+        role = "student",
+        sensoryMode = "Visual",
+        semesterStatus = "Year 4 - Semester 2",
+        aiPersona = "Motivator"
+    )
+
+    val sampleUnitsWithModules = listOf(
+        UnitWithModules(
+            unit = UnitEntity(localId = 1L, unitName = "Data Science", isActive = true),
+            modules = listOf(
+                ModuleWithTopics(
+                    module = ModuleEntity(moduleId = 1L, unitId = 1L, name = "Introduction to ML"),
+                    topics = listOf(
+                        TopicWithSubtopics(
+                            topic = TopicEntity(topicId = 1L, moduleId = 1L, name = "Supervised Learning"),
+                            subtopics = listOf(
+                                SubtopicEntity(subtopicId = 1L, topicId = 1L, name = "Regression", isCompleted = true),
+                                SubtopicEntity(subtopicId = 2L, topicId = 1L, name = "Classification", isCompleted = false)
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val sampleStudentUiState = StudentUiState(
+        user = sampleUser,
+        unitsWithModules = sampleUnitsWithModules
+    )
+
+    val sampleTimetableUiState = TimetableUiState(
+        weeklyPlan = listOf(
+            ApiTimetableSlot(
+                day = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault()).format(java.util.Date()),
+                time = "10:00 AM",
+                activity = "ML Lecture",
+                unit = "Data Science",
+                type = "Lecture"
+            )
+        )
+    )
+
+    TraceTheme {
+        StudentDashboardContent(
+            user = sampleUser,
+            uiState = sampleStudentUiState,
+            recommendation = "Keep up the great work! You're making steady progress in Data Science.",
+            timetableUiState = sampleTimetableUiState,
+            onLogout = {},
+            onLaunchModule = {},
+            onOpenLibrary = {}
+        )
+    }
+}
+
+

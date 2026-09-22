@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.ui.components
 
 import androidx.compose.animation.core.*
@@ -75,35 +76,42 @@ fun ProgressRings(
                     size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
-                val markerAngle = Math.toRadians((sweepAngle - 90f).toDouble())
-                val markerRadius = radius
-                drawCircle(
-                    color = ring.color,
-                    radius = 3.dp.toPx(),
-                    center = androidx.compose.ui.geometry.Offset(
-                        center.x + (kotlin.math.cos(markerAngle) * markerRadius).toFloat(),
-                        center.y + (kotlin.math.sin(markerAngle) * markerRadius).toFloat()
-                    )
-                )
             }
         }
 
-        // Center Content: Removed FOCUS as per user request
-        Box(
+        // Center Content: Scrollable Learning Objectives
+        Column(
             modifier = Modifier
                 .size(110.dp)
                 .padding(4.dp),
-            contentAlignment = Alignment.Center
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    "${animatedPercentages.firstOrNull()?.value?.toInt() ?: 0}%",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text("TRACE", fontSize = 9.sp, letterSpacing = 1.5.sp, color = MaterialTheme.colorScheme.outline)
+            Text(
+                text = "FOCUS",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                items(learningObjectives) { objective ->
+                    Text(
+                        text = objective,
+                        fontSize = 9.sp,
+                        lineHeight = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 1.dp)
+                    )
+                }
             }
         }
     }
 }
+
+

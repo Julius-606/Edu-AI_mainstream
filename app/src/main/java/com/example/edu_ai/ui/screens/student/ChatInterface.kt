@@ -1,8 +1,10 @@
+
 package com.example.edu_ai.ui.screens.student
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,7 +14,6 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayCircleFilled
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
@@ -20,18 +21,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.edu_ai.data.remote.ai.ChatMessage
 import com.example.edu_ai.ui.components.FormattedText
-import com.example.edu_ai.ui.components.InAppBrowser
 import kotlinx.coroutines.delay
 import java.util.regex.Pattern
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatInterface(
     viewModel: ChatViewModel,
@@ -40,12 +38,11 @@ fun ChatInterface(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var inputText by remember { mutableStateOf("") }
+    val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var showHistorySheet by remember { mutableStateOf(false) }
-    var activeBrowserUrl by remember { mutableStateOf<String?>(null) }
 
     Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        // Chat Header - Enhanced with Dynamic Title & History Option
+        // Chat Header - Enhanced with Dynamic Title
         Surface(
             tonalElevation = 4.dp,
             shadowElevation = 2.dp,
@@ -71,9 +68,6 @@ fun ChatInterface(
                     )
                 }
                 Row {
-                    IconButton(onClick = { showHistorySheet = true }) {
-                        Icon(Icons.Default.History, contentDescription = "Chat History", tint = MaterialTheme.colorScheme.primary)
-                    }
                     IconButton(onClick = { viewModel.startNewChat() }) {
                         Icon(Icons.Default.Add, contentDescription = "New Chat", tint = MaterialTheme.colorScheme.primary)
                     }
@@ -108,49 +102,6 @@ fun ChatInterface(
             )
         }
 
-        if (showHistorySheet) {
-            ModalBottomSheet(onDismissRequest = { showHistorySheet = false }) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp)
-                ) {
-                    Text("Past Consultation History", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    if (uiState.archivedSessions.isEmpty()) {
-                        Text("No archived consultation sessions.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
-                    } else {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(uiState.archivedSessions) { session ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            viewModel.resumeSession(session)
-                                            showHistorySheet = false
-                                        }
-                                        .padding(vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(session.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                                        session.description?.let {
-                                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                                        }
-                                    }
-                                    IconButton(onClick = { viewModel.deleteSession(session.id) }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Delete Session", tint = MaterialTheme.colorScheme.error)
-                                    }
-                                }
-                                HorizontalDivider()
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         // 1. Message List
         LazyColumn(
             modifier = Modifier
@@ -162,74 +113,11 @@ fun ChatInterface(
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
             items(uiState.messages) { message ->
-                ChatBubble(message, onLinkClick = { activeBrowserUrl = it })
+                ChatBubble(message)
             }
             if (uiState.isTyping) {
                 item {
                     TypingIndicator()
-                }
-            }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            activeBrowserUrl?.let { url ->
-                item {
-                    Dialog(
-                        onDismissRequest = { activeBrowserUrl = null },
-                        properties = DialogProperties(
-                            usePlatformDefaultWidth = false,
-                            decorFitsSystemWindows = false
-                        )
-                    ) {
-                        InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
-                    }
                 }
             }
         }
@@ -321,7 +209,7 @@ fun TypingIndicator() {
 }
 
 @Composable
-fun ChatBubble(message: ChatMessage, onLinkClick: (String) -> Unit) {
+fun ChatBubble(message: ChatMessage) {
     val isUser = message.role == "user"
     val alignment = if (isUser) Alignment.End else Alignment.Start
     val containerColor = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
@@ -342,14 +230,14 @@ fun ChatBubble(message: ChatMessage, onLinkClick: (String) -> Unit) {
             Column(modifier = Modifier.padding(12.dp)) {
                 FormattedText(
                     text = message.content,
-                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
-                    onLinkClick = onLinkClick
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
                 )
                 
+                // Detect YouTube Links
                 val youtubeUrl = extractYoutubeUrl(message.content)
                 if (youtubeUrl != null) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    VideoRecommendationCard(url = youtubeUrl, onClick = onLinkClick)
+                    VideoRecommendationCard(url = youtubeUrl)
                 }
             }
         }
@@ -357,11 +245,15 @@ fun ChatBubble(message: ChatMessage, onLinkClick: (String) -> Unit) {
 }
 
 @Composable
-fun VideoRecommendationCard(url: String, onClick: (String) -> Unit) {
+fun VideoRecommendationCard(url: String) {
+    val context = LocalContext.current
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
         modifier = Modifier.padding(top = 4.dp),
-        onClick = { onClick(url) }
+        onClick = {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            context.startActivity(intent)
+        }
     ) {
         Row(
             modifier = Modifier.padding(8.dp),
@@ -380,3 +272,5 @@ fun extractYoutubeUrl(content: String): String? {
     val matcher = pattern.matcher(content)
     return if (matcher.find()) matcher.group(0) else null
 }
+
+

@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.data.remote.ai
 
 import android.util.Log
@@ -48,3 +49,5 @@ object GeminiKeyManager {
     // Legacy support for older code
     fun getNextKey(): String = rotateKey()
 }
+
+

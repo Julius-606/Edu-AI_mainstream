@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.ui.screens
 
 import android.content.Intent
@@ -16,9 +17,7 @@ import com.example.edu_ai.BuildConfig
 import com.example.edu_ai.data.remote.RetrofitClient
 import com.example.edu_ai.schemas.LoginRequest
 import com.example.edu_ai.utils.PreferenceManager
-import com.example.edu_ai.EduAIApplication
 import kotlinx.coroutines.launch
-import java.io.IOException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,9 +28,6 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
     var isLoading by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
-    val app = context.applicationContext as EduAIApplication
-    val repository = app.repository
-    
     var isDeveloperMode by remember { mutableStateOf(PreferenceManager.isDeveloperMode(context)) }
     val scope = rememberCoroutineScope()
 
@@ -89,26 +85,9 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
                     errorMessage = null
                     scope.launch {
                         try {
-                            // Attempt Online Login
                             val response = RetrofitClient.instance.login(LoginRequest(email, password))
                             PreferenceManager.saveToken(context, response.accessToken)
-                            PreferenceManager.saveLastUserId(context, response.userId)
-                            
-                            // Sync user details to local DB for offline access
-                            repository.syncUserToLocal(response.userId, email, password)
-                            
                             onLoginSuccess(response.role, response.userId)
-                        } catch (e: IOException) {
-                            // Offline or network error - attempt Offline Login
-                            val offlineUser = repository.offlineLogin(email, password)
-                            if (offlineUser != null) {
-                                PreferenceManager.saveLastUserId(context, offlineUser.id)
-                                // We don't have a fresh token, but we might have an old one 
-                                // or the app can function in a limited way.
-                                onLoginSuccess(offlineUser.role, offlineUser.id)
-                            } else {
-                                errorMessage = "Offline login failed. No cached credentials found."
-                            }
                         } catch (e: Exception) {
                             errorMessage = "Login failed: ${e.message}"
                         } finally {
@@ -156,3 +135,5 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
         }
     }
 }
+
+

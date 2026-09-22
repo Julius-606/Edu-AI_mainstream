@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.ui.screens.student
 
 import androidx.compose.foundation.background
@@ -29,16 +30,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
-import com.example.edu_ai.EduAIApplication
-import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.edu_ai.data.local.ChatSessionEntity
 import com.example.edu_ai.data.local.UserEntity
 import com.example.edu_ai.ui.components.FormattedText
-import com.example.edu_ai.ui.components.InAppBrowser
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -56,11 +51,11 @@ fun ModuleScreen(
         studentViewModel.refreshDashboard(userId)
     }
     
-    val tabs = listOf("Chat", "Browser", "Connect", "Quiz")
+    val tabs = listOf("Chat", "Notes", "Vault", "Quiz")
     val icons = listOf(
         Icons.AutoMirrored.Filled.Chat,
-        Icons.Default.AutoAwesome,
-        Icons.Default.AccountCircle,
+        Icons.Default.StickyNote2,
+        Icons.Default.History,
         Icons.Default.LocalFireDepartment
     )
 
@@ -107,9 +102,26 @@ fun ModuleScreen(
                 }
             } else {
                 when (selectedTab) {
-                    0 -> ChatTabWrapper(uiState.user, onNavigateToHistory = { selectedTab = 0 })
-                    1 -> BrowserTab()
-                    2 -> ConnectTab(userId)
+                    0 -> ChatTabWrapper(uiState.user, onNavigateToHistory = { selectedTab = 2 })
+                    1 -> {
+                        if (uiState.user != null) {
+                            val notesViewModel: NotesViewModel = viewModel(
+                                factory = NotesViewModel.provideFactory(uiState.user!!)
+                            )
+                            NotesTab(viewModel = notesViewModel)
+                        }
+                    }
+                    2 -> {
+                        if (uiState.user != null) {
+                             val chatViewModel: ChatViewModel = viewModel(
+                                factory = ChatViewModel.provideFactory(uiState.user!!)
+                            )
+                             ChatHistoryTab(
+                                 viewModel = chatViewModel,
+                                 onSessionSelected = { selectedTab = 0 }
+                             )
+                        }
+                    }
                     3 -> {
                         if (uiState.user != null) {
                             val quizViewModel: QuizViewModel = viewModel(
@@ -140,118 +152,6 @@ fun ChatTabWrapper(user: UserEntity?, onNavigateToHistory: () -> Unit) {
         )
     }
 }
-
-@Composable
-private fun BrowserTab() {
-        var address by remember { mutableStateOf("https://www.google.com") }
-        var activeUrl by remember { mutableStateOf<String?>(null) }
-        val history = remember { mutableStateListOf<String>() }
-
-        if (activeUrl == null) {
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Browser", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = address,
-                        onValueChange = { address = it },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        label = { Text("Web address") }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = {
-                        val target = if (address.startsWith("http")) address else "https://$address"
-                        address = target
-                        history.remove(target)
-                        history.add(0, target)
-                        activeUrl = target
-                    }) { Text("GO") }
-                }
-                Text("Recent pages", style = MaterialTheme.typography.titleMedium)
-                history.forEach { url ->
-                    TextButton(onClick = { address = url; activeUrl = url }) { Text(url, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                }
-            }
-        } else {
-            InAppBrowser(
-                url = activeUrl!!,
-                onClose = { activeUrl = null },
-                onNavigate = { navigated -> if (!history.contains(navigated)) history.add(0, navigated) }
-            )
-        }
-    }
-
-@Composable
-private fun ConnectTab(userId: String) {
-        val context = LocalContext.current
-        val repository = (context.applicationContext as EduAIApplication).repository
-        val scope = rememberCoroutineScope()
-        var recipientId by remember { mutableStateOf("") }
-        var message by remember { mutableStateOf("") }
-        var status by remember { mutableStateOf<String?>(null) }
-        val messages = remember { mutableStateListOf<com.example.edu_ai.data.remote.ConnectionMessage>() }
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("Connect", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Connect and communicate with people in the Trace Environment.")
-            OutlinedTextField(
-                value = recipientId,
-                onValueChange = { recipientId = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Recipient user ID") }
-            )
-            OutlinedTextField(
-                value = message,
-                onValueChange = { message = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Message") }
-            )
-            Button(
-                onClick = {
-                    val recipient = recipientId.toIntOrNull()
-                    if (recipient == null || message.isBlank()) {
-                        status = "Enter a valid recipient ID and message."
-                    } else {
-                        scope.launch {
-                            status = try {
-                                repository.sendConnectionMessage(userId, recipient, message)
-                                message = ""
-                                "Message sent."
-                            } catch (error: Exception) {
-                                error.message ?: "Unable to send message."
-                            }
-                        }
-                    }
-                }
-            ) { Text("SEND") }
-            OutlinedButton(onClick = {
-                val recipient = recipientId.toIntOrNull()
-                if (recipient == null) {
-                    status = "Enter a valid recipient ID to load messages."
-                } else {
-                    scope.launch {
-                        runCatching { repository.getConnectionMessages(userId, recipient) }
-                            .onSuccess {
-                                messages.clear()
-                                messages.addAll(it)
-                                status = "${it.size} messages loaded."
-                            }
-                            .onFailure { status = it.message ?: "Unable to load messages." }
-                    }
-                }
-            }) { Text("LOAD CONVERSATION") }
-            messages.forEach { item ->
-                Text(
-                    text = "${item.senderId}: ${item.content}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-            status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            Text("Your conversations are kept separate from AI consultations.", style = MaterialTheme.typography.bodySmall)
-        }
-    }
 
 @Composable
 fun ChatHistoryTab(
@@ -366,7 +266,6 @@ fun ZenithTab(
     val recommendation by progressViewModel.recommendation.collectAsState()
     val progressUiState by progressViewModel.uiState.collectAsState()
     val timetableUiState by timetableViewModel.uiState.collectAsState()
-    var activeBrowserUrl by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         progressViewModel.refreshRecommendations()
@@ -399,21 +298,19 @@ fun ZenithTab(
                     } else {
                         FormattedText(
                             text = recommendation,
-                            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
-                            onLinkClick = { activeBrowserUrl = it }
+                            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp)
                         )
                     }
                     
                     Spacer(modifier = Modifier.height(20.dp))
                     
                     Button(
-                        onClick = { progressViewModel.refreshRecommendations(force = true) },
+                        onClick = { progressViewModel.refreshRecommendations() },
                         modifier = Modifier.align(Alignment.End)
                     ) {
                         Text("REFRESH STRATEGY")
                     }
                 }
-
             }
         }
 
@@ -452,8 +349,8 @@ fun ZenithTab(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         ProfileInfoRow(label = "Username", value = user.username)
                         ProfileInfoRow(label = "AI Persona", value = user.aiPersona)
-                        ProfileInfoRow(label = "Difficulty", value = user.difficulty)
-                        ProfileInfoRow(label = "Status", value = user.semesterStatus)
+                        ProfileInfoRow(label = "Difficulty", value = user.semesterStatus)
+                        ProfileInfoRow(label = "Sensory Mode", value = user.sensoryMode)
                     }
                 }
             }
@@ -471,17 +368,6 @@ fun ZenithTab(
         }
         
         item { Spacer(modifier = Modifier.height(24.dp)) }
-    }
-    activeBrowserUrl?.let { url ->
-        Dialog(
-            onDismissRequest = { activeBrowserUrl = null },
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false
-            )
-        ) {
-            InAppBrowser(url = url, onClose = { activeBrowserUrl = null })
-        }
     }
 }
 
@@ -615,3 +501,5 @@ fun ProfileInfoRow(label: String, value: String) {
         Text(text = value, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
     }
 }
+
+

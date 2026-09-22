@@ -1,3 +1,4 @@
+
 package com.example.edu_ai
 
 import androidx.test.platform.app.InstrumentationRegistry
@@ -22,3 +23,4 @@ class ExampleInstrumentedTest {
         assertEquals("com.example.edu_ai", appContext.packageName)
     }
 }
+

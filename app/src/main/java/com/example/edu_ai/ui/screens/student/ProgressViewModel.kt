@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.ui.screens.student
 
 import androidx.lifecycle.ViewModel
@@ -40,47 +41,17 @@ class ProgressViewModel(
         initialValue = ProgressUiState(isLoading = true)
     )
 
-    private val _recommendation = MutableStateFlow(user.lastRecommendationText.ifEmpty { "Analyze your recent quizzes to see where you can grow." })
+    private val _recommendation = MutableStateFlow("Analyze your recent quizzes to see where you can grow.")
     val recommendation: StateFlow<String> = _recommendation.asStateFlow()
 
-    init {
+    fun refreshRecommendations() {
         viewModelScope.launch {
-            dao.getUser(user.id).collect { freshUser ->
-                if (freshUser != null && freshUser.lastRecommendationText.isNotEmpty()) {
-                    _recommendation.value = freshUser.lastRecommendationText
-                }
-            }
-        }
-    }
-
-    fun refreshRecommendations(force: Boolean = false) {
-        viewModelScope.launch {
-            val freshUser = dao.getUserById(user.id) ?: user
-            val oneDayInMillis = 24 * 60 * 60 * 1000L
-            val isFresh = (System.currentTimeMillis() - freshUser.lastRecommendationDate) < oneDayInMillis
-            
-            if (!force && isFresh && freshUser.lastRecommendationText.isNotEmpty()) {
-                _recommendation.value = freshUser.lastRecommendationText
-                return@launch
-            }
-
             _isLoading.value = true
             try {
-                val rec = aiService.getRecommendations(freshUser)
+                val rec = aiService.getRecommendations(user)
                 _recommendation.value = rec
-                // Update user in DB
-                dao.insertUser(freshUser.copy(
-                    lastRecommendationText = rec,
-                    lastRecommendationDate = System.currentTimeMillis()
-                ))
             } catch (e: Exception) {
-                if (freshUser.lastRecommendationText.isNotEmpty()) {
-                    _recommendation.value = freshUser.lastRecommendationText
-                } else if (user.lastRecommendationText.isNotEmpty()) {
-                    _recommendation.value = user.lastRecommendationText
-                } else {
-                    _recommendation.value = "Stay consistent! Your next breakthrough is just one study session away."
-                }
+                _recommendation.value = "Stay consistent! Your next breakthrough is just one study session away."
             } finally {
                 _isLoading.value = false
             }
@@ -97,3 +68,5 @@ class ProgressViewModel(
         }
     }
 }
+
+

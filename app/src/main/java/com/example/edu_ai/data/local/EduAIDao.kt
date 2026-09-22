@@ -1,9 +1,8 @@
+
 // IDENTITY: data/local/EduAIDao.kt
 package com.example.edu_ai.data.local
 
 import androidx.room.*
-import com.example.edu_ai.data.local.cas.CasBlobEntity
-import com.example.edu_ai.data.local.cas.CommitLogEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -15,12 +14,6 @@ interface EduAIDao {
 
     @Query("SELECT * FROM users LIMIT 1")
     fun getUser(): Flow<UserEntity?>
-
-    @Query("SELECT * FROM users WHERE id = :userId LIMIT 1")
-    fun getUser(userId: String): Flow<UserEntity?>
-
-    @Query("SELECT * FROM users WHERE email = :email LIMIT 1")
-    suspend fun getUserByEmail(email: String): UserEntity?
     
     @Query("SELECT * FROM users WHERE id = :userId")
     suspend fun getUserById(userId: String): UserEntity?
@@ -32,28 +25,12 @@ interface EduAIDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUnits(units: List<UnitEntity>): List<Long>
 
-    @Query("SELECT * FROM units WHERE userId = :userId AND isActive = 1")
-    fun getAllUnits(userId: String): Flow<List<UnitEntity>>
-
-    @Query("SELECT * FROM units WHERE userId = :userId AND isActive = 0")
-    fun getArchivedUnits(userId: String): Flow<List<UnitEntity>>
+    @Query("SELECT * FROM units")
+    fun getAllUnits(): Flow<List<UnitEntity>>
 
     @Transaction
-    @Query("SELECT * FROM units WHERE userId = :userId AND isActive = 1")
-    fun getAllUnitsWithModules(userId: String): Flow<List<UnitWithModules>>
-
-    @Transaction
-    @Query("SELECT * FROM units WHERE userId = :userId")
-    fun getAllUnitsWithModulesIncludeArchived(userId: String): Flow<List<UnitWithModules>>
-
-    @Query("DELETE FROM units WHERE localId = :unitId")
-    suspend fun deleteUnit(unitId: Long)
-
-    @Query("UPDATE units SET isActive = :isActive WHERE localId = :unitId")
-    suspend fun setUnitActiveStatus(unitId: Long, isActive: Boolean)
-
-    @Query("DELETE FROM units WHERE userId = :userId")
-    suspend fun deleteUnitsForUser(userId: String)
+    @Query("SELECT * FROM units")
+    fun getAllUnitsWithModules(): Flow<List<UnitWithModules>>
 
     @Query("DELETE FROM units")
     suspend fun deleteAllUnits()
@@ -170,50 +147,6 @@ interface EduAIDao {
 
     @Query("DELETE FROM notes")
     suspend fun clearAllNotes()
-
-    // Learning Content
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertLearningContent(content: LearningContentEntity)
-
-    @Query("SELECT * FROM learning_content WHERE subtopicId = :subtopicId ORDER BY timestamp ASC")
-    fun getLearningContentForSubtopic(subtopicId: Long): Flow<List<LearningContentEntity>>
-
-    @Query("DELETE FROM learning_content")
-    suspend fun clearAllLearningContent()
-
-    // Learning bookmarks
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertBookmark(bookmark: BookmarkEntity)
-
-    @Query("SELECT * FROM bookmarks WHERE userId = :userId ORDER BY createdAt DESC")
-    fun getBookmarks(userId: String): Flow<List<BookmarkEntity>>
-
-    @Query("DELETE FROM bookmarks WHERE id = :bookmarkId")
-    suspend fun deleteBookmark(bookmarkId: Long)
-
-    // Sync Operations
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun enqueueSyncOperation(operation: SyncOperationEntity)
-
-    @Query("SELECT * FROM sync_operations WHERE userId = :userId ORDER BY createdAt ASC")
-    suspend fun getPendingSyncOperations(userId: String): List<SyncOperationEntity>
-
-    @Query("DELETE FROM sync_operations WHERE operationId = :operationId")
-    suspend fun deleteSyncOperation(operationId: String)
-
-    // CAS Blobs & Commit Logs
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCasBlob(blob: CasBlobEntity)
-
-    @Query("SELECT * FROM cas_blobs WHERE hash = :hash LIMIT 1")
-    suspend fun getCasBlob(hash: String): CasBlobEntity?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCommitLog(log: CommitLogEntity)
-
-    @Query("SELECT * FROM commit_logs WHERE commitHash = :commitHash LIMIT 1")
-    suspend fun getCommitLog(commitHash: String): CommitLogEntity?
-
-    @Query("SELECT * FROM commit_logs WHERE entityId = :entityId ORDER BY timestamp ASC")
-    fun getCommitLogsForEntity(entityId: String): Flow<List<CommitLogEntity>>
 }
+
+

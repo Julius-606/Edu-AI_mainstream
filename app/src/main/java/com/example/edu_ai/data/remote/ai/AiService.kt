@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.data.remote.ai
 
 import com.example.edu_ai.data.local.QuizHistoryEntity
@@ -16,8 +17,7 @@ class GeminiAiService : AiService {
     override suspend fun getChatResponse(
         prompt: String,
         userContext: UserEntity,
-        history: List<ChatMessage>,
-        sessionId: Int?
+        history: List<ChatMessage>
     ): String {
         return try {
             val apiHistory = history.map { ApiChatMessage(role = it.role, content = it.content) }
@@ -25,8 +25,7 @@ class GeminiAiService : AiService {
                 ChatRequest(
                     prompt = prompt,
                     user_id = userContext.id,
-                    history = apiHistory,
-                    clientSessionId = sessionId?.toString()
+                    history = apiHistory
                 )
             )
             response.response
@@ -54,7 +53,7 @@ class GeminiAiService : AiService {
                     QuizQuestion(q.question_text, q.options, q.correct_option_index, q.explanation)
                 }
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             null
         }
     }
@@ -75,7 +74,7 @@ class GeminiAiService : AiService {
                     timestamp = System.currentTimeMillis()
                 )
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             // Log error
         }
     }
@@ -86,17 +85,19 @@ class GeminiAiService : AiService {
         return try {
             val response = RetrofitClient.instance.getRecommendations(userContext.id)
             response.recommendation
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             "Keep focusing on your active units! Your personalized strategy is being updated."
         }
     }
 }
 
 interface AiService {
-    suspend fun getChatResponse(prompt: String, userContext: UserEntity, history: List<ChatMessage> = emptyList(), sessionId: Int? = null): String
+    suspend fun getChatResponse(prompt: String, userContext: UserEntity, history: List<ChatMessage> = emptyList()): String
     suspend fun generateQuiz(unitName: String, userContext: UserEntity, topic: String? = null): QuizResponse?
     suspend fun recordQuizResult(unitName: String, score: Int, total: Int, userContext: UserEntity)
     suspend fun getRecommendations(userContext: UserEntity): String
 }
 
 data class ChatMessage(val role: String, val content: String)
+
+

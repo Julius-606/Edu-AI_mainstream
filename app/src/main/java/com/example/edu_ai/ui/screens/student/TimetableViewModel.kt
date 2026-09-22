@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.ui.screens.student
 
 import androidx.lifecycle.ViewModel
@@ -61,3 +62,5 @@ class TimetableViewModel(
         }
     }
 }
+
+

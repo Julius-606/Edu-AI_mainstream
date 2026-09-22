@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.schemas
 
 import com.google.gson.annotations.SerializedName
@@ -14,3 +15,5 @@ data class TokenResponse(
     @SerializedName("username") val username: String,
     @SerializedName("role") val role: String
 )
+
+

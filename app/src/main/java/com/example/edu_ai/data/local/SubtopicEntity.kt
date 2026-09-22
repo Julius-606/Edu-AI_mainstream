@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.data.local
 
 import androidx.room.Entity
@@ -23,3 +24,5 @@ data class SubtopicEntity(
     val name: String,
     val isCompleted: Boolean = false
 )
+
+

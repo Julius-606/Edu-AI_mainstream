@@ -1,3 +1,4 @@
+
 // IDENTITY: data/local/UserEntity.kt
 // VERSION: 1.1.0
 // ⚙️ GEAR 1.2: The Local Database (SQLite)
@@ -13,11 +14,9 @@ data class UserEntity(
     @PrimaryKey val id: String,
     val username: String,
     val role: String,
+    val sensoryMode: String,
     val semesterStatus: String,
-    val difficulty: String,
-    val aiPersona: String,
-    val lastRecommendationText: String = "",
-    val lastRecommendationDate: Long = 0,
-    val email: String = "",
-    val passwordHash: String = "" // In a real app, this should be a secure hash
+    val aiPersona: String
 )
+
+

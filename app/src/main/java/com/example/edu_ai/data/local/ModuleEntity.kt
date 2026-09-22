@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.data.local
 
 import androidx.room.Entity
@@ -22,3 +23,5 @@ data class ModuleEntity(
     val unitId: Long,
     val name: String
 )
+
+

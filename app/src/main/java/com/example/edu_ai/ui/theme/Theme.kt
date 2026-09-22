@@ -1,3 +1,4 @@
+
 package com.example.edu_ai.ui.theme
 
 import android.app.Activity
@@ -56,3 +57,4 @@ fun TraceTheme(
         content = content
     )
 }
+

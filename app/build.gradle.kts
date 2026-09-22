@@ -1,3 +1,4 @@
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -20,8 +21,8 @@ android {
         applicationId = "com.example.edu_ai"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 1
+        versionName = "1.0"
 
         buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
         buildConfigField("String", "FALLBACK_BACKEND_BASE_URL", "\"$fallbackBackendBaseUrl\"")
@@ -67,7 +68,6 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.google.generativeai)
     implementation(libs.androidx.security.crypto)
-    implementation(libs.coil.compose)
 
     // Retrofit
     implementation(libs.retrofit)
@@ -93,3 +93,5 @@ dependencies {
 tasks.register("unitTestClasses") {
     dependsOn(tasks.matching { it.name.contains("UnitTestSources") })
 }
+
+
