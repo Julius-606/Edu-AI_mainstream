@@ -194,4 +194,51 @@ data class LibraryUnit(
     @SerializedName("category") val category: String
 )
 
+// --- SYNC & PERSISTENCE MODELS ---
+
+data class SyncOperation(
+    @SerializedName("operationId") val operationId: String,
+    @SerializedName("entityType") val entityType: String,
+    @SerializedName("entityId") val entityId: Any,
+    @SerializedName("payload") val payload: Map<String, Any?>
+)
+
+data class SyncRequest(
+    @SerializedName("userId") val userId: String,
+    @SerializedName("operations") val operations: List<SyncOperation>
+)
+
+data class SyncResponse(
+    @SerializedName("appliedOperationIds") val appliedOperationIds: List<String> = emptyList(),
+    @SerializedName("failedOperationIds") val failedOperationIds: List<String> = emptyList()
+)
+
+data class LearningContentRequest(
+    @SerializedName("objectiveId") val objectiveId: Int,
+    @SerializedName("userId") val userId: String,
+    @SerializedName("content") val content: String
+)
+
+data class ConnectionMessageRequest(
+    @SerializedName("recipientId") val recipientId: Int,
+    @SerializedName("content") val content: String
+)
+
+data class ConnectionMessage(
+    @SerializedName("id") val id: Int,
+    @SerializedName("senderId") val senderId: Int,
+    @SerializedName("recipientId") val recipientId: Int,
+    @SerializedName("content") val content: String,
+    @SerializedName("timestamp") val timestamp: Long
+)
+
+data class LearningSessionResponse(
+    @SerializedName("subtopic_id") val subtopicId: Int,
+    @SerializedName("subtopic_name") val subtopicName: String,
+    @SerializedName("is_completed") val isCompleted: Boolean,
+    @SerializedName("objectives") val objectives: List<ApiLearningObjective> = emptyList(),
+    @SerializedName("current_objective_index") val currentObjectiveIndex: Int = 0
+)
+
+
 

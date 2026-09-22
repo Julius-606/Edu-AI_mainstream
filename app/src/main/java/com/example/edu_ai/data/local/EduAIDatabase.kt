@@ -33,6 +33,29 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
                 "excerpt TEXT NOT NULL, " +
                 "createdAt INTEGER NOT NULL)"
         )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS content_completion (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "userId TEXT NOT NULL, " +
+                "objectiveId TEXT NOT NULL, " +
+                "contentId TEXT NOT NULL, " +
+                "isCompleted INTEGER NOT NULL, " +
+                "lastUpdated INTEGER NOT NULL)"
+        )
+    }
+}
+
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS content_completion (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "userId TEXT NOT NULL, " +
+                "objectiveId TEXT NOT NULL, " +
+                "contentId TEXT NOT NULL, " +
+                "isCompleted INTEGER NOT NULL, " +
+                "lastUpdated INTEGER NOT NULL)"
+        )
     }
 }
 
@@ -55,7 +78,7 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
         CommitLogEntity::class,
         ContentCompletionEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class EduAIDatabase : RoomDatabase() {
