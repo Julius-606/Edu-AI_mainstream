@@ -112,36 +112,6 @@ data class ApiTimetableResponse(
     @SerializedName("ai_brief") val aiBrief: String
 )
 
-// --- AI Content Generation & Objectives ---
-data class CourseObjectiveRequest(
-    @SerializedName("user_id") val userId: String,
-    @SerializedName("objective_id") val objectiveId: String
-)
-
-data class AiGeneratedContentResponse(
-    @SerializedName("objective_id") val objectiveId: String,
-    @SerializedName("content_title") val contentTitle: String,
-    @SerializedName("generated_text") val generatedText: String,
-    @SerializedName("related_content_ids") val relatedContentIds: List<String> = emptyList() // IDs of granular content pieces
-)
-
-data class ContentCompletionSyncRequest(
-    @SerializedName("user_id") val userId: String,
-    val completions: List<ContentCompletionDto>
-)
-
-data class ContentCompletionDto(
-    @SerializedName("objective_id") val objectiveId: String,
-    @SerializedName("content_id") val contentId: String,
-    @SerializedName("is_completed") val isCompleted: Boolean,
-    @SerializedName("last_updated") val lastUpdated: Long
-)
-
-data class ContentCompletionSyncResponse(
-    @SerializedName("applied_completion_ids") val appliedCompletionIds: List<String> = emptyList(),
-    @SerializedName("failed_completion_ids") val failedCompletionIds: List<String> = emptyList()
-)
-
 // --- AI Models ---
 
 data class ChatMessage(
@@ -194,51 +164,5 @@ data class LibraryUnit(
     @SerializedName("category") val category: String
 )
 
-// --- SYNC & PERSISTENCE MODELS ---
 
-data class SyncOperation(
-    @SerializedName("operationId") val operationId: String,
-    @SerializedName("entityType") val entityType: String,
-    @SerializedName("entityId") val entityId: Any,
-    @SerializedName("payload") val payload: Map<String, Any?>
-)
-
-data class SyncRequest(
-    @SerializedName("userId") val userId: String,
-    @SerializedName("operations") val operations: List<SyncOperation>
-)
-
-data class SyncResponse(
-    @SerializedName("appliedOperationIds") val appliedOperationIds: List<String> = emptyList(),
-    @SerializedName("failedOperationIds") val failedOperationIds: List<String> = emptyList()
-)
-
-data class LearningContentRequest(
-    @SerializedName("objectiveId") val objectiveId: Int,
-    @SerializedName("userId") val userId: String,
-    @SerializedName("content") val content: String
-)
-
-data class ConnectionMessageRequest(
-    @SerializedName("recipientId") val recipientId: Int,
-    @SerializedName("content") val content: String
-)
-
-data class ConnectionMessage(
-    @SerializedName("id") val id: Int,
-    @SerializedName("senderId") val senderId: Int,
-    @SerializedName("recipientId") val recipientId: Int,
-    @SerializedName("content") val content: String,
-    @SerializedName("timestamp") val timestamp: Long
-)
-
-data class LearningSessionResponse(
-    @SerializedName("subtopic_id") val subtopicId: Int,
-    @SerializedName("subtopic_name") val subtopicName: String,
-    @SerializedName("is_completed") val isCompleted: Boolean,
-    @SerializedName("objectives") val objectives: List<ApiLearningObjective> = emptyList(),
-    @SerializedName("current_objective_index") val currentObjectiveIndex: Int = 0
-)
-
-
-
+ 

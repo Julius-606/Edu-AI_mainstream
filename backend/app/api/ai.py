@@ -81,3 +81,4 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db)):
     return schemas.RecommendationResponse(recommendation=rec_text or "Keep going!")
 
 
+ 

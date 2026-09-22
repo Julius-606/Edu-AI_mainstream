@@ -134,3 +134,4 @@ def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Dep
     return user_response(user)
 
 
+ 

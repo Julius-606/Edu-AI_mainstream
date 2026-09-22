@@ -1,3 +1,4 @@
+
 package com.example.edu_ai
 
 import org.junit.Test
@@ -15,3 +16,5 @@ class ExampleUnitTest {
         assertEquals(4, 2 + 2)
     }
 }
+
+ 

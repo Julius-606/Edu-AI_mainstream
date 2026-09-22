@@ -36,7 +36,7 @@ app = FastAPI(
 @app.middleware("http")
 async def api_key_middleware(request, call_next):
     # Skip for public/whitelisted endpoints
-    if request.url.path in ["/", "/docs", "/openapi.json", "/signup", "/api/auth/login", "/favicon.ico", "/api/ai/course-objective", "/api/course-objective", "/api/sync/content-completion", "/api/sync"]:
+    if request.url.path in ["/", "/docs", "/openapi.json", "/signup", "/api/auth/login", "/favicon.ico"]:
         return await call_next(request)
 
     # 1. Check for Internal API Key (Legacy/Internal support)
@@ -711,165 +711,10 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db), current_use
 
     return schemas.RecommendationResponse(recommendation=rec_text)
 
-# --- OBJECTIVE CONTENT GENERATION & GRANULAR PERSISTENCE ---
-
-@app.post("/api/ai/course-objective", response_model=schemas.AiGeneratedContentResponse, tags=["AI Intelligence"])
-@app.post("/api/course-objective", response_model=schemas.AiGeneratedContentResponse, tags=["AI Intelligence"])
-def generate_course_objective_content(
-    request: schemas.CourseObjectiveRequest,
-    db: Session = Depends(get_db)
-):
-    user = find_user(request.user_id, db)
-    obj_desc = "Core Course Objective"
-    obj = None
-    if str(request.objective_id).isdigit():
-        obj = db.query(models.LearningObjective).filter(models.LearningObjective.id == int(request.objective_id)).first()
-        if obj:
-            obj_desc = obj.description
-
-    persona = user.ai_persona if user else "Standard Trace"
-    level = user.semester_status if user else "Year 4 - Clinical Rotations"
-    system_instruction = (
-        f"You are {persona}, an expert academic curriculum designer and medical tutor. "
-        f"Target learner level: {level}. "
-        f"Generate clear, objective-driven pedagogical study content that systematically explains this objective. "
-        f"Structure with clear headings, clinical pearls, key mechanisms, and high-yield review takeaways."
-    )
-    prompt = f"Objective ID: {request.objective_id}\nTarget Objective: {obj_desc}\nExplain this objective in depth."
-    generated_text = ai_engine.ask(prompt=prompt, system_instruction=system_instruction)
-    if not generated_text:
-        generated_text = f"## {obj_desc}\n\nKey academic principles, pathophysiology, and clinical mechanisms for objective {request.objective_id}."
-
-    content_record = models.LearningContent(
-        user_id=str(user.id) if user else request.user_id,
-        objective_id=str(request.objective_id),
-        subtopic_id=obj.subtopic_id if obj else None,
-        title=f"Objective Study Guide: {obj_desc[:50]}",
-        content=generated_text,
-        created_at=time.time()
-    )
-    db.add(content_record)
-    db.commit()
-
-    return schemas.AiGeneratedContentResponse(
-        objective_id=str(request.objective_id),
-        content_title=f"Objective Study Guide: {obj_desc[:50]}",
-        generated_text=generated_text,
-        related_content_ids=[str(content_record.id)]
-    )
-
-@app.post("/api/sync/content-completion", response_model=schemas.ContentCompletionSyncResponse, tags=["Content Persistence"])
-@app.post("/api/sync", response_model=schemas.SyncResponse, tags=["Sync Protocol"])
-def sync_content_completion(
-    request: schemas.ContentCompletionSyncRequest,
-    db: Session = Depends(get_db)
-):
-    applied = []
-    failed = []
-    for item in request.completions:
-        try:
-            existing = db.query(models.ContentCompletion).filter(
-                models.ContentCompletion.user_id == str(request.user_id),
-                models.ContentCompletion.objective_id == str(item.objective_id),
-                models.ContentCompletion.content_id == str(item.content_id)
-            ).first()
-            if existing:
-                existing.is_completed = item.is_completed
-                existing.last_updated = item.last_updated
-            else:
-                new_comp = models.ContentCompletion(
-                    user_id=str(request.user_id),
-                    objective_id=str(item.objective_id),
-                    content_id=str(item.content_id),
-                    is_completed=item.is_completed,
-                    last_updated=item.last_updated
-                )
-                db.add(new_comp)
-            applied.append(f"{item.objective_id}_{item.content_id}")
-        except Exception:
-            failed.append(f"{item.objective_id}_{item.content_id}")
-    db.commit()
-    return schemas.ContentCompletionSyncResponse(
-        applied_completion_ids=applied,
-        failed_completion_ids=failed
-    )
-
-@app.get("/api/connections/{user_id}/messages/{with_user_id}", tags=["Connections"])
-def get_connection_messages(user_id: str, with_user_id: int, db: Session = Depends(get_db)):
-    return []
-
-@app.post("/api/connections/{user_id}/messages", tags=["Connections"])
-def send_connection_message(user_id: str, req: schemas.ConnectionMessageRequest, db: Session = Depends(get_db)):
-    return {"status": "sent", "recipient_id": req.recipient_id}
-
-@app.get("/api/learning/session/{subtopic_id}", tags=["Learning Sessions"])
-def get_learning_session(subtopic_id: int, user_id: str = Query(...), db: Session = Depends(get_db)):
-    subtopic = db.query(models.Subtopic).filter(models.Subtopic.id == subtopic_id).first()
-    if not subtopic:
-        raise HTTPException(status_code=404, detail="Subtopic not found")
-    objectives = [
-        {"id": obj.id, "description": obj.description, "is_completed": obj.is_completed}
-        for obj in subtopic.learning_objectives
-    ]
-    return {
-        "subtopic_id": subtopic.id,
-        "subtopic_name": subtopic.name,
-        "is_completed": subtopic.is_completed,
-        "objectives": objectives,
-        "current_objective_index": 0
-    }
-
-@app.post("/api/learning/session/{subtopic_id}/next", tags=["Learning Sessions"])
-def next_objective(subtopic_id: int, user_id: str = Query(...), user_message: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    return {"status": "advanced", "subtopic_id": subtopic_id}
-
-@app.post("/api/learning/session/{subtopic_id}/prev", tags=["Learning Sessions"])
-def previous_objective(subtopic_id: int, user_id: str = Query(...), db: Session = Depends(get_db)):
-    return {"status": "reversed", "subtopic_id": subtopic_id}
-
-@app.post("/api/learning/content", tags=["Learning Sessions"])
-def save_learning_content(req: schemas.LearningContentRequest, db: Session = Depends(get_db)):
-    record = models.LearningContent(
-        user_id=req.userId,
-        objective_id=str(req.objectiveId),
-        title=f"Saved Content for Objective {req.objectiveId}",
-        content=req.content,
-        created_at=time.time()
-    )
-    db.add(record)
-    db.commit()
-    return {"status": "saved", "content_id": record.id}
-
-@app.delete("/api/users/{user_id}/units/{unit_id}", tags=["Units"])
-def delete_user_unit(user_id: str, unit_id: int, db: Session = Depends(get_db)):
-    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
-    if unit:
-        db.delete(unit)
-        db.commit()
-        return {"status": "deleted", "unit_id": unit_id}
-    return {"status": "not_found", "unit_id": unit_id}
-
-@app.get("/api/users/{user_id}/restore", tags=["User State"])
-def restore_user_data(user_id: str, db: Session = Depends(get_db)):
-    user = find_user(user_id, db)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    completions = db.query(models.ContentCompletion).filter(models.ContentCompletion.user_id == str(user.id)).all()
-    units = db.query(models.Unit).filter(models.Unit.owner_id == user.id).all()
-    return {
-        "user_id": user.id,
-        "username": user.username,
-        "role": user.role,
-        "units": [{"id": u.id, "name": u.name} for u in units],
-        "completions": [
-            {"objective_id": c.objective_id, "content_id": c.content_id, "is_completed": c.is_completed}
-            for c in completions
-        ]
-    }
-
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
 
 
+ 

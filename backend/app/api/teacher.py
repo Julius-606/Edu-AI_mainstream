@@ -105,3 +105,4 @@ def send_student_report(student_id: int, db: Session = Depends(get_db)):
     return {"status": "Success", "message": f"Report sent to parent of {student.username}", "ai_summary": ai_summary}
 
 
+ 

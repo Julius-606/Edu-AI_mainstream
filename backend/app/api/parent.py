@@ -33,3 +33,4 @@ def get_parent_dashboard(student_id: str, db: Session = Depends(get_db)):
     )
 
 
+ 

@@ -20,10 +20,8 @@ google-genai
 google-generativeai>=0.7.2
 jinja2==3.1.3
 
-# --- Tunneling & Testing ---
+# --- Tunneling ---
 pyngrok==7.1.6
-requests>=2.31.0
-pytest>=8.0.0
 
 
-
+ 

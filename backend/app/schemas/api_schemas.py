@@ -1,6 +1,6 @@
 
 from pydantic import BaseModel
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any
 
 class UnitBase(BaseModel):
     name: str
@@ -214,53 +214,5 @@ class TokenResponse(BaseModel):
 class RecommendationResponse(BaseModel):
     recommendation: str
 
-# --- Course Objectives & Content Completion ---
-class CourseObjectiveRequest(BaseModel):
-    user_id: str
-    objective_id: str
 
-class AiGeneratedContentResponse(BaseModel):
-    objective_id: str
-    content_title: str
-    generated_text: str
-    related_content_ids: List[str] = []
-
-class ContentCompletionDto(BaseModel):
-    objective_id: str
-    content_id: str
-    is_completed: bool
-    last_updated: float
-
-class ContentCompletionSyncRequest(BaseModel):
-    user_id: str
-    completions: List[ContentCompletionDto]
-
-class ContentCompletionSyncResponse(BaseModel):
-    applied_completion_ids: List[str] = []
-    failed_completion_ids: List[str] = []
-
-class SyncOperationDto(BaseModel):
-    operationId: str
-    entityType: str
-    entityId: Any = 0
-    payload: Dict[str, Any] = {}
-
-class SyncRequest(BaseModel):
-    userId: str
-    operations: List[SyncOperationDto] = []
-
-class SyncResponse(BaseModel):
-    appliedOperationIds: List[str] = []
-    failedOperationIds: List[str] = []
-
-class LearningContentRequest(BaseModel):
-    objectiveId: int
-    userId: str
-    content: str
-
-class ConnectionMessageRequest(BaseModel):
-    recipient_id: int
-    content: str
-
-
-
+ 

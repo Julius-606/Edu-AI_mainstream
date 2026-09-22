@@ -164,37 +164,5 @@ class Timetable(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="timetables")
 
-class ContentCompletion(Base):
-    __tablename__ = "content_completion"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(100), index=True)
-    objective_id = Column(String(100), index=True)
-    content_id = Column(String(100), index=True)
-    is_completed = Column(Boolean, default=False)
-    last_updated = Column(Float, default=0.0)
-
-class LearningContent(Base):
-    __tablename__ = "learning_content"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(100), index=True, nullable=True)
-    objective_id = Column(String(100), index=True, nullable=True)
-    subtopic_id = Column(Integer, nullable=True)
-    title = Column(String(200))
-    content = Column(Text)
-    content_hash = Column(String(100), default="")
-    created_at = Column(Float, default=0.0)
-
-class Bookmark(Base):
-    __tablename__ = "bookmarks"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(100), index=True)
-    subtopic_id = Column(Integer)
-    objective_description = Column(Text)
-    excerpt = Column(Text)
-    created_at = Column(Float, default=0.0)
-
-
-
+ 

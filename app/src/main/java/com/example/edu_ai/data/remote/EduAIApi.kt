@@ -69,60 +69,7 @@ interface EduAIApi {
         @Path("unit_id") unitId: Int,
         @Query("user_id") userId: String
     ): Map<String, String>
-
-    // --- Objective-Driven AI Generation & Persistence ---
-    @POST("api/ai/course-objective")
-    suspend fun getAiGeneratedContent(@Body request: CourseObjectiveRequest): AiGeneratedContentResponse
-
-    @POST("api/sync")
-    suspend fun sync(@Body request: SyncRequest): SyncResponse
-
-    @POST("api/sync/content-completion")
-    suspend fun syncContentCompletion(@Body request: ContentCompletionSyncRequest): ContentCompletionSyncResponse
-
-    @GET("api/connections/{user_id}/messages/{with_user_id}")
-    suspend fun getConnectionMessages(
-        @Path("user_id") userId: String,
-        @Path("with_user_id") withUserId: Int
-    ): List<ConnectionMessage>
-
-    @POST("api/connections/{user_id}/messages")
-    suspend fun sendConnectionMessage(
-        @Path("user_id") userId: String,
-        @Body request: ConnectionMessageRequest
-    ): Map<String, Any?>
-
-    @GET("api/learning/session/{subtopic_id}")
-    suspend fun getLearningSession(
-        @Path("subtopic_id") subtopicId: Int,
-        @Query("user_id") userId: String
-    ): LearningSessionResponse
-
-    @POST("api/learning/session/{subtopic_id}/next")
-    suspend fun nextObjective(
-        @Path("subtopic_id") subtopicId: Int,
-        @Query("user_id") userId: String,
-        @Query("user_message") userMessage: String? = null
-    ): Map<String, Any?>
-
-    @POST("api/learning/session/{subtopic_id}/prev")
-    suspend fun previousObjective(
-        @Path("subtopic_id") subtopicId: Int,
-        @Query("user_id") userId: String
-    ): Map<String, Any?>
-
-    @POST("api/learning/content")
-    suspend fun saveLearningContent(@Body request: LearningContentRequest): Map<String, Any?>
-
-    @retrofit2.http.DELETE("api/users/{user_id}/units/{unit_id}")
-    suspend fun deleteUserUnit(
-        @Path("user_id") userId: String,
-        @Path("unit_id") unitId: Long
-    ): Map<String, Any?>
-
-    @GET("api/users/{user_id}/restore")
-    suspend fun restoreUserData(@Path("user_id") userId: String): Map<String, Any?>
 }
 
 
-
+ 

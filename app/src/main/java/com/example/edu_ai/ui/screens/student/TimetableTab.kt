@@ -183,3 +183,4 @@ fun TimetableSlotItem(slot: ApiTimetableSlot) {
 }
 
 
+ 

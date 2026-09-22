@@ -123,3 +123,4 @@ def record_quiz(history: schemas.QuizRecordRequest, db: Session = Depends(get_db
     return {"status": "Success", "message": "Result recorded."}
 
 
+ 
