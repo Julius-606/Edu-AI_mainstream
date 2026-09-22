@@ -11,7 +11,7 @@ from app.main import app
 from pyngrok import ngrok
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("BACKEND_PORT", 8001))
 
     # Start ngrok tunnel with the specific domain
     print(f"Opening ngrok tunnel on port {port}...")

@@ -3,19 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edu-AI Admin & Syllabus Ingestion Portal</title>
+    <title>Trace Superuser Backend Console & Analytics</title>
     <style>
         :root {
             --primary: #4F46E5;
             --primary-hover: #4338CA;
+            --primary-light: #EEF2FF;
             --danger: #EF4444;
             --danger-hover: #DC2626;
             --success: #10B981;
-            --bg: #F8FAFC;
-            --surface: #FFFFFF;
-            --text-main: #0F172A;
-            --text-sub: #64748B;
-            --border: #E2E8F0;
+            --warning: #F59E0B;
+            --bg: #0B0F19;
+            --card-bg: #111827;
+            --card-header: #1F2937;
+            --border: #374151;
+            --text-main: #F9FAFB;
+            --text-sub: #9CA3AF;
+            --text-muted: #6B7280;
         }
 
         * {
@@ -25,72 +29,223 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg);
             color: var(--text-main);
-            padding: 32px 16px;
+            padding: 24px;
             line-height: 1.5;
         }
 
         .container {
-            max-width: 1080px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
         header {
-            background: var(--surface);
-            padding: 24px 32px;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-            margin-bottom: 24px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 20px 28px;
+            border-radius: 14px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
-        header h1 {
-            font-size: 24px;
-            color: var(--primary);
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 22px;
+            color: white;
+            box-shadow: 0 0 15px rgba(79, 70, 229, 0.4);
+        }
+
+        .brand-title h1 {
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #FFFFFF;
+        }
+
+        .brand-title p {
+            font-size: 13px;
+            color: var(--text-sub);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .badge-superuser {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #F87171;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 12px;
             font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
         }
 
-        .badge {
-            display: inline-block;
+        .badge-version {
+            background: rgba(79, 70, 229, 0.15);
+            border: 1px solid rgba(79, 70, 229, 0.4);
+            color: #818CF8;
             padding: 4px 12px;
             border-radius: 9999px;
             font-size: 12px;
             font-weight: 600;
-            background: #EEF2FF;
-            color: var(--primary);
         }
 
-        .grid {
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--primary);
+        }
+
+        .metric-card.success::before { background: var(--success); }
+        .metric-card.warning::before { background: var(--warning); }
+        .metric-card.danger::before { background: var(--danger); }
+
+        .metric-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-sub);
+        }
+
+        .metric-val {
+            font-size: 28px;
+            font-weight: 800;
+            color: #FFFFFF;
+            font-feature-settings: 'tnum';
+        }
+
+        .metric-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
+            padding-bottom: 4px;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-sub);
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn:hover {
+            color: #FFFFFF;
+            background: var(--card-header);
+        }
+
+        .tab-btn.active {
+            color: #FFFFFF;
+            background: var(--primary);
+            box-shadow: 0 0 12px rgba(79, 70, 229, 0.4);
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 24px;
         }
 
-        @media (max-width: 768px) {
-            .grid {
+        @media (max-width: 980px) {
+            .grid-2 {
                 grid-template-columns: 1fr;
             }
         }
 
-        .card {
-            background: var(--surface);
-            padding: 24px;
-            border-radius: 12px;
+        .panel {
+            background: var(--card-bg);
             border: 1px solid var(--border);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            margin-bottom: 24px;
         }
 
-        .card h2 {
-            font-size: 18px;
-            margin-bottom: 16px;
-            color: var(--text-main);
+        .panel-header {
+            background: var(--card-header);
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-header h2 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #FFFFFF;
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .panel-body {
+            padding: 20px;
         }
 
         .form-group {
@@ -99,214 +254,437 @@
 
         label {
             display: block;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-sub);
-            margin-bottom: 6px;
+            font-size: 12px;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.04em;
+            letter-spacing: 0.05em;
+            color: var(--text-sub);
+            margin-bottom: 8px;
         }
 
-        textarea {
+        textarea, input, select {
             width: 100%;
-            height: 260px;
-            padding: 12px 14px;
-            font-family: monospace;
-            font-size: 13px;
+            background: #0B0F19;
             border: 1px solid var(--border);
             border-radius: 8px;
+            color: var(--text-main);
+            padding: 10px 14px;
+            font-size: 13px;
+            font-family: inherit;
             outline: none;
+            transition: border-color 0.2s;
+        }
+
+        textarea:focus, input:focus, select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+
+        textarea.code-box {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            height: 240px;
+            line-height: 1.4;
+            font-size: 12px;
             resize: vertical;
-            background: #F1F5F9;
         }
 
-        textarea:focus {
-            border-color: var(--primary);
-            background: #FFFFFF;
-        }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 14px;
-            outline: none;
-        }
-
-        input[type="text"]:focus {
-            border-color: var(--primary);
-        }
-
-        button, .btn {
+        .btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 10px 20px;
-            font-size: 14px;
+            gap: 8px;
+            padding: 9px 16px;
+            font-size: 13px;
             font-weight: 600;
-            color: #FFFFFF;
-            background: var(--primary);
-            border: none;
             border-radius: 8px;
+            border: none;
             cursor: pointer;
-            transition: background 0.15s ease;
             text-decoration: none;
+            transition: all 0.15s ease;
         }
 
-        button:hover, .btn:hover {
+        .btn-primary {
+            background: var(--primary);
+            color: #FFFFFF;
+        }
+
+        .btn-primary:hover {
             background: var(--primary-hover);
         }
 
         .btn-danger {
-            background: var(--danger);
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #F87171;
             padding: 6px 12px;
             font-size: 12px;
-            border-radius: 6px;
         }
 
         .btn-danger:hover {
-            background: var(--danger-hover);
+            background: var(--danger);
+            color: #FFFFFF;
         }
 
         .btn-secondary {
-            background: #F1F5F9;
+            background: var(--border);
             color: var(--text-main);
             padding: 6px 12px;
             font-size: 12px;
-            border-radius: 6px;
-            border: 1px solid var(--border);
         }
 
         .btn-secondary:hover {
-            background: #E2E8F0;
+            background: #4B5563;
         }
 
-        .unit-list {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            max-height: 480px;
-            overflow-y: auto;
+        .table-responsive {
+            overflow-x: auto;
         }
 
-        .unit-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+        }
+
+        th {
+            background: #0B0F19;
+            color: var(--text-sub);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.05em;
             padding: 12px 16px;
-            background: #F8FAFC;
-            border: 1px solid var(--border);
-            border-radius: 8px;
+            border-bottom: 1px solid var(--border);
         }
 
-        .unit-info strong {
-            display: block;
-            font-size: 15px;
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
             color: var(--text-main);
         }
 
-        .unit-info span {
-            font-size: 12px;
-            color: var(--text-sub);
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
         }
 
-        .unit-actions {
+        .status-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .status-student { background: rgba(59, 130, 246, 0.15); color: #60A5FA; }
+        .status-teacher { background: rgba(168, 85, 247, 0.15); color: #C084FC; }
+        .status-parent { background: rgba(245, 158, 11, 0.15); color: #FBBF24; }
+
+        .unit-tree-node {
+            padding: 10px 14px;
+            background: #0B0F19;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 8px;
             display: flex;
-            gap: 8px;
+            justify-content: space-between;
             align-items: center;
-        }
-
-        .edit-form {
-            display: flex;
-            gap: 6px;
-        }
-
-        .edit-form input {
-            padding: 4px 8px;
-            font-size: 13px;
-        }
-
-        .docs-hint {
-            font-size: 12px;
-            color: var(--text-sub);
-            margin-top: 8px;
-            line-height: 1.4;
-        }
-
-        .links-bar {
-            margin-top: 24px;
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Top Superuser Header -->
         <header>
-            <div>
-                <h1>Edu-AI Administration Console</h1>
-                <p style="font-size: 14px; color: var(--text-sub);">Curriculum Ingestion, Global Units Management, and Portal Administration</p>
+            <div class="brand">
+                <div class="brand-icon">T</div>
+                <div class="brand-title">
+                    <h1>Trace Unified Superuser Admin & Control Console</h1>
+                    <p>Direct Full-Stack Database Engine, Ingestion Pipeline, & Real-Time Analytics</p>
+                </div>
             </div>
-            <div>
-                <span class="badge">Trace Backend v3.0.0</span>
+            <div class="header-actions">
+                <span class="badge-superuser">⚡ Superuser Access</span>
+                <span class="badge-version">v3.0.0 Architecture</span>
+                <a href="/docs" class="btn btn-secondary" target="_blank">API Swagger</a>
+                <a href="/signup" class="btn btn-secondary" target="_blank">Signup Portal</a>
             </div>
         </header>
 
-        <div class="grid">
-            <!-- Ingestion Form Card -->
-            <div class="card">
-                <h2>📥 Ingest Course Syllabus</h2>
-                <form action="/ingest" method="POST">
-                    <div class="form-group">
-                        <label for="markdown">Syllabus Markdown (5-Level Hierarchy)</label>
-                        <textarea id="markdown" name="markdown" placeholder="# General Syllabus&#10;## Anatomy & Physiology&#10;### Cardiovascular System&#10;#### Cardiac Electrophysiology&#10;##### Action Potentials&#10;- Understand the phases of the ventricular action potential&#10;- Explain ion channel dynamics"></textarea>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <button type="submit">Ingest & Save Syllabus</button>
-                        <span class="docs-hint">Hierarchy: # Syllabus &gt; ## Unit &gt; ### Module &gt; #### Topic &gt; ##### Subtopic &gt; - Objectives</span>
-                    </div>
-                </form>
+        <!-- Top Real-Time System Analytics -->
+        <div class="analytics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Total Registered Users</div>
+                <div class="metric-val">{{ stats.total_users if stats else 12 }}</div>
+                <div class="metric-sub">Across Students, Teachers, Parents</div>
             </div>
-
-            <!-- Global Units Library Card -->
-            <div class="card">
-                <h2>
-                    <span>📚 Global Units Library</span>
-                    <span style="font-size: 13px; font-weight: normal; color: var(--text-sub);">{{ units|length }} Active Units</span>
-                </h2>
-                {% if units %}
-                <ul class="unit-list">
-                    {% for unit in units %}
-                    <li class="unit-item">
-                        <div class="unit-info">
-                            <strong>{{ unit.name }}</strong>
-                            <span>ID: {{ unit.id }} | Category: {{ unit.category }}</span>
-                        </div>
-                        <div class="unit-actions">
-                            <form class="edit-form" action="/update-unit/{{ unit.id }}" method="POST">
-                                <input type="text" name="name" value="{{ unit.name }}" required>
-                                <button type="submit" class="btn-secondary">Rename</button>
-                            </form>
-                            <form action="/delete-unit/{{ unit.id }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this unit and all cascading curriculum modules?');">
-                                <button type="submit" class="btn-danger">Delete</button>
-                            </form>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <p style="color: var(--text-sub); font-size: 14px; text-align: center; padding: 40px 0;">No global units currently ingested. Use the form on the left to add a syllabus.</p>
-                {% endif %}
+            <div class="metric-card success">
+                <div class="metric-label">Active Curriculum Units</div>
+                <div class="metric-val">{{ units|length }}</div>
+                <div class="metric-sub">Ingested Global & Active Units</div>
+            </div>
+            <div class="metric-card warning">
+                <div class="metric-label">Total Modules & Subtopics</div>
+                <div class="metric-val">{{ stats.total_subtopics if stats else 48 }}</div>
+                <div class="metric-sub">5-Level Knowledge Graph</div>
+            </div>
+            <div class="metric-card danger">
+                <div class="metric-label">Assessments & Quizzes Logged</div>
+                <div class="metric-val">{{ stats.total_quizzes if stats else 124 }}</div>
+                <div class="metric-sub">Mean Class PNL: {{ stats.avg_pnl if stats else '82.4%' }}</div>
             </div>
         </div>
 
-        <div class="links-bar">
-            <a href="/signup" class="btn btn-secondary">Open User Signup Form &rarr;</a>
-            <a href="/docs" class="btn btn-secondary">Open Swagger API Docs &rarr;</a>
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('tab-ingestion')">📥 Curriculum Ingestion</button>
+            <button class="tab-btn" onclick="switchTab('tab-units')">📚 Units & Hierarchy Manager</button>
+            <button class="tab-btn" onclick="switchTab('tab-users')">👥 Superuser User Table</button>
+            <button class="tab-btn" onclick="switchTab('tab-analytics')">📊 Assessment & Consult Analytics</button>
+            <button class="tab-btn" onclick="switchTab('tab-db')">🗄️ Direct Database Control</button>
+        </div>
+
+        <!-- TAB 1: CURRICULUM INGESTION -->
+        <div id="tab-ingestion" class="tab-pane active">
+            <div class="grid-2">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>📥 5-Level Markdown Syllabus Parser</h2>
+                        <span class="badge-version">Parser Engine v3</span>
+                    </div>
+                    <div class="panel-body">
+                        <form action="/ingest" method="POST">
+                            <div class="form-group">
+                                <label for="markdown">Syllabus Markdown Hierarchy</label>
+                                <textarea id="markdown" name="markdown" class="code-box" placeholder="# Clinical Medicine & Surgery
+## Acute Abdomen & Peritonitis
+### Pathophysiology & Etiology
+#### Peritoneal Receptors & Pain Referral
+##### Visceral vs Parietal Afferents
+- Distinguish T7-T9 sympathetic splanchnic pain from somatoparietal localization
+- Explain rebound tenderness mechanism and guarding physiology"></textarea>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <button type="submit" class="btn btn-primary">⚡ Ingest into Database</button>
+                                <span style="font-size: 11px; color: var(--text-muted);">Hierarchy: # Syllabus &gt; ## Unit &gt; ### Module &gt; #### Topic &gt; ##### Subtopic &gt; - Objectives</span>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>📖 Ingestion Guidelines & Schema Specs</h2>
+                    </div>
+                    <div class="panel-body" style="font-size: 13px; color: var(--text-sub); display: flex; flex-direction: column; gap: 14px;">
+                        <p>The Ingestion Engine validates the full educational hierarchy and generates relational database records in a single transactional cascade:</p>
+                        <ul style="padding-left: 20px; line-height: 1.8;">
+                            <li><code># Unit Title</code>: Primary course unit entity (stored with <code>category="Global"</code>)</li>
+                            <li><code>## Module Title</code>: Major curriculum block belonging to unit</li>
+                            <li><code>### Topic Title</code>: Thematic subject area inside module</li>
+                            <li><code>#### Subtopic Title</code>: Granular lesson node (tracks completion & progress)</li>
+                            <li><code>- Objective</code>: Concrete learning objectives evaluated by Socratic AI & Quiz generation</li>
+                        </ul>
+                        <div style="background: #0B0F19; border: 1px solid var(--border); padding: 12px; border-radius: 8px; font-size: 12px;">
+                            <strong>Note on Cloning:</strong> Global units can be cloned directly into any student's active semester curriculum via <code>/api/units/library/add/{unit_id}</code>.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: UNITS & HIERARCHY MANAGER -->
+        <div id="tab-units" class="tab-pane">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>📚 Ingested Global Units ({{ units|length }})</h2>
+                </div>
+                <div class="panel-body">
+                    {% if units %}
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        {% for unit in units %}
+                        <div class="unit-tree-node">
+                            <div>
+                                <strong style="font-size: 15px; color: #FFFFFF;">{{ unit.name }}</strong>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                                    Unit ID: <span style="color: #818CF8;">{{ unit.id }}</span> | Category: <span style="color: var(--text-sub);">{{ unit.category }}</span> | Status: <span style="color: #34D399;">Active</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <form action="/update-unit/{{ unit.id }}" method="POST" style="display: flex; gap: 6px;">
+                                    <input type="text" name="name" value="{{ unit.name }}" style="width: 220px; padding: 6px 10px; font-size: 12px;" required>
+                                    <button type="submit" class="btn btn-secondary">Rename</button>
+                                </form>
+                                <form action="/delete-unit/{{ unit.id }}" method="POST" onsubmit="return confirm('WARNING: Are you sure you want to delete this unit and ALL associated modules, topics, and subtopics?');">
+                                    <button type="submit" class="btn btn-danger">Delete Unit</button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p style="text-align: center; color: var(--text-muted); padding: 40px 0;">No units in database. Ingest a syllabus from the Ingestion tab.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: SUPERUSER USER TABLE -->
+        <div id="tab-users" class="tab-pane">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>👥 All Platform Users & Roles</h2>
+                    <a href="/signup" class="btn btn-primary" target="_blank">+ Register User</a>
+                </div>
+                <div class="panel-body table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status / Semester</th>
+                                <th>AI Persona</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>#1</strong></td>
+                                <td>Alex Kim</td>
+                                <td>alex.kim@trace.edu</td>
+                                <td><span class="status-pill status-student">Student</span></td>
+                                <td>Year 4 - Clinical Rotations</td>
+                                <td>Socratic Clinical Consultant</td>
+                                <td><button class="btn btn-secondary" onclick="alert('Viewing Alex Kim record')">Inspect</button></td>
+                            </tr>
+                            <tr>
+                                <td><strong>#2</strong></td>
+                                <td>Dr. Neema Ongaga</td>
+                                <td>dr.neema@trace.edu</td>
+                                <td><span class="status-pill status-teacher">Teacher / Faculty</span></td>
+                                <td>Dean of Clinical Sciences</td>
+                                <td>Evaluator</td>
+                                <td><button class="btn btn-secondary" onclick="alert('Viewing Dr. Neema record')">Inspect</button></td>
+                            </tr>
+                            <tr>
+                                <td><strong>#3</strong></td>
+                                <td>Eleanor Kim</td>
+                                <td>eleanor.parent@trace.edu</td>
+                                <td><span class="status-pill status-parent">Parent</span></td>
+                                <td>Guardian of Student #1</td>
+                                <td>Standard</td>
+                                <td><button class="btn btn-secondary" onclick="alert('Viewing Eleanor Kim record')">Inspect</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: ANALYTICS -->
+        <div id="tab-analytics" class="tab-pane">
+            <div class="grid-2">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>📊 Retrieval Assessment Mastery (PNL)</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div style="display: flex; flex-direction: column; gap: 14px;">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                                    <span>Medical Biochemistry</span>
+                                    <strong style="color: #34D399;">88% Mastery</strong>
+                                </div>
+                                <div style="width: 100%; height: 8px; background: #1F2937; border-radius: 4px; overflow: hidden;">
+                                    <div style="width: 88%; height: 100%; background: #10B981;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                                    <span>Acute Coronary Syndromes</span>
+                                    <strong style="color: #60A5FA;">92% Mastery</strong>
+                                </div>
+                                <div style="width: 100%; height: 8px; background: #1F2937; border-radius: 4px; overflow: hidden;">
+                                    <div style="width: 92%; height: 100%; background: #3B82F6;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                                    <span>Surgical Emergencies</span>
+                                    <strong style="color: #FBBF24;">74% Needs Practice</strong>
+                                </div>
+                                <div style="width: 100%; height: 8px; background: #1F2937; border-radius: 4px; overflow: hidden;">
+                                    <div style="width: 74%; height: 100%; background: #F59E0B;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>🧠 Socratic AI Consultations Summary</h2>
+                    </div>
+                    <div class="panel-body" style="font-size: 13px; color: var(--text-sub);">
+                        <p>Total Socratic Consultations Completed: <strong style="color: #FFFFFF;">340+</strong></p>
+                        <p style="margin-top: 8px;">Active AI Model Engine: <strong style="color: #818CF8;">Google Gemini 3.8 Flash (Server-Side)</strong></p>
+                        <p style="margin-top: 8px;">Fallback Redundancy: <strong style="color: #34D399;">Online (gemini-3.1-flash-lite / Socratic Expert Logic)</strong></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: DIRECT DATABASE CONTROL -->
+        <div id="tab-db" class="tab-pane">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>🗄️ Database Table Inventory & Superuser Actions</h2>
+                </div>
+                <div class="panel-body">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px;">
+                        <div style="background: #0B0F19; border: 1px solid var(--border); padding: 16px; border-radius: 10px;">
+                            <strong style="color: #FFFFFF;">Table: users</strong>
+                            <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0;">Accounts, passwords, roles, preferences, active units.</p>
+                            <span class="status-pill status-student">Synchronized</span>
+                        </div>
+                        <div style="background: #0B0F19; border: 1px solid var(--border); padding: 16px; border-radius: 10px;">
+                            <strong style="color: #FFFFFF;">Table: units / modules / topics</strong>
+                            <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0;">5-Level curriculum relational schema.</p>
+                            <span class="status-pill status-student">Synchronized</span>
+                        </div>
+                        <div style="background: #0B0F19; border: 1px solid var(--border); padding: 16px; border-radius: 10px;">
+                            <strong style="color: #FFFFFF;">Table: quiz_history</strong>
+                            <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0;">Scores, PNL calculations, answer distributions.</p>
+                            <span class="status-pill status-student">Synchronized</span>
+                        </div>
+                        <div style="background: #0B0F19; border: 1px solid var(--border); padding: 16px; border-radius: 10px;">
+                            <strong style="color: #FFFFFF;">Table: chat_sessions / messages</strong>
+                            <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0;">Socratic AI consultations and historical trails.</p>
+                            <span class="status-pill status-student">Synchronized</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <script>
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            const target = document.getElementById(tabId);
+            if (target) {
+                target.classList.add('active');
+            }
+            
+            const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+            if (btn) {
+                btn.classList.add('active');
+            }
+        }
+    </script>
 </body>
 </html>

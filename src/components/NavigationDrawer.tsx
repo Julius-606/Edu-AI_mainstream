@@ -11,7 +11,8 @@ import {
   Settings,
   LogOut,
   GraduationCap,
-  Users
+  Users,
+  ShieldAlert
 } from 'lucide-react';
 import { User, UserRole } from '../types';
 
@@ -156,6 +157,18 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
             <Globe className="w-4 h-4 text-blue-400" />
             <span>Trace Browser</span>
           </button>
+          {user.role === 'Admin' && (
+            <button
+              onClick={() => {
+                onSelectTab('dashboard');
+                onClose();
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-red-300 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors font-semibold"
+            >
+              <ShieldAlert className="w-4 h-4 text-red-400" />
+              <span>Superuser Console</span>
+            </button>
+          )}
 
           <div className="px-3 pt-4 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
             Account & Curriculum
@@ -209,8 +222,8 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
           <div className="px-3 pt-4 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
             Switch Perspective
           </div>
-          <div className="grid grid-cols-3 gap-1 px-1 py-1">
-            {(['Student', 'Teacher', 'Parent'] as UserRole[]).map((r) => (
+          <div className="grid grid-cols-4 gap-1 px-1 py-1">
+            {(['Student', 'Teacher', 'Parent', 'Admin'] as UserRole[]).map((r) => (
               <button
                 key={r}
                 onClick={() => {

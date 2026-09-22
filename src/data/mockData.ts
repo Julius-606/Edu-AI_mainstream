@@ -33,6 +33,17 @@ export const INITIAL_USERS: User[] = [
     aiPersona: "Supportive Education Consultant",
     sensoryMode: "Standard",
     activeUnits: ["Biochemistry II", "General Surgery", "Internal Medicine"]
+  },
+  {
+    id: "4",
+    username: "Admin Root",
+    email: "admin@trace.edu",
+    role: "Admin",
+    difficulty: "Superuser",
+    semesterStatus: "System Administration & Oversight",
+    aiPersona: "System Architect & Lead Consultant",
+    sensoryMode: "Standard",
+    activeUnits: ["Biochemistry II", "General Surgery", "Internal Medicine", "Pathology & Diagnostics"]
   }
 ];
 

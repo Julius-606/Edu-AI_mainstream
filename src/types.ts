@@ -1,4 +1,4 @@
-export type UserRole = 'Student' | 'Teacher' | 'Parent';
+export type UserRole = 'Student' | 'Teacher' | 'Parent' | 'Admin';
 
 export interface User {
   id: string;
@@ -133,4 +133,20 @@ export interface StudentProgressSummary {
   totalSubtopics: number;
   isAtRisk: boolean;
   riskReason?: string;
+}
+
+
+export interface SystemLogEntry {
+  id: string;
+  timestamp: number;
+  level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG';
+  source: 'FastAPI Backend' | 'Express Node' | 'AI Engine' | 'Database Engine';
+  method: string;
+  endpoint: string;
+  statusCode: number;
+  durationMs: number;
+  ip: string;
+  message: string;
+  payloadSnippet?: string;
+  errorStack?: string;
 }

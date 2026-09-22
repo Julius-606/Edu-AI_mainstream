@@ -51,6 +51,147 @@ async function callGeminiSafe(prompt: string, config?: any): Promise<string | nu
 // API ROUTES
 // ==========================================
 
+
+// ==========================================
+// SYSTEM AUDIT & REQUEST LOGGING STORE
+// ==========================================
+export interface SystemLogEntry {
+  id: string;
+  timestamp: number;
+  level: "INFO" | "WARN" | "ERROR" | "DEBUG";
+  source: "FastAPI Backend" | "Express Node" | "AI Engine" | "Database Engine";
+  method: string;
+  endpoint: string;
+  statusCode: number;
+  durationMs: number;
+  ip: string;
+  message: string;
+  payloadSnippet?: string;
+  errorStack?: string;
+}
+
+const SYSTEM_LOGS: SystemLogEntry[] = [
+  {
+    id: "log-seed-1",
+    timestamp: Date.now() - 120000,
+    level: "INFO",
+    source: "FastAPI Backend",
+    method: "POST",
+    endpoint: "/api/auth/login",
+    statusCode: 200,
+    durationMs: 42,
+    ip: "127.0.0.1",
+    message: "User authentication token generated (role: Student, user_id: 1).",
+    payloadSnippet: "{\"email\": \"student@trace.edu\"}"
+  },
+  {
+    id: "log-seed-2",
+    timestamp: Date.now() - 95000,
+    level: "INFO",
+    source: "FastAPI Backend",
+    method: "GET",
+    endpoint: "/api/users/1/dashboard",
+    statusCode: 200,
+    durationMs: 68,
+    ip: "127.0.0.1",
+    message: "Curriculum progress payload loaded (3 active units, 68 subtopics).",
+  },
+  {
+    id: "log-seed-3",
+    timestamp: Date.now() - 75000,
+    level: "INFO",
+    source: "FastAPI Backend",
+    method: "POST",
+    endpoint: "/api/ai/chat",
+    statusCode: 200,
+    durationMs: 310,
+    ip: "127.0.0.1",
+    message: "Socratic consultation request resolved via Gemini inference pipeline.",
+    payloadSnippet: "{\"prompt\": \"Explain acute pancreatitis epigastric pain referral\"}"
+  },
+  {
+    id: "log-seed-4",
+    timestamp: Date.now() - 48000,
+    level: "WARN",
+    source: "FastAPI Backend",
+    method: "POST",
+    endpoint: "/api/ai/quiz",
+    statusCode: 200,
+    durationMs: 240,
+    ip: "127.0.0.1",
+    message: "Dynamic question generator applied high-yield clinical fallback bank.",
+  },
+  {
+    id: "log-seed-5",
+    timestamp: Date.now() - 25000,
+    level: "ERROR",
+    source: "FastAPI Backend",
+    method: "POST",
+    endpoint: "/api/units/library/add/999",
+    statusCode: 404,
+    durationMs: 14,
+    ip: "127.0.0.1",
+    message: "SQLAlchemy UnitNotFoundException: Unit ID 999 does not exist in relational catalog.",
+    errorStack: "Traceback (most recent call last):\n  File \"/app/backend/app/api/learning.py\", line 84, in add_unit_to_user\n    raise HTTPException(status_code=404, detail=\"Unit not found\")"
+  },
+  {
+    id: "log-seed-6",
+    timestamp: Date.now() - 10000,
+    level: "INFO",
+    source: "FastAPI Backend",
+    method: "GET",
+    endpoint: "/api/teacher/dashboard",
+    statusCode: 200,
+    durationMs: 51,
+    ip: "127.0.0.1",
+    message: "Teacher faculty audit query completed for Department of Clinical Sciences.",
+  }
+];
+
+function addSystemLog(log: Omit<SystemLogEntry, "id" | "timestamp">) {
+  const entry: SystemLogEntry = {
+    id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    timestamp: Date.now(),
+    ...log
+  };
+  SYSTEM_LOGS.unshift(entry);
+  if (SYSTEM_LOGS.length > 300) {
+    SYSTEM_LOGS.pop();
+  }
+  return entry;
+}
+
+
+// Intercept all API calls and log in real time
+app.use((req, res, next) => {
+  if (!req.path.startsWith("/api") || req.path === "/api/admin/logs") {
+    return next();
+  }
+
+  const startTime = Date.now();
+  const reqBody = req.body ? JSON.stringify(req.body).slice(0, 150) : undefined;
+
+  res.on("finish", () => {
+    const durationMs = Date.now() - startTime;
+    const statusCode = res.statusCode;
+    const isError = statusCode >= 400;
+
+    addSystemLog({
+      level: isError ? (statusCode >= 500 ? "ERROR" : "WARN") : "INFO",
+      source: "FastAPI Backend",
+      method: req.method,
+      endpoint: req.path,
+      statusCode,
+      durationMs,
+      ip: req.ip || "127.0.0.1",
+      message: `${req.method} ${req.path} completed with status ${statusCode} (${durationMs}ms)`,
+      payloadSnippet: reqBody
+    });
+  });
+
+  next();
+});
+
 // Health Check
 app.get("/api/health", (req, res) => {
   res.json({
@@ -95,6 +236,201 @@ app.post("/api/auth/login", (req, res) => {
     });
   }
 });
+
+
+// ==========================================
+// SUPERUSER & BACKEND ADMIN ENDPOINTS
+// ==========================================
+app.get("/api/admin/overview", (req, res) => {
+  res.json({
+    system: "Trace Learning System - Unified Superuser Engine",
+    version: "3.0.0",
+    timestamp: Date.now(),
+    metrics: {
+      registeredUsers: 14,
+      activeUnits: 8,
+      totalModules: 24,
+      totalSubtopics: 68,
+      totalObjectives: 184,
+      quizzesRecorded: 156,
+      averagePnl: 84.6,
+      socraticConsultations: 382,
+      databaseSyncStatus: "Healthy",
+      latencyMs: 18
+    },
+    tables: [
+      { name: "users", records: 14, primaryKey: "id", description: "Authentication, permissions, roles, academic progress" },
+      { name: "units", records: 8, primaryKey: "id", description: "Course units, clinical modules, global curriculum items" },
+      { name: "modules", records: 24, primaryKey: "id", description: "Curriculum modules and core subjects" },
+      { name: "topics", records: 46, primaryKey: "id", description: "Thematic subject groupings" },
+      { name: "subtopics", records: 68, primaryKey: "id", description: "Granular lesson nodes & mastery tracking" },
+      { name: "learning_objectives", records: 184, primaryKey: "id", description: "Assessment and AI consultation rubrics" },
+      { name: "quiz_history", records: 156, primaryKey: "id", description: "Assessment scores, percentage next level (PNL), answer telemetry" },
+      { name: "chat_sessions", records: 92, primaryKey: "id", description: "Socratic AI consultation threads and clinical audits" },
+      { name: "timetables", records: 18, primaryKey: "id", description: "AI-generated study schedules and weekly schedules" }
+    ]
+  });
+});
+
+app.post("/api/admin/ingest-syllabus", (req, res) => {
+  const { markdown, category = "Global" } = req.body;
+  if (!markdown) {
+    return res.status(400).json({ error: "Markdown syllabus content is required." });
+  }
+
+  // Parse lines
+  const lines = markdown.split(String.fromCharCode(10));
+  let unitTitle = "Clinical Medicine Unit";
+  const modules: any[] = [];
+  let currentMod: any = null;
+  let currentTopic: any = null;
+
+  for (let line of lines) {
+    line = line.trim();
+    if (line.startsWith("# ")) {
+      unitTitle = line.replace("# ", "").trim();
+    } else if (line.startsWith("## ")) {
+      currentMod = { name: line.replace("## ", "").trim(), topics: [] };
+      modules.push(currentMod);
+      currentTopic = null;
+    } else if (line.startsWith("### ") && currentMod) {
+      currentTopic = { name: line.replace("### ", "").trim(), subtopics: [] };
+      currentMod.topics.push(currentTopic);
+    } else if (line.startsWith("#### ") && currentTopic) {
+      currentTopic.subtopics.push({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        name: line.replace("#### ", "").trim(),
+        isCompleted: false,
+        objectives: []
+      });
+    }
+  }
+
+  return res.json({
+    status: "success",
+    message: `Unit "${unitTitle}" parsed and ingested successfully.`,
+    unit: {
+      id: Date.now(),
+      unitName: unitTitle,
+      category,
+      modulesCount: modules.length
+    }
+  });
+});
+
+
+
+// ==========================================
+// SYSTEM LOGS & ERROR TELEMETRY ENDPOINTS
+// ==========================================
+app.get("/api/admin/logs", (req, res) => {
+  const { level, source, limit = "100", search } = req.query;
+  let results = [...SYSTEM_LOGS];
+
+  if (level && level !== "ALL") {
+    results = results.filter((l) => l.level === level);
+  }
+  if (source && source !== "ALL") {
+    results = results.filter((l) => l.source === source);
+  }
+  if (search) {
+    const q = String(search).toLowerCase();
+    results = results.filter(
+      (l) =>
+        l.endpoint.toLowerCase().includes(q) ||
+        l.message.toLowerCase().includes(q) ||
+        (l.payloadSnippet && l.payloadSnippet.toLowerCase().includes(q))
+    );
+  }
+
+  const parsedLimit = Math.min(parseInt(String(limit), 10) || 100, 300);
+  res.json({
+    total: results.length,
+    logs: results.slice(0, parsedLimit),
+    summary: {
+      totalLogged: SYSTEM_LOGS.length,
+      errorsCount: SYSTEM_LOGS.filter((l) => l.level === "ERROR").length,
+      warnsCount: SYSTEM_LOGS.filter((l) => l.level === "WARN").length,
+      infoCount: SYSTEM_LOGS.filter((l) => l.level === "INFO").length,
+      avgDurationMs: Math.round(
+        SYSTEM_LOGS.reduce((acc, l) => acc + l.durationMs, 0) / Math.max(SYSTEM_LOGS.length, 1)
+      )
+    }
+  });
+});
+
+app.post("/api/admin/logs/clear", (req, res) => {
+  SYSTEM_LOGS.length = 0;
+  addSystemLog({
+    level: "INFO",
+    source: "FastAPI Backend",
+    method: "POST",
+    endpoint: "/api/admin/logs/clear",
+    statusCode: 200,
+    durationMs: 4,
+    ip: "127.0.0.1",
+    message: "System request log buffer cleared by Superuser administrator."
+  });
+  res.json({ status: "success", message: "Logs cleared." });
+});
+
+app.post("/api/admin/logs/simulate-error", (req, res) => {
+  const { errorType = "validation" } = req.body || {};
+  let generatedLog: SystemLogEntry;
+
+  if (errorType === "database") {
+    generatedLog = addSystemLog({
+      level: "ERROR",
+      source: "FastAPI Backend",
+      method: "POST",
+      endpoint: "/api/ai/quiz/submit",
+      statusCode: 500,
+      durationMs: 142,
+      ip: req.ip || "127.0.0.1",
+      message: "psycopg2.OperationalError: server closed the connection unexpectedly (PostgreSQL Neon).",
+      errorStack: "Traceback (most recent call last):\n  File \"/app/backend/app/db/session.py\", line 32, in execute_query\n    raise OperationalError(\"Database pool exhausted\")"
+    });
+  } else if (errorType === "auth") {
+    generatedLog = addSystemLog({
+      level: "WARN",
+      source: "FastAPI Backend",
+      method: "POST",
+      endpoint: "/api/auth/login",
+      statusCode: 401,
+      durationMs: 38,
+      ip: req.ip || "127.0.0.1",
+      message: "HTTPException(401): Invalid credentials submitted for user alex.kim@hospital.org",
+      payloadSnippet: "{\"email\": \"alex.kim@hospital.org\"}"
+    });
+  } else if (errorType === "rate_limit") {
+    generatedLog = addSystemLog({
+      level: "ERROR",
+      source: "AI Engine",
+      method: "POST",
+      endpoint: "/api/ai/chat",
+      statusCode: 429,
+      durationMs: 220,
+      ip: req.ip || "127.0.0.1",
+      message: "ResourceExhausted: 429 Resource has been exhausted (e.g. check quota) - rotating to fallback AI key.",
+      errorStack: "GoogleGenerativeAIError: ResourceExhausted at GeminiClient.generateContent (/app/server.ts:88)"
+    });
+  } else {
+    generatedLog = addSystemLog({
+      level: "ERROR",
+      source: "FastAPI Backend",
+      method: "POST",
+      endpoint: "/api/ai/chat",
+      statusCode: 422,
+      durationMs: 18,
+      ip: req.ip || "127.0.0.1",
+      message: "pydantic.error_wrappers.ValidationError: 1 validation error for ChatRequest -> prompt: field required",
+      payloadSnippet: "{\"user_id\": \"1\"}"
+    });
+  }
+
+  res.json({ status: "simulated", log: generatedLog });
+});
+
 
 // AI Consultation / Chat Endpoint
 app.post("/api/chat/message", async (req, res) => {

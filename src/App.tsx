@@ -28,6 +28,7 @@ import { LibraryScreen } from './components/LibraryScreen';
 import { UnitOutlineScreen } from './components/UnitOutlineScreen';
 import { LearningRepositoryScreen } from './components/LearningRepositoryScreen';
 import { ConnectTab } from './components/ConnectTab';
+import { AdminDashboard } from './components/AdminDashboard';
 import { TeacherDashboard } from './components/TeacherDashboard';
 import { ParentDashboard } from './components/ParentDashboard';
 import { InAppBrowser } from './components/InAppBrowser';
@@ -82,7 +83,21 @@ export const App: React.FC = () => {
 
   const handleChangeRole = (role: UserRole) => {
     const all = TraceStore.getAllUsers();
-    const matched = all.find((u) => u.role === role);
+    let matched = all.find((u) => u.role === role);
+    if (!matched && role === 'Admin') {
+      matched = {
+        id: '4',
+        username: 'Admin Root',
+        email: 'admin@trace.edu',
+        role: 'Admin',
+        difficulty: 'Superuser',
+        semesterStatus: 'System Administration & Oversight',
+        aiPersona: 'System Architect & Lead Consultant',
+        sensoryMode: 'Standard',
+        activeUnits: ['Biochemistry II', 'General Surgery', 'Internal Medicine']
+      };
+      TraceStore.setUser(matched);
+    }
     if (matched) {
       setUser(matched);
       TraceStore.setUser(matched);
@@ -248,6 +263,9 @@ export const App: React.FC = () => {
               <span className="text-xs font-semibold text-slate-200 hidden sm:inline">
                 {user.username.split(' ')[0]}
               </span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                {user.role}
+              </span>
             </button>
           </div>
         </div>
@@ -255,7 +273,9 @@ export const App: React.FC = () => {
 
       {/* Main Screen Router Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
-        {user.role === 'Teacher' ? (
+        {user.role === 'Admin' ? (
+          <AdminDashboard currentUser={user} onNavigateToTab={(t) => setCurrentTab(t as any)} onRefreshData={() => setUnits(TraceStore.getUnits())} />
+        ) : user.role === 'Teacher' ? (
           <TeacherDashboard user={user} />
         ) : user.role === 'Parent' ? (
           <ParentDashboard user={user} />
