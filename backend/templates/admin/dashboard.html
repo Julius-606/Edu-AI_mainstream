@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trace Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .sidebar-collapsed { width: 0; padding-left: 0; padding-right: 0; overflow: hidden; }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+<div class="flex min-h-screen">
+    <aside id="admin-sidebar" class="w-64 shrink-0 border-r border-slate-800 bg-slate-900 p-5 transition-all duration-200">
+        <div class="flex items-center gap-2 mb-10">
+            <div class="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center font-bold">T</div>
+            <div><div class="font-bold">TRACE ADMIN</div><div class="text-xs text-slate-500">v{{ version }}</div></div>
+        </div>
+        <nav class="space-y-2 text-sm">
+            <a href="/admin" class="block rounded-lg px-3 py-2 {{ 'bg-indigo-600' if section == 'overview' else 'hover:bg-slate-800' }}">Overview</a>
+            <a href="/admin/ingestion" class="block rounded-lg px-3 py-2 hover:bg-slate-800">Ingest New</a>
+            <a href="/admin/catalogue" class="block rounded-lg px-3 py-2 {{ 'bg-indigo-600' if section == 'catalogue' else 'hover:bg-slate-800' }}">Curriculum Catalogue</a>
+            <a href="/admin/users" class="block rounded-lg px-3 py-2 {{ 'bg-indigo-600' if section == 'users' else 'hover:bg-slate-800' }}">Users &amp; Data</a>
+            <a href="/admin/releases" class="block rounded-lg px-3 py-2 {{ 'bg-indigo-600' if section == 'archives' else 'hover:bg-slate-800' }}">Archives</a>
+            <a href="/admin/database" class="block rounded-lg px-3 py-2 {{ 'bg-indigo-600' if section == 'database' else 'hover:bg-slate-800' }}">Database browser</a>
+        </nav>
+        <form method="post" action="/admin/logout" class="mt-10"><button class="text-sm text-slate-400 hover:text-white">Sign out</button></form>
+    </aside>
+    <main class="min-w-0 flex-1 p-6 md:p-10 max-w-7xl">
+        <button id="admin-nav-toggle" type="button" aria-label="Toggle admin navigation" aria-expanded="true" class="mb-5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-300 hover:text-white">☰ <span class="ml-1 text-sm">Navigation</span></button>
+        <div class="mb-8">
+            <p class="text-sm text-indigo-400 uppercase tracking-widest">Backend management</p>
+            <h1 class="text-3xl font-bold mt-2">
+                {% if section == 'catalogue' %}Curriculum Catalogue{% elif section == 'users' %}Users &amp; Data{% elif section == 'archives' %}Archives{% else %}Admin Dashboard{% endif %}
+            </h1>
+        </div>
+
+        {% if section == 'overview' %}
+        <div class="grid md:grid-cols-3 gap-4 mb-8">
+            <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5"><p class="text-slate-500 text-sm">Users</p><p class="text-3xl font-bold mt-2">{{ users|length }}</p></div>
+            <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5"><p class="text-slate-500 text-sm">Global units</p><p class="text-3xl font-bold mt-2">{{ units|length }}</p></div>
+            <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5"><p class="text-slate-500 text-sm">Archived releases</p><p class="text-3xl font-bold mt-2">{{ releases|length }}</p></div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-4">
+            <a href="/admin/ingestion" class="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-6 hover:bg-indigo-500/20"><h2 class="font-bold text-lg">Ingest New</h2><p class="text-slate-400 text-sm mt-2">Add structured curriculum content.</p></a>
+            <a href="/admin/catalogue" class="rounded-2xl border border-slate-800 bg-slate-900 p-6 hover:bg-slate-800"><h2 class="font-bold text-lg">Open Catalogue</h2><p class="text-slate-400 text-sm mt-2">Inspect and edit complete unit structures.</p></a>
+        </div>
+        {% elif section == 'catalogue' %}
+        <div class="space-y-6">
+            {% for field in catalog %}
+            <section class="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+                <button type="button" class="w-full rounded-xl bg-indigo-600/20 px-5 py-4 text-left text-xl font-bold text-indigo-200" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                    {{ field.name }} <span class="float-right text-sm font-normal text-indigo-300">{{ field.courses|length }} courses</span>
+                </button>
+                <div class="mt-4 max-h-[70vh] space-y-3 overflow-y-auto pr-2">
+                    {% for course in field.courses %}
+                    <details class="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                        <summary class="cursor-pointer font-bold text-slate-200">{{ course.name }} <span class="text-xs text-slate-500">({{ course.unit_groups|length }} unit groups)</span></summary>
+                        <div class="mt-3 grid gap-2">
+                            {% for group in course.unit_groups %}
+                            <div class="rounded-lg border border-slate-800 p-3">
+                                <p class="mb-2 text-sm font-semibold text-indigo-300">{{ group.name }}</p>
+                                <div class="grid gap-2">
+                                {% for unit in group.units %}
+                                    <div class="flex items-center justify-between rounded-lg bg-slate-900 px-3 py-2">
+                                        <a href="/admin/units/{{ unit.id }}" class="text-sm text-slate-200 hover:text-indigo-300">{{ unit.name }} <span class="text-xs text-slate-500">({{ unit.modules|length }} modules)</span></a>
+                                        <a href="/admin/units/{{ unit.id }}" class="text-xs text-indigo-300 hover:underline">Manage</a>
+                                    </div>
+                                {% endfor %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    {% endfor %}
+                </div>
+            </section>
+            {% else %}<p class="text-slate-500">No global units have been ingested.</p>{% endfor %}
+        </div>
+        {% elif section == 'users' %}
+        <div class="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+            <table class="w-full text-left text-sm"><thead class="border-b border-slate-800 text-slate-500"><tr><th class="p-4">User</th><th class="p-4">Role</th><th class="p-4">Units</th><th class="p-4">ID</th></tr></thead><tbody>
+            {% for user in users %}<tr class="border-b border-slate-800/70"><td class="p-4"><a class="font-semibold text-indigo-300 hover:underline" href="/admin/users/{{ user.id }}">{{ user.username }}</a><div class="text-slate-500">{{ user.email or 'No email' }}</div></td><td class="p-4">{{ user.role }}</td><td class="p-4">{{ user.units|length }}</td><td class="p-4 text-slate-500">#{{ user.id }}</td></tr>{% else %}<tr><td class="p-4 text-slate-500" colspan="4">No users found.</td></tr>{% endfor %}
+            </tbody></table>
+        </div>
+        {% elif section == 'database' %}
+        <div class="space-y-4">
+            <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">Database editor. Every write checks the row for conflicts and requires the admin password again. Password hashes and primary keys cannot be edited.</div>
+            {% for table in database_tables %}
+            <details class="rounded-2xl border border-slate-800 bg-slate-900">
+                <summary class="cursor-pointer px-5 py-4 font-bold">{{ table.label }} <span class="text-xs font-normal text-slate-500">({{ table.rows|length }} rows)</span></summary>
+                <div class="max-h-96 overflow-auto border-t border-slate-800">
+                    <table class="min-w-full text-left text-xs"><thead class="sticky top-0 bg-slate-950 text-slate-500"><tr>{% for column in table.columns %}<th class="whitespace-nowrap px-3 py-2">{{ column }}</th>{% endfor %}<th class="px-3 py-2">Commit</th></tr></thead><tbody>
+                    {% for row in table.rows %}<tr class="border-t border-slate-800/70">{% for column in table.columns %}<td class="max-w-xs whitespace-nowrap px-3 py-2 text-slate-300">{% if column in table.editable_columns %}<input name="{{ column }}" value="{{ row['values'][column] }}" form="edit-{{ table.table_name }}-{{ row['id'] }}" class="w-full min-w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1">{% else %}{{ row['values'][column] }}{% endif %}</td>{% endfor %}<td class="px-3 py-2"><details><summary class="cursor-pointer text-indigo-300">Commit</summary><form id="edit-{{ table.table_name }}-{{ row['id'] }}" method="post" action="/admin/database/{{ table.table_name }}/{{ row['id'] }}" class="mt-2 space-y-2"><input type="hidden" name="original" value="{{ row['original'] }}"><input name="admin_password" type="password" required placeholder="Admin password" class="w-36 rounded border border-slate-700 bg-slate-950 px-2 py-1"><button class="rounded bg-indigo-600 px-2 py-1 text-xs">Confirm</button></form></details></td></tr>{% else %}<tr><td class="px-3 py-4 text-slate-500" colspan="{{ table.columns|length + 1 }}">No rows.</td></tr>{% endfor %}
+                    </tbody></table>
+                </div>
+            </details>
+            {% endfor %}
+        </div>
+        {% elif section == 'archives' %}
+        <div class="grid lg:grid-cols-2 gap-6">
+            <form method="post" action="/admin/releases" class="rounded-2xl border border-slate-800 bg-slate-900 p-6 space-y-3">
+                <h2 class="font-bold text-lg mb-3">Archive a release</h2>
+                <input name="version" required placeholder="Version (e.g. 3.1.5)" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
+                <input name="artifact_type" value="Trace Mobile App" placeholder="Artifact type" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
+                <input name="download_url" type="url" placeholder="Download URL" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
+                <textarea name="release_notes" rows="4" placeholder="Release notes" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"></textarea>
+                <label class="flex items-center gap-2 text-sm text-slate-400"><input type="checkbox" name="is_current" value="true" class="accent-indigo-600"> Mark as current release</label>
+                <button class="rounded-lg bg-indigo-600 px-4 py-2 font-bold">Archive release</button>
+            </form>
+            <div class="space-y-3">
+                <h2 class="font-bold text-lg">Files in Archives/</h2>
+                {% for asset in archive_files %}<form method="post" action="/admin/archives/{{ asset.file_name }}" class="rounded-xl border border-slate-800 bg-slate-900 p-4 space-y-2">
+                    <div class="flex justify-between"><a class="font-semibold text-indigo-300 hover:underline" href="/admin/archives/{{ asset.file_name }}">{{ asset.file_name }}</a><span class="text-xs text-slate-500">{{ (asset.size / 1048576)|round(2) }} MB · {{ asset.modified_at.strftime('%Y-%m-%d') }}</span></div>
+                    <input name="display_name" value="{{ asset.display_name }}" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
+                    <input name="artifact_type" value="{{ asset.artifact_type }}" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
+                    <textarea name="release_notes" rows="2" placeholder="Archive notes" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">{{ asset.release_notes or '' }}</textarea>
+                    <button class="rounded-lg bg-slate-700 px-3 py-2 text-xs">Save archive details</button>
+                </form>{% else %}<p class="text-slate-500">No files found in Archives/.</p>{% endfor %}
+                {% for release in releases %}<div class="rounded-xl border border-slate-800 bg-slate-900 p-4"><div class="flex justify-between"><b>v{{ release.version }}</b><span class="text-xs text-slate-500">{{ release.artifact_type }}</span></div>{% if release.download_url %}<a class="text-sm text-indigo-400 hover:underline" href="{{ release.download_url }}" target="_blank" rel="noopener">Download</a>{% endif %}<p class="text-sm text-slate-400 mt-2">{{ release.release_notes or 'No release notes.' }}</p></div>{% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </main>
+</div>
+<script>
+    (() => {
+        const sidebar = document.getElementById("admin-sidebar");
+        const toggle = document.getElementById("admin-nav-toggle");
+        const key = "trace-admin-sidebar-collapsed";
+        const setCollapsed = (collapsed) => {
+            sidebar.classList.toggle("sidebar-collapsed", collapsed);
+            toggle.setAttribute("aria-expanded", String(!collapsed));
+        };
+        setCollapsed(window.localStorage.getItem(key) === "true");
+        toggle.addEventListener("click", () => {
+            const collapsed = !sidebar.classList.contains("sidebar-collapsed");
+            setCollapsed(collapsed);
+            window.localStorage.setItem(key, String(collapsed));
+        });
+    })();
+</script>
+</body>
+</html>

@@ -20,7 +20,7 @@ class EduAIApplication : Application() {
             EduAIDatabase::class.java,
             "edu_ai_db"
         )
-        .fallbackToDestructiveMigration(dropAllTables = true) // Updated to non-deprecated version
+        .fallbackToDestructiveMigration() // Updated to non-deprecated version
         .build()
 
         repository = EduAIRepository(

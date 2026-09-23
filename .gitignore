@@ -1,43 +1,71 @@
-#🙈 IGNORE LIST
-
-pycache/
-*.py[cod]
-*$py.class
-
-🔧 Environment
-
-venv/
+# Environment and secrets
 .env
-.DS_Store
-
-#☁️ Cloud Credentials (NEVER COMMIT THESE)
-
-bot_memory_*.json
-*.json
-!Archives/archives.json
+.env.*
+!.env.example
+venv/
+.venv/
+env/
 credentials.json
+credentials.*.json
 config.json
+config.*.json
+bot_memory_*.json
 google-services.json
 
-*.env
-#📉 Logs
+# Python caches and tooling
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+*.egg-info/
+htmlcov/
+.coverage
+.coverage.*
 
+# Node, Vite, and package-manager output
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Android and Gradle build output
+Archives/
+.gradle/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.iml
+local.properties
+edu_ai_vault.db
+
+# IDE and OS files
+.idea/
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
 *.log
 logs.txt
+*.tmp
+*.temp
+*.swp
+*.swo
 
-#📊 Data Files
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
+gradle.properties
+*.hprof
