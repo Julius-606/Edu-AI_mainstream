@@ -10,12 +10,12 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.BookOpen
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.*
+import androidx.compose.material3.NavigationDrawerDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -200,7 +200,7 @@ fun StudentDashboard(
                         com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
                         onOpenLibrary()
                     },
-                    icon = { Icon(Icons.Default.BookOpen, contentDescription = null) },
+                    icon = { Icon(Icons.Default.MenuBook, contentDescription = null) },
                     modifier = Modifier.padding(NavigationDrawerDefaults.ItemPadding)
                 )
 
