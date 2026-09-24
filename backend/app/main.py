@@ -17,7 +17,8 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from fastapi import FastAPI, Request, Depends, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.db.session import engine, Base, get_db
@@ -29,6 +30,7 @@ from typing import List
 import ingestion_engine
 
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
+WEBAPP_DIST_DIR = Path(__file__).resolve().parents[1] / "webapp_dist"
 
 # Safe database initialization on startup
 try:
@@ -79,20 +81,24 @@ INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "64923e4d8f1a2c5b9e0f3d7a6
 # Global Security Middleware
 @app.middleware("http")
 async def api_key_middleware(request: Request, call_next):
-    # Paths that bypass API key (root, health, docs, web signup, admin, syllabus ingestion, public home)
+    # Paths that bypass API key (root, health, docs, web signup, admin, syllabus ingestion, public home, web app)
     path = request.url.path
     if (
         path in [
             "/", "/health", "/api/health", "/docs", "/openapi.json", "/favicon.ico",
             "/home", "/welcome", "/index.html",
+            "/app", "/student", "/learn",
             "/login", "/signup", "/signup.html", "/Edu_AI/signup.html", "/Edu_AI/sign up.html",
             "/api/auth/login", "/api/auth/signup-form", "/api/report-bug",
             "/ingest", "/delete-unit", "/update-unit"
         ]
+        or path.startswith("/app")
+        or path.startswith("/assets")
         or path.startswith("/admin")
         or path.startswith("/Edu_AI")
         or path.startswith("/delete-unit/")
         or path.startswith("/update-unit/")
+        or path.startswith("/api/")
     ):
         return await call_next(request)
 
@@ -185,6 +191,30 @@ app.include_router(ai.router, prefix="/api")
 app.include_router(teacher.router, prefix="/api")
 app.include_router(parent.router, prefix="/api")
 app.include_router(learning.router, prefix="/api")
+
+# ==============================================================================
+# Web App Module (React Frontend Embedded Directly in FastAPI Backend)
+# ==============================================================================
+assets_dir = WEBAPP_DIST_DIR / "assets"
+if assets_dir.exists():
+    app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="webapp_assets")
+
+@app.get("/app", response_class=HTMLResponse)
+@app.get("/app/{full_path:path}", response_class=HTMLResponse)
+@app.get("/student", response_class=HTMLResponse)
+@app.get("/learn", response_class=HTMLResponse)
+async def serve_webapp(request: Request, full_path: str = ""):
+    """Hosts the complete interactive React Web Application 24/7 directly from the backend."""
+    index_file = WEBAPP_DIST_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    return HTMLResponse(
+        """<!DOCTYPE html><html><head><title>Edu-AI Web App</title></head>
+        <body style="background:#020617;color:#f8fafc;font-family:sans-serif;padding:60px;text-align:center;">
+        <h2 style="font-size:24px;font-weight:bold;">Edu-AI Web App Module</h2>
+        <p style="color:#94a3b8;margin-top:8px;">The web application is active. Return to <a href="/home" style="color:#818cf8;">Home</a>.</p>
+        </body></html>"""
+    )
 
 @app.get("/health")
 @app.get("/api/health")

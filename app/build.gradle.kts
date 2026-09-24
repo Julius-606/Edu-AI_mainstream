@@ -11,7 +11,7 @@ android {
     compileSdk = 35
 
     val backendBaseUrl = (project.findProperty("backendBaseUrl") as? String)
-        ?: "https://huggingface.co/spaces/Agent606/Edu-AI/"
+        ?: "https://agent606-edu-ai.hf.space/"
     val fallbackBackendBaseUrl = (project.findProperty("fallbackBackendBaseUrl") as? String)
         ?: "https://untropic-rozanne-noncomprehendingly.ngrok-free.dev/"
 

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build",
+    "build": "vite build && vite build --outDir backend/webapp_dist",
+    "build:backend": "vite build --outDir backend/webapp_dist",
     "preview": "vite preview"
   },
   "dependencies": {

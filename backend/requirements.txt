@@ -2,6 +2,7 @@
 # --- Core API ---
 fastapi==0.109.2
 uvicorn==0.27.1
+aiofiles>=23.2.1
 pydantic
 python-multipart==0.0.9
 

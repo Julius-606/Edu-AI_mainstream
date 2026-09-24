@@ -54,7 +54,7 @@ async function callGeminiSafe(prompt: string, config?: any): Promise<string | nu
 // ==========================================
 
 const BACKEND_TARGETS = {
-  cloud: "https://huggingface.co/spaces/Agent606/Edu-AI",
+  cloud: "https://agent606-edu-ai.hf.space",
   ngrok: "https://untropic-rozanne-noncomprehendingly.ngrok-free.dev",
   container: "http://127.0.0.1:8001"
 };
@@ -302,6 +302,21 @@ app.use(["/admin", "/signup", "/signup.html", "/Edu_AI", "/login"], async (req, 
 
     next();
   }
+});
+
+// Web App Static Assets & SPA Fallback
+app.use("/assets", express.static(path.join(process.cwd(), "backend", "webapp_dist", "assets")));
+
+app.get(["/app", "/app/*", "/student", "/learn"], (req, res) => {
+  const webappIndex = path.join(process.cwd(), "backend", "webapp_dist", "index.html");
+  if (fs.existsSync(webappIndex)) {
+    return res.sendFile(webappIndex);
+  }
+  const distIndex = path.join(process.cwd(), "dist", "index.html");
+  if (fs.existsSync(distIndex)) {
+    return res.sendFile(distIndex);
+  }
+  res.redirect("/");
 });
 
 // Root & Public Homepage
