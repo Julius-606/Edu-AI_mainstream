@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, ArrowLeft, ArrowRight, RotateCw, ExternalLink, Globe, BookOpen } from 'lucide-react';
+import { X, ArrowLeft, ArrowRight, RotateCw, ExternalLink, Globe, BookOpen, Bookmark as BookmarkIcon } from 'lucide-react';
+import { TraceStore } from '../lib/store';
 
 interface InAppBrowserProps {
   url: string;
@@ -9,6 +10,20 @@ interface InAppBrowserProps {
 export const InAppBrowser: React.FC<InAppBrowserProps> = ({ url: initialUrl, onClose }) => {
   const [currentUrl, setCurrentUrl] = useState(initialUrl || 'https://en.wikipedia.org/wiki/Medicine');
   const [inputUrl, setInputUrl] = useState(currentUrl);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+
+  const handleBookmarkCurrentUrl = () => {
+    TraceStore.addBookmark({
+      userId: TraceStore.getUser().id,
+      type: 'browser',
+      title: `Reference Resource: ${currentUrl.split('/')[2] || currentUrl}`,
+      target: currentUrl,
+      excerpt: `In-App Browser link for reference.`,
+      notes: 'Saved from Trace Browser'
+    });
+    setIsBookmarked(true);
+    setTimeout(() => setIsBookmarked(false), 2000);
+  };
 
   const quickLinks = [
     { label: 'NCBI PubMed', url: 'https://pubmed.ncbi.nlm.nih.gov' },
@@ -74,6 +89,17 @@ export const InAppBrowser: React.FC<InAppBrowserProps> = ({ url: initialUrl, onC
 
           {/* External open and close */}
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleBookmarkCurrentUrl}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isBookmarked
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800'
+              }`}
+              title="Bookmark this page"
+            >
+              <BookmarkIcon className="w-4 h-4" />
+            </button>
             <a
               href={currentUrl}
               target="_blank"

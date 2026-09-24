@@ -44,6 +44,7 @@ import { AccountModal } from './components/AccountModal';
 import { ArchivesModal } from './components/ArchivesModal';
 import { ManageUnitsModal } from './components/ManageUnitsModal';
 import { SyncModal } from './components/SyncModal';
+import { BookmarksScreen } from './components/BookmarksScreen';
 
 export const App: React.FC = () => {
   const [user, setUser] = useState<User>(TraceStore.getUser());
@@ -69,6 +70,109 @@ export const App: React.FC = () => {
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
 
   const timetable = TraceStore.getTimetable();
+
+  const triggerCloudSync = async (userId: string) => {
+    try {
+      const res = await fetch(`/api/user/${userId}/sync`);
+      if (!res.ok) return;
+      const data = await res.json();
+      
+      if (data.progress && data.progress.length > 0) {
+        const localUnits = TraceStore.getUnits();
+        for (const p of data.progress) {
+          if (p.node_type === 'subtopic' && p.status === 'Completed') {
+            for (const unit of localUnits) {
+              for (const mod of unit.modules) {
+                for (const topic of mod.topics) {
+                  for (const sub of topic.subtopics) {
+                    if (sub.id === p.node_id) {
+                      sub.isCompleted = true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        TraceStore.saveUnits(localUnits);
+        setUnits([...localUnits]);
+      }
+
+      if (data.bookmarks && data.bookmarks.length > 0) {
+        const localBookmarks = TraceStore.getBookmarks();
+        for (const b of data.bookmarks) {
+          const exists = localBookmarks.some((lb) => lb.target === b.target || (lb.subtopicId === b.subtopicId && lb.objectiveDescription === b.objectiveDescription));
+          if (!exists) {
+            localBookmarks.unshift({
+              id: b.id ? String(b.id) : `bm-${Date.now()}-${Math.random()}`,
+              userId: userId,
+              subtopicId: b.subtopicId || 0,
+              subtopicName: b.subtopicName || b.title || 'Saved Item',
+              objectiveDescription: b.objectiveDescription || '',
+              excerpt: b.excerpt || b.context || '',
+              timestamp: b.timestamp * 1000 || Date.now(),
+              notes: b.notes || '',
+              type: b.type,
+              title: b.title,
+              target: b.target
+            } as any);
+          }
+        }
+        localStorage.setItem('trace_bookmarks', JSON.stringify(localBookmarks));
+      }
+
+      if (data.quizzes && data.quizzes.length > 0) {
+        const localHistory = TraceStore.getQuizHistory();
+        for (const q of data.quizzes) {
+          const exists = localHistory.some((lh) => lh.timestamp === q.timestamp || lh.id === String(q.id));
+          if (!exists) {
+            localHistory.unshift({
+              id: String(q.id),
+              userId: userId,
+              unitName: q.unit_name,
+              score: q.score,
+              total: q.total,
+              pnlScore: Math.round(q.pnl * 100) || Math.round((q.score / q.total) * 100),
+              timestamp: typeof q.timestamp === 'number' ? q.timestamp : Date.now()
+            });
+          }
+        }
+        localStorage.setItem('trace_quiz_history', JSON.stringify(localHistory));
+      }
+
+      if (data.chats && data.chats.length > 0) {
+        const localSessions = TraceStore.getChatSessions();
+        for (const s of data.chats) {
+          const exists = localSessions.some((ls) => ls.id === String(s.id));
+          if (!exists) {
+            localSessions.unshift({
+              id: String(s.id),
+              userId: userId,
+              title: s.title,
+              description: s.description || '',
+              timestamp: s.timestamp * 1000 || Date.now(),
+              messages: (s.messages || []).map((m: any) => ({
+                id: String(m.id),
+                sender: m.role === 'user' ? 'user' : 'assistant',
+                text: m.content,
+                timestamp: typeof m.timestamp === 'number' ? m.timestamp : Date.now()
+              }))
+            });
+          }
+        }
+        localStorage.setItem('trace_chat_sessions', JSON.stringify(localSessions));
+      }
+
+    } catch (err) {
+      console.error("Cloud synchronization failed:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoggedIn && user && user.id) {
+      triggerCloudSync(user.id);
+    }
+  }, [isLoggedIn, user]);
 
   const handleSelectUnitToLearn = (unitId: number, subtopicId?: number) => {
     setActiveUnitId(unitId);
@@ -167,7 +271,10 @@ export const App: React.FC = () => {
             user={user}
             units={units}
             timetable={timetable}
-            onOpenUnit={(unitId) => handleSelectUnitToLearn(unitId)}
+            onOpenUnit={(unitId) => {
+              setActiveUnitId(unitId);
+              setCurrentTab('unit-outline');
+            }}
             onOpenConsultation={() => setCurrentTab('consultations')}
             onOpenQuizzes={() => setCurrentTab('quizzes')}
             onOpenTimetable={() => setCurrentTab('timetable')}
@@ -224,7 +331,7 @@ export const App: React.FC = () => {
         {currentTab === 'unit-outline' && activeUnit && (
           <UnitOutlineScreen
             unit={activeUnit}
-            onBack={() => setCurrentTab('library')}
+            onBack={() => setCurrentTab('dashboard')}
             onOpenSubtopic={(uId, sId) => handleSelectUnitToLearn(uId, sId)}
             onLaunchQuiz={(uName, tName) => handleLaunchQuiz(uName, tName)}
           />
@@ -248,6 +355,25 @@ export const App: React.FC = () => {
               }
               setCurrentTab('dashboard');
             }}
+          />
+        )}
+
+        {currentTab === 'bookmarks' && (
+          <BookmarksScreen
+            onNavigateToLearn={(subtopicId) => {
+              const foundUnit = units.find((u) =>
+                u.modules.some((m) =>
+                  m.topics.some((t) =>
+                    t.subtopics.some((s) => s.id === subtopicId)
+                  )
+                )
+              );
+              if (foundUnit) {
+                handleSelectUnitToLearn(foundUnit.id, subtopicId);
+              }
+            }}
+            onOpenBrowser={(url) => setBrowserUrl(url)}
+            onSelectTab={(tab) => setCurrentTab(tab)}
           />
         )}
 

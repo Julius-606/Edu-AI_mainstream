@@ -214,5 +214,36 @@ class TokenResponse(BaseModel):
 class RecommendationResponse(BaseModel):
     recommendation: str
 
+class BookmarkBase(BaseModel):
+    type: str
+    title: str
+    target: str
+    context: Optional[str] = None
+    timestamp: float
+
+class BookmarkCreate(BookmarkBase):
+    pass
+
+class BookmarkResponse(BookmarkBase):
+    id: int
+    owner_id: int
+
+    class Config:
+        from_attributes = True
+
+class SyllabusProgressItem(BaseModel):
+    node_id: int
+    node_type: str
+    status: str
+    last_studied_at: Optional[float] = None
+
+class SyncRequest(BaseModel):
+    progress: List[SyllabusProgressItem] = []
+    bookmarks: List[BookmarkBase] = []
+
+class SyncResponse(BaseModel):
+    success: bool
+    message: str
+
 
  

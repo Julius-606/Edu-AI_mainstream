@@ -12,7 +12,8 @@ import {
   LogOut,
   GraduationCap,
   Users,
-  ShieldAlert
+  ShieldAlert,
+  Bookmark as BookmarkIcon
 } from 'lucide-react';
 import { User, UserRole } from '../types';
 
@@ -147,6 +148,17 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
           >
             <Users className="w-4 h-4 text-sky-400" />
             <span>Study Connect</span>
+          </button>
+
+          <button
+            onClick={() => {
+              onSelectTab('bookmarks');
+              onClose();
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-slate-200 hover:bg-slate-800 hover:text-indigo-300 transition-colors"
+          >
+            <BookmarkIcon className="w-4 h-4 text-amber-400" />
+            <span>Saved Bookmarks & Clips</span>
           </button>
 
           <button

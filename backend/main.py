@@ -711,6 +711,177 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db), current_use
 
     return schemas.RecommendationResponse(recommendation=rec_text)
 
+# --- BOOKMARK & SYNC ENDPOINTS ---
+
+@app.get("/api/user/{user_id}/bookmarks", response_model=List[schemas.BookmarkResponse])
+def get_bookmarks(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db.query(models.Bookmark).filter(models.Bookmark.owner_id == user.id).all()
+
+@app.post("/api/user/{user_id}/bookmarks", response_model=schemas.BookmarkResponse)
+def create_bookmark(user_id: str, bookmark: schemas.BookmarkCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    new_bookmark = models.Bookmark(
+        type=bookmark.type,
+        title=bookmark.title,
+        target=bookmark.target,
+        context=bookmark.context,
+        timestamp=bookmark.timestamp,
+        owner_id=user.id
+    )
+    db.add(new_bookmark)
+    db.commit()
+    db.refresh(new_bookmark)
+    return new_bookmark
+
+@app.delete("/api/user/{user_id}/bookmarks/{bookmark_id}")
+def delete_bookmark(user_id: str, bookmark_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    bk = db.query(models.Bookmark).filter(models.Bookmark.id == bookmark_id, models.Bookmark.owner_id == user.id).first()
+    if not bk:
+        raise HTTPException(status_code=404, detail="Bookmark not found")
+    
+    db.delete(bk)
+    db.commit()
+    return {"status": "success", "message": "Bookmark deleted"}
+
+@app.get("/api/user/{user_id}/sync")
+def get_user_sync_data(user_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # 1. Fetch Syllabus Progress
+    progress = db.query(models.UserSyllabusProgress).filter(models.UserSyllabusProgress.user_id == user.id).all()
+    progress_list = []
+    for p in progress:
+        progress_list.append({
+            "node_id": p.node_id,
+            "node_type": p.node_type,
+            "status": p.status,
+            "last_studied_at": p.last_studied_at
+        })
+
+    # 2. Fetch Bookmarks
+    bookmarks = db.query(models.Bookmark).filter(models.Bookmark.owner_id == user.id).all()
+    bookmarks_list = []
+    for b in bookmarks:
+        bookmarks_list.append({
+            "id": b.id,
+            "type": b.type,
+            "title": b.title,
+            "target": b.target,
+            "context": b.context,
+            "timestamp": b.timestamp
+        })
+
+    # 3. Fetch Quiz History
+    quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
+    quizzes_list = []
+    for q in quizzes:
+        quizzes_list.append({
+            "id": q.id,
+            "unit_name": q.unit_name,
+            "score": q.score,
+            "total": q.total,
+            "pnl": q.pnl,
+            "timestamp": q.timestamp
+        })
+
+    # 4. Fetch Chat sessions & messages
+    sessions = db.query(models.ChatSession).filter(models.ChatSession.owner_id == user.id).all()
+    sessions_list = []
+    for s in sessions:
+        msgs = db.query(models.ChatMessage).filter(models.ChatMessage.session_id == s.id).order_by(models.ChatMessage.id.asc()).all()
+        msgs_list = []
+        for m in msgs:
+            msgs_list.append({
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "timestamp": m.timestamp
+            })
+        sessions_list.append({
+            "id": s.id,
+            "title": s.title,
+            "description": s.description,
+            "timestamp": s.timestamp,
+            "is_archived": s.is_archived,
+            "messages": msgs_list
+        })
+
+    return {
+        "progress": progress_list,
+        "bookmarks": bookmarks_list,
+        "quizzes": quizzes_list,
+        "chats": sessions_list,
+        "user": {
+            "id": str(user.id),
+            "username": user.username,
+            "email": user.email,
+            "role": user.role,
+            "difficulty": user.difficulty,
+            "semesterStatus": user.semester_status,
+            "aiPersona": user.ai_persona,
+            "sensoryMode": user.sensory_mode,
+            "activeUnits": user.active_units_list
+        }
+    }
+
+@app.post("/api/user/{user_id}/sync", response_model=schemas.SyncResponse)
+def sync_user_data(user_id: str, payload: schemas.SyncRequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # 1. Sync Syllabus Progress
+    for p_item in payload.progress:
+        existing = db.query(models.UserSyllabusProgress).filter(
+            models.UserSyllabusProgress.user_id == user.id,
+            models.UserSyllabusProgress.node_id == p_item.node_id,
+            models.UserSyllabusProgress.node_type == p_item.node_type
+        ).first()
+        if existing:
+            existing.status = p_item.status
+            existing.last_studied_at = p_item.last_studied_at
+        else:
+            db.add(models.UserSyllabusProgress(
+                user_id=user.id,
+                node_id=p_item.node_id,
+                node_type=p_item.node_type,
+                status=p_item.status,
+                last_studied_at=p_item.last_studied_at
+            ))
+    
+    # 2. Sync Bookmarks
+    for b_item in payload.bookmarks:
+        # Check if identical bookmark exists
+        existing_b = db.query(models.Bookmark).filter(
+            models.Bookmark.owner_id == user.id,
+            models.Bookmark.target == b_item.target,
+            models.Bookmark.type == b_item.type
+        ).first()
+        if not existing_b:
+            db.add(models.Bookmark(
+                type=b_item.type,
+                title=b_item.title,
+                target=b_item.target,
+                context=b_item.context,
+                timestamp=b_item.timestamp,
+                owner_id=user.id
+            ))
+            
+    db.commit()
+    return schemas.SyncResponse(success=True, message="Data synced successfully")
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))

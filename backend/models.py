@@ -28,6 +28,7 @@ class User(Base):
     chat_sessions = relationship("ChatSession", back_populates="owner", cascade="all, delete-orphan")
     performance_logs = relationship("PerformanceLog", back_populates="owner", cascade="all, delete-orphan")
     timetables = relationship("Timetable", back_populates="owner", cascade="all, delete-orphan")
+    bookmarks = relationship("Bookmark", back_populates="owner", cascade="all, delete-orphan")
 
     @property
     def active_units_list(self):
@@ -167,6 +168,19 @@ class Timetable(Base):
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="timetables")
+
+class Bookmark(Base):
+    __tablename__ = "bookmarks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    type = Column(String(50)) # 'learn' | 'chat' | 'browser' | 'quiz' | 'general'
+    title = Column(String(200))
+    target = Column(String(500)) # path or target reference
+    context = Column(Text, nullable=True) # text content or excerpt
+    timestamp = Column(Float) # epoch time
+
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="bookmarks")
 
 
  

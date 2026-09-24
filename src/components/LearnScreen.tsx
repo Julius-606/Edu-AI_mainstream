@@ -63,22 +63,62 @@ export const LearnScreen: React.FC<LearnScreenProps> = ({
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
-  const handleToggleComplete = () => {
+  const handleToggleComplete = async () => {
     if (!activeSubtopic) return;
     TraceStore.toggleSubtopicCompleted(activeSubtopic.id);
-    setIsCompleted(!isCompleted);
+    const targetState = !isCompleted;
+    setIsCompleted(targetState);
+
+    try {
+      const u = TraceStore.getUser();
+      await fetch(`/api/user/${u.id}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          progress: [
+            {
+              node_id: activeSubtopic.id,
+              node_type: 'subtopic',
+              status: targetState ? 'Completed' : 'Unlocked',
+              last_studied_at: Date.now() / 1000
+            }
+          ],
+          bookmarks: []
+        })
+      });
+    } catch (e) {
+      console.warn("Could not sync syllabus progress to cloud, cached locally.", e);
+    }
   };
 
-  const handleSaveBookmark = () => {
+  const handleSaveBookmark = async () => {
     if (!activeSubtopic || !currentObjective) return;
-    TraceStore.addBookmark({
+    const bk = {
       userId: TraceStore.getUser().id,
       subtopicId: activeSubtopic.id,
       subtopicName: activeSubtopic.name,
       objectiveDescription: currentObjective.title,
       excerpt: currentObjective.content.slice(0, 160) + '...',
       notes: bookmarkNote.trim() || undefined
-    });
+    };
+    TraceStore.addBookmark(bk);
+
+    try {
+      await fetch(`/api/user/${bk.userId}/bookmarks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'learn',
+          title: bk.subtopicName,
+          target: String(bk.subtopicId),
+          context: bk.excerpt,
+          timestamp: Date.now() / 1000
+        })
+      });
+    } catch (e) {
+      console.warn("Could not save bookmark to cloud, saved locally.", e);
+    }
+
     setBookmarked(true);
     setShowBookmarkInput(false);
     setBookmarkNote('');
