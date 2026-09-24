@@ -349,6 +349,15 @@ export interface SystemLogEntry {
   message: string;
   payloadSnippet?: string;
   errorStack?: string;
+  recurrenceCount?: number;
+  lastSeen?: number;
+  instances?: Array<{
+    timestamp: number;
+    durationMs: number;
+    ip: string;
+    payloadSnippet?: string;
+    errorStack?: string;
+  }>;
 }
 
 const SYSTEM_LOGS: SystemLogEntry[] = [
@@ -430,9 +439,42 @@ const SYSTEM_LOGS: SystemLogEntry[] = [
 ];
 
 function addSystemLog(log: Omit<SystemLogEntry, "id" | "timestamp">) {
+  // Smart aggregation: check if exact same event has already been logged
+  if (log.level === "ERROR" || log.level === "WARN") {
+    const existing = SYSTEM_LOGS.find(
+      (l) =>
+        l.level === log.level &&
+        l.source === log.source &&
+        l.method === log.method &&
+        l.endpoint === log.endpoint &&
+        l.statusCode === log.statusCode &&
+        l.message === log.message
+    );
+
+    if (existing) {
+      existing.recurrenceCount = (existing.recurrenceCount || 1) + 1;
+      existing.lastSeen = Date.now();
+      existing.instances = existing.instances || [];
+      // Keep maximum of 30 instances to prevent buffer memory overload
+      if (existing.instances.length < 30) {
+        existing.instances.push({
+          timestamp: Date.now(),
+          durationMs: log.durationMs,
+          ip: log.ip,
+          payloadSnippet: log.payloadSnippet,
+          errorStack: log.errorStack
+        });
+      }
+      return existing;
+    }
+  }
+
   const entry: SystemLogEntry = {
     id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     timestamp: Date.now(),
+    recurrenceCount: 1,
+    lastSeen: Date.now(),
+    instances: [],
     ...log
   };
   SYSTEM_LOGS.unshift(entry);
@@ -653,6 +695,97 @@ app.post("/api/admin/logs/clear", (req, res) => {
     message: "System request log buffer cleared by Superuser administrator."
   });
   res.json({ status: "success", message: "Logs cleared." });
+});
+
+app.get("/api/admin/logs/compile-report", (req, res) => {
+  const errors = SYSTEM_LOGS.filter((l) => l.level === "ERROR" || l.level === "WARN");
+  
+  let md = `# TRACE CLINICAL STUDY PORTAL - COMPILED SYSTEM ERROR & DIAGNOSTIC REPORT\n`;
+  md += `**Generated At:** ${new Date().toISOString()}\n`;
+  md += `**Total Monitored Logs:** ${SYSTEM_LOGS.length}\n`;
+  md += `**Failures Detected:** ${errors.filter(l => l.level === "ERROR").length} Errors, ${errors.filter(l => l.level === "WARN").length} Warnings\n\n`;
+  md += `## 1. EXECUTIVE FAILURE ANALYSIS SUMMARY\n\n`;
+  
+  if (errors.length === 0) {
+    md += `✅ **Pristine State Detected:** No active system failures or security warning logs in the ring buffer. All system metrics operating within normal tolerances.\n`;
+  } else {
+    md += `| Timestamp | Severity | Source | Endpoint | Status | Message |\n`;
+    md += `|---|---|---|---|---|---|\n`;
+    errors.forEach((e) => {
+      const severityEmoji = e.level === "ERROR" ? "🔴 ERROR" : "🟡 WARNING";
+      const timestampStr = new Date(e.timestamp).toLocaleTimeString();
+      md += `| ${timestampStr} | ${severityEmoji} | ${e.source} | \`${e.method} ${e.endpoint}\` | \`${e.statusCode}\` | ${e.message} |\n`;
+    });
+    
+    md += `\n## 2. DETAIL OF KEY COGNITIVE BREAKDOWNS\n\n`;
+    errors.forEach((e, idx) => {
+      md += `### [${idx + 1}] ${e.level}: ${e.message}\n`;
+      md += `* **Source Component:** ${e.source}\n`;
+      md += `* **Interruption Target:** \`${e.method} ${e.endpoint}\` (HTTP ${e.statusCode})\n`;
+      md += `* **Latency Duration:** ${e.durationMs}ms\n`;
+      if (e.payloadSnippet) {
+        md += `* **Parameters Submitted:** \`${e.payloadSnippet}\`\n`;
+      }
+      if (e.errorStack) {
+        md += `\n**Stack Trace & Diagnostics:**\n\`\`\`python\n${e.errorStack}\n\`\`\`\n`;
+      }
+      md += `\n---\n`;
+    });
+  }
+  
+  res.json({
+    compiledAt: new Date().toISOString(),
+    errorCount: errors.filter(l => l.level === "ERROR").length,
+    warningCount: errors.filter(l => l.level === "WARN").length,
+    markdown: md,
+    filename: `trace-error-report-${new Date().toISOString().slice(0,10)}.md`
+  });
+});
+
+app.post("/api/admin/logs/ai-explain", async (req, res) => {
+  const errors = SYSTEM_LOGS.filter((l) => l.level === "ERROR" || l.level === "WARN");
+  if (errors.length === 0) {
+    return res.json({
+      status: "success",
+      explanation: "### AI Diagnostic Overview\n\nNo errors or warning logs detected in the system logs buffer! The system is operating in a perfectly pristine state. No active debugging or remedial actions are required."
+    });
+  }
+  
+  let logsContext = "Here are the compiled error and warning logs from our Trace System Logs:\n\n";
+  errors.slice(0, 10).forEach((e, idx) => {
+    logsContext += `--- LOG #${idx + 1} ---\n`;
+    logsContext += `Timestamp: ${new Date(e.timestamp).toISOString()}\n`;
+    logsContext += `Level: ${e.level}\n`;
+    logsContext += `Source: ${e.source}\n`;
+    logsContext += `Route: ${e.method} ${e.endpoint} (Status: ${e.statusCode})\n`;
+    logsContext += `Message: ${e.message}\n`;
+    if (e.errorStack) {
+      logsContext += `Stack Trace:\n${e.errorStack}\n`;
+    }
+  });
+  
+  const prompt = `You are "The Socratic Overseer", the advanced clinical-system AI debugger for TRACE (Socratic Medical Learning and Clinical Assessment Portal). 
+Your task is to analyze the following system failure logs, identify the root causes (relational schema, query timeouts, learning loop leaks, AI response formatting, database pool exhaustion, or unauthorized access), and provide a professional, deeply technical Socratic diagnostics report with concrete code or schema solutions.
+
+${logsContext}
+
+Please structure your response in beautiful markdown, including:
+1. **Critical Failure Root Cause Analyses**: Explain exactly what went wrong for each type of error.
+2. **Mitigation Plans**: Provide direct technical, code, or database configuration solutions (such as increasing SQLAlchemy database pool sizes, resolving Neon connection states, or handling Gemini JSON schema mismatches).
+3. **Preventative Engineering Guidelines**: Provide 3 general principles for keeping this application operating with zero-leakage, high-performance, and high-uptime.`;
+
+  try {
+    const explanation = await callGeminiSafe(prompt);
+    res.json({
+      status: "success",
+      explanation: explanation || "AI Socratic explanation pipeline is currently warm. Please retry in a moment."
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: "error",
+      detail: err?.message || "Failed to engage AI diagnostic module"
+    });
+  }
 });
 
 app.post("/api/admin/logs/simulate-error", (req, res) => {

@@ -6,6 +6,7 @@ import {
   Users,
   BookOpen,
   FileCode,
+  FileText,
   Layers,
   Sparkles,
   RefreshCw,
@@ -102,6 +103,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [globalAiPersona, setGlobalAiPersona] = useState<'Socratic Tutor' | 'Strict Clinical Evaluator' | 'Pedagogical Mentor'>('Socratic Tutor');
   const [modelTemperature, setModelTemperature] = useState<number>(0.7);
   const [securityProfile, setSecurityProfile] = useState<'Enforced Zero-Leakage' | 'Audit Mode' | 'Permissive Debug'>('Enforced Zero-Leakage');
+
+  // Compiled report and AI check states
+  const [compiledReportModalOpen, setCompiledReportModalOpen] = useState(false);
+  const [compiledReportData, setCompiledReportData] = useState<{ compiledAt: string; errorCount: number; warningCount: number; markdown: string; filename: string } | null>(null);
+  const [isCompilingReport, setIsCompilingReport] = useState(false);
+  const [aiExplanationText, setAiExplanationText] = useState<string | null>(null);
+  const [isGeneratingAiExplanation, setIsGeneratingAiExplanation] = useState(false);
+
+  const handleCompileErrorReport = async () => {
+    setIsCompilingReport(true);
+    try {
+      const res = await fetch('/api/admin/logs/compile-report');
+      if (res.ok) {
+        const data = await res.json();
+        setCompiledReportData(data);
+        setCompiledReportModalOpen(true);
+      }
+    } catch (err) {
+      console.error("Failed to compile error report:", err);
+    } finally {
+      setIsCompilingReport(false);
+    }
+  };
+
+  const handleRunAiLogCheck = async () => {
+    setIsGeneratingAiExplanation(true);
+    setAiExplanationText(null);
+    try {
+      const res = await fetch('/api/admin/logs/ai-explain', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setAiExplanationText(data.explanation);
+      } else {
+        setAiExplanationText("### AI Check Interrupted\n\nFailed to receive diagnostics from Socratic AI agent. Please ensure the backend is connected and try again.");
+      }
+    } catch (err) {
+      setAiExplanationText("### Diagnostic Pipeline Offline\n\nFailed to establish connection to AI diagnostic agent.");
+    } finally {
+      setIsGeneratingAiExplanation(false);
+    }
+  };
+
+  const handleDownloadMarkdownReport = () => {
+    if (!compiledReportData) return;
+    const dataStr = 'data:text/markdown;charset=utf-8,' + encodeURIComponent(compiledReportData.markdown);
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', compiledReportData.filename);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
 
   // Fetch logs function
   const fetchLogs = async () => {
@@ -693,6 +746,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
+              {/* Compile Error Report */}
+              <button
+                onClick={handleCompileErrorReport}
+                disabled={isCompilingReport}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 text-xs font-semibold transition-all disabled:opacity-50"
+                title="Compile and Analyze Failure Logs"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>{isCompilingReport ? 'Compiling...' : 'Compile Error Report'}</span>
+              </button>
+
+              {/* AI Socratic Scan */}
+              <button
+                onClick={async () => {
+                  await handleCompileErrorReport();
+                  handleRunAiLogCheck();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 text-xs font-semibold transition-all"
+                title="AI Socratic Diagnostic Scan"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                <span>AI Socratic Scan</span>
+              </button>
+
               {/* Export JSON */}
               <button
                 onClick={handleExportLogs}
@@ -824,6 +901,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               {log.durationMs}ms
                             </span>
 
+                            {log.recurrenceCount && log.recurrenceCount > 1 && (
+                              <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[9px] font-bold border border-indigo-500/30 font-mono animate-pulse">
+                                ↺ {log.recurrenceCount}x recurring
+                              </span>
+                            )}
+
                             <span className="text-[10px] text-slate-500 ml-auto hidden sm:inline">
                               {log.source}
                             </span>
@@ -899,6 +982,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         {selectedLog.message}
                       </p>
                     </div>
+
+                    {selectedLog.recurrenceCount && selectedLog.recurrenceCount > 1 && (
+                      <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30 space-y-2">
+                        <div className="flex items-center justify-between text-indigo-400 font-bold">
+                          <span className="flex items-center gap-1">
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Recurring Fault Tracker</span>
+                          </span>
+                          <span className="text-xs bg-indigo-500/20 px-2 py-0.5 rounded-full font-mono">
+                            {selectedLog.recurrenceCount} Hits
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-300 leading-normal">
+                          The first occurrence is preserved above. Subsequent recurrences are listed below:
+                        </p>
+                        
+                        {selectedLog.instances && selectedLog.instances.length > 0 && (
+                          <div className="max-h-24 overflow-y-auto divide-y divide-slate-800 pt-1 text-[10px] font-mono text-slate-400 space-y-1">
+                            {selectedLog.instances.map((inst, iIdx) => (
+                              <div key={iIdx} className="py-1 flex items-center justify-between gap-1">
+                                <span>{new Date(inst.timestamp).toLocaleTimeString()}</span>
+                                <span>IP: {inst.ip}</span>
+                                <span>{inst.durationMs}ms</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {selectedLog.payloadSnippet && (
                       <div>
@@ -1721,6 +1833,174 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <p className="text-[11px] text-slate-400 mt-1">Bash launcher with automated background PID management.</p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* COMPILED ERROR REPORT & AI SOcratic scan DIAGNOSTICS MODAL */}
+      {/* ------------------------------------------------------------- */}
+      {compiledReportModalOpen && compiledReportData && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in duration-200">
+          <div className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden my-8">
+            
+            {/* Header */}
+            <div className="px-6 py-5 bg-slate-950/60 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Compiled Failure Diagnostic Report</h3>
+                  <p className="text-xs text-slate-400">Generated on-demand from real-time telemetry buffer</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setCompiledReportModalOpen(false);
+                  setAiExplanationText(null);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs transition-all"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              
+              {/* Report Metadata */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Report Status</span>
+                  <div className="text-lg font-black text-white mt-2 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                    <span>Active Audit</span>
+                  </div>
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Failures Compiled</span>
+                  <div className="text-2xl font-black text-white mt-2 flex items-center gap-1.5">
+                    <span className="text-red-400">{compiledReportData.errorCount} Errors</span>
+                    <span className="text-slate-500 font-normal">/</span>
+                    <span className="text-amber-400 text-lg">{compiledReportData.warningCount} Warnings</span>
+                  </div>
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">AI Diagnostic Status</span>
+                  <div className="text-lg font-bold text-indigo-400 mt-2 flex items-center gap-1.5">
+                    {isGeneratingAiExplanation ? (
+                      <span className="animate-pulse">Analyzing...</span>
+                    ) : aiExplanationText ? (
+                      <span className="text-emerald-400">Scan Complete</span>
+                    ) : (
+                      <span>Ready for Scan</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-slate-950/40 border border-slate-800">
+                <span className="text-xs text-slate-300">Choose remedial or investigative operations:</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleDownloadMarkdownReport}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/20"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Markdown Report</span>
+                  </button>
+
+                  <button
+                    onClick={handleRunAiLogCheck}
+                    disabled={isGeneratingAiExplanation}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 text-white disabled:text-slate-500 text-xs font-bold transition-all shadow-lg shadow-purple-600/20 disabled:shadow-none"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>{isGeneratingAiExplanation ? 'AI analyzing...' : 'Run Socratic AI Diagnostic'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* TWO COLUMN VIEWER */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Column 1: Compiled Markdown Report */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-indigo-400" />
+                    <span>Compiled Report Stream</span>
+                  </h4>
+                  <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 h-[450px] overflow-y-auto font-mono text-[11px] text-slate-300 space-y-4 leading-relaxed select-text">
+                    <pre className="whitespace-pre-wrap">{compiledReportData.markdown}</pre>
+                  </div>
+                </div>
+
+                {/* Column 2: AI Socratic Explanation */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    <span>Socratic AI Advisor Analysis</span>
+                  </h4>
+                  <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 h-[450px] overflow-y-auto font-sans text-xs text-slate-300 leading-relaxed select-text">
+                    {isGeneratingAiExplanation ? (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-3">
+                        <Sparkles className="w-8 h-8 text-purple-400 animate-spin" />
+                        <p className="font-semibold text-center">Reading crash stacks, logs context and tracing DB operational fallbacks...</p>
+                        <p className="text-[10px] text-slate-500 text-center">Evaluating server connection metrics with Socratic model keys.</p>
+                      </div>
+                    ) : aiExplanationText ? (
+                      <div className="space-y-4 markdown-rendered">
+                        {aiExplanationText.split('\n').map((line, lIdx) => {
+                          const isHeading1 = line.startsWith('# ');
+                          const isHeading2 = line.startsWith('## ');
+                          const isHeading3 = line.startsWith('### ');
+                          const isBullet = line.trim().startsWith('* ') || line.trim().startsWith('- ');
+                          
+                          if (isHeading1) {
+                            return <h2 key={lIdx} className="text-base font-black text-white mt-4 border-b border-slate-800 pb-1">{line.replace('# ', '')}</h2>;
+                          }
+                          if (isHeading2) {
+                            return <h3 key={lIdx} className="text-sm font-black text-indigo-300 mt-3">{line.replace('## ', '')}</h3>;
+                          }
+                          if (isHeading3) {
+                            return <h4 key={lIdx} className="text-xs font-bold text-purple-300 mt-2">{line.replace('### ', '')}</h4>;
+                          }
+                          if (isBullet) {
+                            return <p key={lIdx} className="pl-3 border-l-2 border-indigo-500/40 text-slate-300 py-0.5 my-1">{line.trim().substring(2)}</p>;
+                          }
+                          return <p key={lIdx} className="text-slate-300 my-1.5">{line}</p>;
+                        })}
+                      </div>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-2">
+                        <Sparkles className="w-8 h-8 opacity-40 text-purple-400" />
+                        <p className="text-center font-medium">Socratic diagnostic scanner ready.</p>
+                        <p className="text-[10px] text-slate-600 text-center max-w-xs">Click the "Run Socratic AI Diagnostic" button above to send the crash buffer to Gemini for structural remedial planning.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-950/60 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-[10px] text-slate-500">Security: Enforced Zero-Leakage &bull; Trace Admin Panel v3.2.0</span>
+              <button
+                onClick={() => {
+                  setCompiledReportModalOpen(false);
+                  setAiExplanationText(null);
+                }}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all"
+              >
+                Dismiss Viewer
+              </button>
+            </div>
+
           </div>
         </div>
       )}

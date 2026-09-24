@@ -37,6 +37,15 @@ try:
     Base.metadata.create_all(bind=engine)
     logger.info("Database schemas verified successfully.")
     with Session(bind=engine) as init_db:
+        # Smart automated migrations: Ensure 'type' column exists on 'bookmarks' table
+        try:
+            from sqlalchemy import text
+            init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'general';"))
+            init_db.commit()
+            logger.info("Database migration: Verified type column exists on bookmarks table.")
+        except Exception as migration_err:
+            logger.warning(f"Database migration bookmarks.type column update skipped/handled: {migration_err}")
+
         admin_email = os.environ.get("ADMIN_EMAIL", "admin@trace.edu")
         existing_admin = init_db.query(models.User).filter(models.User.email == admin_email).first()
         if not existing_admin:
