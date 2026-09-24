@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.*
-import androidx.compose.material3.NavigationDrawerDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -141,7 +140,7 @@ fun StudentDashboard(
                         currentTab = "dashboard"
                     },
                     icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    modifier = Modifier.padding(NavigationDrawerDefaults.ItemPadding)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                 )
 
                 NavigationDrawerItem(
@@ -153,7 +152,7 @@ fun StudentDashboard(
                         currentTab = "socratic"
                     },
                     icon = { Icon(Icons.Default.MenuBook, contentDescription = null) },
-                    modifier = Modifier.padding(NavigationDrawerDefaults.ItemPadding)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                 )
 
                 NavigationDrawerItem(
@@ -165,7 +164,7 @@ fun StudentDashboard(
                         currentTab = "assessment"
                     },
                     icon = { Icon(Icons.Default.School, contentDescription = null) },
-                    modifier = Modifier.padding(NavigationDrawerDefaults.ItemPadding)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                 )
 
                 NavigationDrawerItem(
@@ -177,7 +176,7 @@ fun StudentDashboard(
                         currentTab = "connect"
                     },
                     icon = { Icon(Icons.Default.Group, contentDescription = null) },
-                    modifier = Modifier.padding(NavigationDrawerDefaults.ItemPadding)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                 )
 
                 NavigationDrawerItem(
@@ -189,7 +188,7 @@ fun StudentDashboard(
                         currentTab = "timetable"
                     },
                     icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
-                    modifier = Modifier.padding(NavigationDrawerDefaults.ItemPadding)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                 )
 
                 NavigationDrawerItem(
@@ -201,7 +200,7 @@ fun StudentDashboard(
                         onOpenLibrary()
                     },
                     icon = { Icon(Icons.Default.MenuBook, contentDescription = null) },
-                    modifier = Modifier.padding(NavigationDrawerDefaults.ItemPadding)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                 )
 
                 NavigationDrawerItem(
@@ -213,7 +212,7 @@ fun StudentDashboard(
                         onOpenBookmarks()
                     },
                     icon = { Icon(Icons.Default.Bookmark, contentDescription = null) },
-                    modifier = Modifier.padding(NavigationDrawerDefaults.ItemPadding)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                 )
 
                 Spacer(modifier = Modifier.weight(1f))
@@ -227,7 +226,7 @@ fun StudentDashboard(
                         onLogout()
                     },
                     icon = { Icon(Icons.Default.ExitToApp, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                    modifier = Modifier.padding(NavigationDrawerDefaults.ItemPadding)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                 )
             }
         }
