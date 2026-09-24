@@ -125,6 +125,84 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // Fetch live system data for units, users, and quizzes from Neon/Cloud DB
+  const fetchSystemData = async () => {
+    try {
+      // 1. Fetch Users
+      const usersRes = await fetch('/admin/api/system/users');
+      if (usersRes.ok) {
+        const usersData = await usersRes.json();
+        const mappedUsers = usersData.map((u: any) => ({
+          id: String(u.id),
+          username: u.username,
+          email: u.email || `${u.username.toLowerCase()}@trace.edu`,
+          role: u.role,
+          difficulty: u.difficulty || 'Medium (Standard)',
+          semesterStatus: u.semester_status || 'Active',
+          aiPersona: u.ai_persona || 'Helper',
+          sensoryMode: u.sensory_mode || 'Standard',
+          activeUnits: u.active_units || []
+        }));
+        setAllUsers(mappedUsers);
+      }
+
+      // 2. Fetch Units
+      const unitsRes = await fetch('/admin/api/system/units');
+      if (unitsRes.ok) {
+        const unitsData = await unitsRes.json();
+        const mappedUnits = unitsData.map((u: any) => ({
+          id: u.id,
+          unitName: u.name,
+          category: u.category || 'Global',
+          description: 'Loaded from live database',
+          isActive: true,
+          modules: (u.modules || []).map((m: any) => ({
+            id: m.id,
+            unitId: u.id,
+            name: m.name,
+            topics: (m.topics || []).map((t: any) => ({
+              id: t.id,
+              moduleId: m.id,
+              name: t.name,
+              subtopics: (t.subtopics || []).map((s: any) => ({
+                id: s.id,
+                topicId: t.id,
+                name: s.name,
+                isCompleted: s.is_completed || false,
+                objectives: []
+              }))
+            }))
+          }))
+        }));
+        if (mappedUnits.length > 0) {
+          setUnits(mappedUnits);
+        }
+      }
+
+      // 3. Fetch Quizzes
+      const quizzesRes = await fetch('/admin/api/system/quizzes');
+      if (quizzesRes.ok) {
+        const quizzesData = await quizzesRes.json();
+        const mappedQuizzes = quizzesData.map((q: any) => ({
+          id: String(q.id),
+          userId: String(q.owner_id),
+          unitName: q.unit_name,
+          score: q.score,
+          total: q.total,
+          pnlScore: Math.round(q.pnl),
+          timestamp: typeof q.timestamp === 'number' ? q.timestamp : Date.now()
+        }));
+        setQuizHistory(mappedQuizzes);
+      }
+    } catch (err) {
+      console.log('Error loading live system data:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchSystemData();
+  }, []);
+
   // Real-time polling effect
   useEffect(() => {
     fetchLogs();

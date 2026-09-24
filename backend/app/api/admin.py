@@ -813,6 +813,55 @@ async def get_system_telemetry(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/admin/api/system/users")
+async def list_all_users_json(db: Session = Depends(get_db)):
+    from app.schemas import api_schemas as schemas
+    users = db.query(models.User).all()
+    results = []
+    for u in users:
+        response = schemas.UserResponseSchema.model_validate(u)
+        response.active_units = u.active_units_list
+        results.append(response)
+    return results
+
+
+@router.get("/admin/api/system/units")
+async def list_all_global_units_json(db: Session = Depends(get_db)):
+    units = db.query(models.Unit).filter(models.Unit.owner_id == None).all()
+    return [{
+        "id": u.id,
+        "name": u.name,
+        "category": u.category,
+        "modules": [{
+            "id": m.id,
+            "name": m.name,
+            "topics": [{
+                "id": t.id,
+                "name": t.name,
+                "subtopics": [{
+                    "id": s.id,
+                    "name": s.name,
+                    "is_completed": s.is_completed
+                } for s in t.subtopics]
+            } for t in m.topics]
+        } for m in u.modules]
+    } for u in units]
+
+
+@router.get("/admin/api/system/quizzes")
+async def list_all_quizzes_json(db: Session = Depends(get_db)):
+    quizzes = db.query(models.QuizHistory).all()
+    return [{
+        "id": q.id,
+        "unit_name": q.unit_name,
+        "score": q.score,
+        "total": q.total,
+        "pnl": q.pnl,
+        "timestamp": q.timestamp,
+        "owner_id": q.owner_id
+    } for q in quizzes]
+
+
 @router.post("/admin/api/system/test-ai")
 async def test_ai_engine(prompt: str = Form("Hello, test AI connection")):
     """Pings Gemini AI to verify live reasoning status."""

@@ -162,6 +162,22 @@ export const App: React.FC = () => {
           }
           localStorage.setItem('trace_chat_sessions', JSON.stringify(localSessions));
         }
+
+        if (data.user) {
+          const updatedUser: User = {
+            id: String(data.user.id),
+            username: data.user.username || 'Student',
+            email: data.user.email || '',
+            role: data.user.role as any || 'Student',
+            difficulty: data.user.difficulty || 'Medium (Standard)',
+            semesterStatus: data.user.semesterStatus || 'Active',
+            aiPersona: data.user.aiPersona || 'Helper',
+            sensoryMode: data.user.sensoryMode || 'Standard',
+            activeUnits: data.user.activeUnits || []
+          };
+          setUser(updatedUser);
+          TraceStore.setUser(updatedUser);
+        }
       }
 
       // 2. Post merged client state back to the FastAPI cloud backend
