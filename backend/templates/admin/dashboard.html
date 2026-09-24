@@ -3,68 +3,343 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trace Admin Dashboard</title>
+    <title>Edu-AI Trace | Superuser Admin Control Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
         .sidebar-collapsed { width: 0; padding-left: 0; padding-right: 0; overflow: hidden; }
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(1.03); }
+        }
+        .pulse-badge { animation: pulse-subtle 2s infinite ease-in-out; }
     </style>
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100">
-<div class="flex min-h-screen">
-    <aside id="admin-sidebar" class="w-64 shrink-0 border-r border-slate-800 bg-slate-900 p-5 transition-all duration-200">
-        <div class="flex items-center gap-2 mb-10">
-            <div class="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center font-bold">T</div>
-            <div><div class="font-bold">TRACE ADMIN</div><div class="text-xs text-slate-500">v{{ version }}</div></div>
+<body class="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased">
+
+<!-- Top Navigation Bar -->
+<header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+        <button id="admin-nav-toggle" type="button" aria-label="Toggle navigation" class="rounded-lg border border-slate-700 bg-slate-800/60 p-2 text-slate-300 hover:text-white transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 bg-gradient-to-tr from-indigo-600 to-indigo-500 rounded-xl flex items-center justify-center font-black text-white shadow-md shadow-indigo-600/30">
+                T
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="font-extrabold tracking-tight text-white text-base">Edu-AI Trace</span>
+                    <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Superuser</span>
+                </div>
+            </div>
         </div>
-        <nav class="space-y-2 text-sm">
-            <a href="/admin" class="block rounded-lg px-3 py-2 {{ 'bg-indigo-600' if section == 'overview' else 'hover:bg-slate-800' }}">Overview</a>
-            <a href="/admin/ingestion" class="block rounded-lg px-3 py-2 hover:bg-slate-800">Ingest New</a>
-            <a href="/admin/catalogue" class="block rounded-lg px-3 py-2 {{ 'bg-indigo-600' if section == 'catalogue' else 'hover:bg-slate-800' }}">Curriculum Catalogue</a>
-            <a href="/admin/users" class="block rounded-lg px-3 py-2 {{ 'bg-indigo-600' if section == 'users' else 'hover:bg-slate-800' }}">Users &amp; Data</a>
-            <a href="/admin/releases" class="block rounded-lg px-3 py-2 {{ 'bg-indigo-600' if section == 'archives' else 'hover:bg-slate-800' }}">Archives</a>
-            <a href="/admin/database" class="block rounded-lg px-3 py-2 {{ 'bg-indigo-600' if section == 'database' else 'hover:bg-slate-800' }}">Database browser</a>
-        </nav>
-        <form method="post" action="/admin/logout" class="mt-10"><button class="text-sm text-slate-400 hover:text-white">Sign out</button></form>
-    </aside>
-    <main class="min-w-0 flex-1 p-6 md:p-10 max-w-7xl">
-        <button id="admin-nav-toggle" type="button" aria-label="Toggle admin navigation" aria-expanded="true" class="mb-5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-300 hover:text-white">☰ <span class="ml-1 text-sm">Navigation</span></button>
-        <div class="mb-8">
-            <p class="text-sm text-indigo-400 uppercase tracking-widest">Backend management</p>
-            <h1 class="text-3xl font-bold mt-2">
-                {% if section == 'catalogue' %}Curriculum Catalogue{% elif section == 'users' %}Users &amp; Data{% elif section == 'archives' %}Archives{% else %}Admin Dashboard{% endif %}
-            </h1>
+    </div>
+
+    <!-- Top Action & Telemetry Badges -->
+    <div class="flex items-center gap-3 sm:gap-4">
+        <!-- Live System Connection Status -->
+        <div class="hidden md:flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-slate-950/70 border border-slate-800">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <span class="text-slate-300 font-medium">DB: {{ db_type or 'SQLite' }}</span>
+            <span class="text-slate-600">|</span>
+            <span class="text-slate-300 font-medium">AI: {{ 'Gemini Online' if gemini_active else 'Key Needed' }}</span>
         </div>
 
+        <!-- Notifications Bell Trigger -->
+        <button onclick="toggleNotificationsDrawer()" class="relative rounded-xl border border-slate-700/80 bg-slate-800/80 p-2 text-slate-300 hover:text-white hover:border-slate-600 transition flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+            {% if unread_count and unread_count > 0 %}
+            <span id="unread-pill" class="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white shadow-md pulse-badge">
+                {{ unread_count }}
+            </span>
+            {% else %}
+            <span id="unread-pill" class="hidden absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white">0</span>
+            {% endif %}
+        </button>
+
+        <!-- Quick Bug / Glitch Report Modal Button -->
+        <button onclick="openBugReportModal()" class="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition">
+            <span>🐞 Report Glitch</span>
+        </button>
+
+        <!-- Sign Out -->
+        <form method="post" action="/admin/logout">
+            <button class="text-xs font-semibold text-slate-400 hover:text-rose-400 px-3 py-2 rounded-xl hover:bg-slate-800/80 transition">
+                Sign out
+            </button>
+        </form>
+    </div>
+</header>
+
+<div class="flex flex-1 min-h-[calc(100vh-57px)]">
+    <!-- Collapsible Sidebar -->
+    <aside id="admin-sidebar" class="w-64 shrink-0 border-r border-slate-800/80 bg-slate-900/60 p-5 transition-all duration-200 flex flex-col justify-between">
+        <div class="space-y-6">
+            <div>
+                <p class="text-[11px] uppercase tracking-wider font-bold text-slate-500 px-3 mb-2">Core Navigation</p>
+                <nav class="space-y-1 text-sm font-medium">
+                    <a href="/admin/overseer" class="flex items-center justify-between rounded-xl px-3 py-2.5 transition {{ 'bg-gradient-to-r from-rose-600 to-indigo-600 text-white font-bold shadow-lg shadow-rose-600/30' if section == 'overseer' else 'text-slate-200 hover:bg-slate-800/80 hover:text-white' }}">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-base">👁️</span>
+                            <span class="tracking-tight">THE OVERSEER</span>
+                        </div>
+                        <span class="text-[10px] uppercase font-black px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 pulse-badge">Live</span>
+                    </a>
+                    <a href="/admin" class="flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition {{ 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/20' if section == 'overview' else 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                        <span>System Overview</span>
+                    </a>
+                    <a href="/admin/users" class="flex items-center justify-between rounded-xl px-3 py-2.5 transition {{ 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/20' if section == 'users' else 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <div class="flex items-center gap-2.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                            <span>Users &amp; Roles</span>
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">{{ users|length if users else '•' }}</span>
+                    </a>
+                    <a href="/admin/catalogue" class="flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition {{ 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/20' if section == 'catalogue' else 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                        <span>Curriculum Catalogue</span>
+                    </a>
+                    <a href="/admin/ingestion" class="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-slate-300 hover:bg-slate-800/80 hover:text-white transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span>Syllabus Ingestion</span>
+                    </a>
+                    <a href="/admin/database" class="flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition {{ 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/20' if section == 'database' else 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1.5 3 3.5 3h9c2 0 3.5-1 3.5-3V7c0-2-1.5-3-3.5-3h-9C5.5 4 4 5 4 7zm0 5c0 2 1.5 3 3.5 3h9c2 0 3.5-1 3.5-3m-16-5c0 2 1.5 3 3.5 3h9c2 0 3.5-1 3.5-3"/></svg>
+                        <span>Database Browser</span>
+                    </a>
+                    <a href="/admin/releases" class="flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition {{ 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/20' if section == 'archives' else 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                        <span>Release Archives</span>
+                    </a>
+                </nav>
+            </div>
+
+            <!-- External Portals -->
+            <div>
+                <p class="text-[11px] uppercase tracking-wider font-bold text-slate-500 px-3 mb-2">Endpoints &amp; Portals</p>
+                <div class="space-y-1 text-xs">
+                    <a href="/signup" target="_blank" class="flex items-center justify-between rounded-lg px-3 py-2 text-slate-400 hover:bg-slate-800/60 hover:text-indigo-300 transition">
+                        <span>🎓 Student Signup Form</span>
+                        <span>&nearr;</span>
+                    </a>
+                    <a href="/docs" target="_blank" class="flex items-center justify-between rounded-lg px-3 py-2 text-slate-400 hover:bg-slate-800/60 hover:text-indigo-300 transition">
+                        <span>⚡ Swagger API Docs</span>
+                        <span>&nearr;</span>
+                    </a>
+                    <a href="/health" target="_blank" class="flex items-center justify-between rounded-lg px-3 py-2 text-slate-400 hover:bg-slate-800/60 hover:text-indigo-300 transition">
+                        <span>🟢 Diagnostic Health</span>
+                        <span>&nearr;</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="pt-4 border-t border-slate-800/80 text-[11px] text-slate-500">
+            <div>Edu-AI Backend v{{ version }}</div>
+            <div class="text-slate-600 mt-0.5">Superuser Console Active</div>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="min-w-0 flex-1 p-6 md:p-10 max-w-7xl">
+        
+        <!-- SECTION: OVERVIEW -->
         {% if section == 'overview' %}
-        <div class="grid md:grid-cols-3 gap-4 mb-8">
-            <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5"><p class="text-slate-500 text-sm">Users</p><p class="text-3xl font-bold mt-2">{{ users|length }}</p></div>
-            <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5"><p class="text-slate-500 text-sm">Global units</p><p class="text-3xl font-bold mt-2">{{ units|length }}</p></div>
-            <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5"><p class="text-slate-500 text-sm">Archived releases</p><p class="text-3xl font-bold mt-2">{{ releases|length }}</p></div>
+        <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <p class="text-xs uppercase tracking-widest text-indigo-400 font-bold">Superuser Operations</p>
+                <h1 class="text-3xl font-extrabold text-white tracking-tight mt-1">Backend Overview &amp; Control</h1>
+                <p class="text-sm text-slate-400 mt-1">Real-time status of user sessions, curriculum hierarchy, database records, and backend events.</p>
+            </div>
+
+            <!-- Superuser Actions Ribbon -->
+            <div class="flex flex-wrap items-center gap-2.5">
+                <button onclick="testAiEngine()" class="rounded-xl border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 px-3.5 py-2 text-xs font-bold transition flex items-center gap-1.5">
+                    <span>✨ Test AI Engine</span>
+                </button>
+                <button onclick="openBroadcastModal()" class="rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2 text-xs font-bold transition flex items-center gap-1.5">
+                    <span>📢 Broadcast Alert</span>
+                </button>
+                <button onclick="openCreateUserModal()" class="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 text-xs font-bold shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5">
+                    <span>+ New User</span>
+                </button>
+            </div>
         </div>
-        <div class="grid md:grid-cols-2 gap-4">
-            <a href="/admin/ingestion" class="rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-6 hover:bg-indigo-500/20"><h2 class="font-bold text-lg">Ingest New</h2><p class="text-slate-400 text-sm mt-2">Add structured curriculum content.</p></a>
-            <a href="/admin/catalogue" class="rounded-2xl border border-slate-800 bg-slate-900 p-6 hover:bg-slate-800"><h2 class="font-bold text-lg">Open Catalogue</h2><p class="text-slate-400 text-sm mt-2">Inspect and edit complete unit structures.</p></a>
+
+        <!-- Telemetry Cards Grid -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <p class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Users</p>
+                    <span class="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 text-xs">👥</span>
+                </div>
+                <p class="text-3xl font-black text-white mt-2">{{ users|length }}</p>
+                <p class="text-xs text-slate-500 mt-1"><a href="/admin/users" class="text-indigo-400 hover:underline">Manage accounts &rarr;</a></p>
+            </div>
+
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <p class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Global Units</p>
+                    <span class="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs">📚</span>
+                </div>
+                <p class="text-3xl font-black text-white mt-2">{{ units|length }}</p>
+                <p class="text-xs text-slate-500 mt-1"><a href="/admin/catalogue" class="text-emerald-400 hover:underline">Inspect catalogue &rarr;</a></p>
+            </div>
+
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <p class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Quiz Records</p>
+                    <span class="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 text-xs">🎯</span>
+                </div>
+                <p class="text-3xl font-black text-white mt-2">{{ total_quizzes }}</p>
+                <p class="text-xs text-slate-500 mt-1">Retrieval assessments taken</p>
+            </div>
+
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <p class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Unread Alerts</p>
+                    <span class="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-xs">🔔</span>
+                </div>
+                <p class="text-3xl font-black text-rose-400 mt-2" id="stat-unread-count">{{ unread_count }}</p>
+                <p class="text-xs text-slate-500 mt-1"><button onclick="toggleNotificationsDrawer()" class="text-rose-400 hover:underline">View live alerts &rarr;</button></p>
+            </div>
         </div>
+
+        <!-- Two-column: Quick Operations & Recent Superuser Alerts -->
+        <div class="grid lg:grid-cols-3 gap-6 mb-8">
+            <!-- Left: Module Shortcuts & Status -->
+            <div class="lg:col-span-1 space-y-4">
+                <div class="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 space-y-4">
+                    <h2 class="font-bold text-base text-white flex items-center gap-2">
+                        <span>⚡</span>
+                        <span>Quick Management</span>
+                    </h2>
+                    <a href="/admin/ingestion" class="block rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4 hover:bg-indigo-500/20 transition">
+                        <h3 class="font-bold text-sm text-indigo-200">Ingest Syllabus Markdown</h3>
+                        <p class="text-xs text-slate-400 mt-1">Paste curriculum outlines to parse into units, modules &amp; topics.</p>
+                    </a>
+                    <a href="/admin/catalogue" class="block rounded-xl border border-slate-800 bg-slate-950/60 p-4 hover:bg-slate-800/60 transition">
+                        <h3 class="font-bold text-sm text-slate-200">Browse Full Hierarchy</h3>
+                        <p class="text-xs text-slate-400 mt-1">Add, edit, or remove modules, topics, and learning objectives.</p>
+                    </a>
+                    <a href="/admin/database" class="block rounded-xl border border-slate-800 bg-slate-950/60 p-4 hover:bg-slate-800/60 transition">
+                        <h3 class="font-bold text-sm text-slate-200">Database Direct Browser</h3>
+                        <p class="text-xs text-slate-400 mt-1">Directly view and edit table rows across the database.</p>
+                    </a>
+                </div>
+
+                <!-- Live Diagnostics Card -->
+                <div class="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 text-xs space-y-3">
+                    <h3 class="font-bold text-slate-300 uppercase tracking-wider text-[10px]">Environment Diagnostics</h3>
+                    <div class="flex justify-between py-1 border-b border-slate-800/60">
+                        <span class="text-slate-400">Database Driver</span>
+                        <span class="font-mono text-indigo-300 font-semibold">{{ db_type }}</span>
+                    </div>
+                    <div class="flex justify-between py-1 border-b border-slate-800/60">
+                        <span class="text-slate-400">Gemini AI API Key</span>
+                        <span class="font-semibold {{ 'text-emerald-400' if gemini_active else 'text-amber-400' }}">
+                            {{ 'Active (Configured)' if gemini_active else 'Missing GEMINI_API_KEY' }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between py-1">
+                        <span class="text-slate-400">Chat Messages Transcripts</span>
+                        <span class="font-mono text-slate-200">{{ total_chats }} stored</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Real-time Superuser Alerts Feed -->
+            <div class="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/90 p-6 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <h2 class="font-bold text-lg text-white">System Alerts &amp; Glitch Monitor</h2>
+                            <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">Real-Time</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="clearAllNotifications()" class="text-xs text-indigo-400 hover:text-indigo-300 font-semibold">Mark all read</button>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400 mb-4">Instant feed of every user entry, backend 500 error, exception, or reported glitch.</p>
+
+                    <div id="alerts-container" class="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                        {% for n in notifications %}
+                        <div class="rounded-xl border border-slate-800 bg-slate-950/70 p-3.5 flex items-start justify-between gap-3 {{ 'opacity-60' if n.is_read else 'border-l-4 border-l-indigo-500' }}">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] uppercase font-black px-1.5 py-0.5 rounded {{ 'bg-rose-500/20 text-rose-300' if n.level == 'error' or n.level == 'critical' else ('bg-amber-500/20 text-amber-300' if n.level == 'warning' else 'bg-indigo-500/20 text-indigo-300') }}">
+                                        {{ n.category }}
+                                    </span>
+                                    <span class="font-bold text-sm text-slate-200">{{ n.title }}</span>
+                                </div>
+                                <p class="text-xs text-slate-300">{{ n.message }}</p>
+                                {% if n.details %}
+                                <details class="text-[11px] text-slate-500 mt-1 cursor-pointer">
+                                    <summary>View details / trace</summary>
+                                    <pre class="mt-1 p-2 bg-slate-900 rounded border border-slate-800 font-mono text-[10px] text-slate-400 overflow-x-auto">{{ n.details }}</pre>
+                                </details>
+                                {% endif %}
+                            </div>
+                            <div class="text-right shrink-0">
+                                {% if not n.is_read %}
+                                <button onclick="markNotificationRead({{ n.id }}, this)" class="text-[11px] text-indigo-400 hover:underline">Acknowledge</button>
+                                {% else %}
+                                <span class="text-[10px] text-slate-600">Acknowledged</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-sm text-slate-500 text-center py-8">No notifications or glitches recorded yet. System running cleanly!</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
+                    <span>Auto-polling every 10 seconds</span>
+                    <button onclick="fetchNotifications()" class="text-indigo-400 hover:text-indigo-300 font-medium">Refresh Feed Now &circlearrowright;</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION: CURRICULUM CATALOGUE -->
         {% elif section == 'catalogue' %}
+        <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <p class="text-xs uppercase tracking-widest text-indigo-400 font-bold">Curriculum Hierarchy</p>
+                <h1 class="text-3xl font-extrabold text-white tracking-tight mt-1">Curriculum Catalogue</h1>
+                <p class="text-sm text-slate-400 mt-1">Full breakdown of ingested fields, courses, unit groups, and structured learning objectives.</p>
+            </div>
+            <a href="/admin/ingestion" class="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-600/30 transition flex items-center gap-2">
+                <span>+ Ingest New Syllabus</span>
+            </a>
+        </div>
+
         <div class="space-y-6">
             {% for field in catalog %}
-            <section class="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-                <button type="button" class="w-full rounded-xl bg-indigo-600/20 px-5 py-4 text-left text-xl font-bold text-indigo-200" onclick="this.nextElementSibling.classList.toggle('hidden')">
-                    {{ field.name }} <span class="float-right text-sm font-normal text-indigo-300">{{ field.courses|length }} courses</span>
+            <section class="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-lg">
+                <button type="button" class="w-full rounded-xl bg-indigo-600/20 px-5 py-4 text-left text-xl font-extrabold text-indigo-200 hover:bg-indigo-600/30 transition flex items-center justify-between" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                    <span>{{ field.name }}</span>
+                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300">{{ field.courses|length }} courses</span>
                 </button>
-                <div class="mt-4 max-h-[70vh] space-y-3 overflow-y-auto pr-2">
+                <div class="mt-4 space-y-3 pr-1">
                     {% for course in field.courses %}
-                    <details class="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                        <summary class="cursor-pointer font-bold text-slate-200">{{ course.name }} <span class="text-xs text-slate-500">({{ course.unit_groups|length }} unit groups)</span></summary>
-                        <div class="mt-3 grid gap-2">
+                    <details class="rounded-xl border border-slate-800 bg-slate-950/60 p-4" open>
+                        <summary class="cursor-pointer font-bold text-slate-200 text-base">{{ course.name }} <span class="text-xs text-slate-500 font-normal">({{ course.unit_groups|length }} unit groups)</span></summary>
+                        <div class="mt-3 grid gap-3">
                             {% for group in course.unit_groups %}
-                            <div class="rounded-lg border border-slate-800 p-3">
-                                <p class="mb-2 text-sm font-semibold text-indigo-300">{{ group.name }}</p>
+                            <div class="rounded-xl border border-slate-800/80 bg-slate-900/60 p-3.5">
+                                <p class="mb-2 text-xs font-bold uppercase tracking-wider text-indigo-400">{{ group.name }}</p>
                                 <div class="grid gap-2">
                                 {% for unit in group.units %}
-                                    <div class="flex items-center justify-between rounded-lg bg-slate-900 px-3 py-2">
-                                        <a href="/admin/units/{{ unit.id }}" class="text-sm text-slate-200 hover:text-indigo-300">{{ unit.name }} <span class="text-xs text-slate-500">({{ unit.modules|length }} modules)</span></a>
-                                        <a href="/admin/units/{{ unit.id }}" class="text-xs text-indigo-300 hover:underline">Manage</a>
+                                    <div class="flex items-center justify-between rounded-xl bg-slate-950 px-4 py-2.5 border border-slate-800/60 hover:border-indigo-500/40 transition">
+                                        <div>
+                                            <a href="/admin/units/{{ unit.id }}" class="text-sm font-semibold text-slate-200 hover:text-indigo-300">{{ unit.name }}</a>
+                                            <span class="text-xs text-slate-500 ml-2">({{ unit.modules|length }} modules)</span>
+                                        </div>
+                                        <a href="/admin/units/{{ unit.id }}" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-3 py-1.5 rounded-lg border border-indigo-500/20 transition">Manage Unit &rarr;</a>
                                     </div>
                                 {% endfor %}
                                 </div>
@@ -75,70 +350,750 @@
                     {% endfor %}
                 </div>
             </section>
-            {% else %}<p class="text-slate-500">No global units have been ingested.</p>{% endfor %}
+            {% else %}
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center">
+                <p class="text-slate-400">No curriculum units found in database.</p>
+                <a href="/admin/ingestion" class="mt-4 inline-block rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white">Ingest your first syllabus &rarr;</a>
+            </div>
+            {% endfor %}
         </div>
+
+        <!-- SECTION: USERS & ROLES -->
         {% elif section == 'users' %}
-        <div class="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
-            <table class="w-full text-left text-sm"><thead class="border-b border-slate-800 text-slate-500"><tr><th class="p-4">User</th><th class="p-4">Role</th><th class="p-4">Units</th><th class="p-4">ID</th></tr></thead><tbody>
-            {% for user in users %}<tr class="border-b border-slate-800/70"><td class="p-4"><a class="font-semibold text-indigo-300 hover:underline" href="/admin/users/{{ user.id }}">{{ user.username }}</a><div class="text-slate-500">{{ user.email or 'No email' }}</div></td><td class="p-4">{{ user.role }}</td><td class="p-4">{{ user.units|length }}</td><td class="p-4 text-slate-500">#{{ user.id }}</td></tr>{% else %}<tr><td class="p-4 text-slate-500" colspan="4">No users found.</td></tr>{% endfor %}
-            </tbody></table>
+        <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <p class="text-xs uppercase tracking-widest text-indigo-400 font-bold">User Management</p>
+                <h1 class="text-3xl font-extrabold text-white tracking-tight mt-1">Users &amp; Roles</h1>
+                <p class="text-sm text-slate-400 mt-1">Oversee accounts, adjust difficulty and sensory settings, or promote user roles.</p>
+            </div>
+            <button onclick="openCreateUserModal()" class="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-600/30 transition flex items-center gap-2">
+                <span>+ Create Account</span>
+            </button>
         </div>
+
+        <div class="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/90 shadow-xl">
+            <table class="w-full text-left text-sm">
+                <thead class="border-b border-slate-800 bg-slate-950/60 text-slate-400 text-xs uppercase tracking-wider">
+                    <tr>
+                        <th class="p-4">User</th>
+                        <th class="p-4">Role</th>
+                        <th class="p-4">Difficulty</th>
+                        <th class="p-4">Units</th>
+                        <th class="p-4">Quizzes</th>
+                        <th class="p-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60">
+                    {% for u in users %}
+                    <tr class="hover:bg-slate-800/30 transition">
+                        <td class="p-4">
+                            <a class="font-bold text-indigo-300 hover:text-indigo-200 hover:underline text-sm" href="/admin/users/{{ u.id }}">
+                                {{ u.username }}
+                            </a>
+                            <div class="text-xs text-slate-400">{{ u.email or 'No email' }}</div>
+                        </td>
+                        <td class="p-4">
+                            <span class="text-xs px-2.5 py-1 rounded-full font-bold {{ 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' if u.role == 'Admin' else ('bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' if u.role == 'Teacher' else 'bg-slate-800 text-slate-300') }}">
+                                {{ u.role }}
+                            </span>
+                        </td>
+                        <td class="p-4 text-xs text-slate-300">{{ u.difficulty }}</td>
+                        <td class="p-4 text-xs text-slate-300">{{ u.units|length }}</td>
+                        <td class="p-4 text-xs text-slate-300">{{ u.quiz_history|length }}</td>
+                        <td class="p-4 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <a href="/admin/users/{{ u.id }}" class="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition">Inspect</a>
+                                <form method="post" action="/admin/users/{{ u.id }}/delete" onsubmit="return confirm('Permanently delete user {{ u.username }}?');">
+                                    <button class="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 transition">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td class="p-8 text-center text-slate-500" colspan="6">No registered users found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- SECTION: DATABASE BROWSER -->
         {% elif section == 'database' %}
+        <div class="mb-6">
+            <p class="text-xs uppercase tracking-widest text-indigo-400 font-bold">Data Architecture</p>
+            <h1 class="text-3xl font-extrabold text-white tracking-tight mt-1">Database Direct Inspector</h1>
+            <p class="text-sm text-slate-400 mt-1">Directly query and verify table records, schema integrity, and real-time state.</p>
+        </div>
+
         <div class="space-y-4">
-            <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">Database editor. Every write checks the row for conflicts and requires the admin password again. Password hashes and primary keys cannot be edited.</div>
             {% for table in database_tables %}
-            <details class="rounded-2xl border border-slate-800 bg-slate-900">
-                <summary class="cursor-pointer px-5 py-4 font-bold">{{ table.label }} <span class="text-xs font-normal text-slate-500">({{ table.rows|length }} rows)</span></summary>
+            <details class="rounded-2xl border border-slate-800 bg-slate-900/90 shadow-lg" {% if loop.first %}open{% endif %}>
+                <summary class="cursor-pointer px-6 py-4 font-bold text-base flex items-center justify-between">
+                    <span class="text-white">{{ table.label }} <code class="text-xs font-mono text-indigo-400 ml-2">({{ table.table_name }})</code></span>
+                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-slate-400">{{ table.rows|length }} rows loaded</span>
+                </summary>
                 <div class="max-h-96 overflow-auto border-t border-slate-800">
-                    <table class="min-w-full text-left text-xs"><thead class="sticky top-0 bg-slate-950 text-slate-500"><tr>{% for column in table.columns %}<th class="whitespace-nowrap px-3 py-2">{{ column }}</th>{% endfor %}<th class="px-3 py-2">Commit</th></tr></thead><tbody>
-                    {% for row in table.rows %}<tr class="border-t border-slate-800/70">{% for column in table.columns %}<td class="max-w-xs whitespace-nowrap px-3 py-2 text-slate-300">{% if column in table.editable_columns %}<input name="{{ column }}" value="{{ row['values'][column] }}" form="edit-{{ table.table_name }}-{{ row['id'] }}" class="w-full min-w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1">{% else %}{{ row['values'][column] }}{% endif %}</td>{% endfor %}<td class="px-3 py-2"><details><summary class="cursor-pointer text-indigo-300">Commit</summary><form id="edit-{{ table.table_name }}-{{ row['id'] }}" method="post" action="/admin/database/{{ table.table_name }}/{{ row['id'] }}" class="mt-2 space-y-2"><input type="hidden" name="original" value="{{ row['original'] }}"><input name="admin_password" type="password" required placeholder="Admin password" class="w-36 rounded border border-slate-700 bg-slate-950 px-2 py-1"><button class="rounded bg-indigo-600 px-2 py-1 text-xs">Confirm</button></form></details></td></tr>{% else %}<tr><td class="px-3 py-4 text-slate-500" colspan="{{ table.columns|length + 1 }}">No rows.</td></tr>{% endfor %}
-                    </tbody></table>
+                    <table class="min-w-full text-left text-xs">
+                        <thead class="sticky top-0 bg-slate-950 text-slate-400 font-semibold uppercase">
+                            <tr>
+                                {% for column in table.columns %}
+                                <th class="whitespace-nowrap px-4 py-3">{{ column }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/60">
+                            {% for row in table.rows %}
+                            <tr class="hover:bg-slate-800/20">
+                                {% for column in table.columns %}
+                                <td class="max-w-xs whitespace-nowrap px-4 py-2.5 text-slate-300 font-mono">
+                                    {{ row['values'][column] }}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% else %}
+                            <tr><td class="px-4 py-4 text-slate-500" colspan="{{ table.columns|length }}">No records found.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </details>
             {% endfor %}
         </div>
+
+        <!-- SECTION: ARCHIVES / RELEASES -->
         {% elif section == 'archives' %}
+        <div class="mb-6">
+            <p class="text-xs uppercase tracking-widest text-indigo-400 font-bold">Release Management</p>
+            <h1 class="text-3xl font-extrabold text-white tracking-tight mt-1">Artifact &amp; Release Archives</h1>
+            <p class="text-sm text-slate-400 mt-1">Manage version numbers, binary APK download links, and release notes.</p>
+        </div>
+
         <div class="grid lg:grid-cols-2 gap-6">
-            <form method="post" action="/admin/releases" class="rounded-2xl border border-slate-800 bg-slate-900 p-6 space-y-3">
-                <h2 class="font-bold text-lg mb-3">Archive a release</h2>
-                <input name="version" required placeholder="Version (e.g. 3.1.5)" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
-                <input name="artifact_type" value="Trace Mobile App" placeholder="Artifact type" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
-                <input name="download_url" type="url" placeholder="Download URL" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
-                <textarea name="release_notes" rows="4" placeholder="Release notes" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"></textarea>
-                <label class="flex items-center gap-2 text-sm text-slate-400"><input type="checkbox" name="is_current" value="true" class="accent-indigo-600"> Mark as current release</label>
-                <button class="rounded-lg bg-indigo-600 px-4 py-2 font-bold">Archive release</button>
+            <form method="post" action="/admin/releases" class="rounded-2xl border border-slate-800 bg-slate-900/90 p-6 space-y-4 shadow-lg">
+                <h2 class="font-bold text-base text-white">Publish / Archive Release</h2>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Version string</label>
+                    <input name="version" required placeholder="e.g. 3.2.0" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Artifact Type</label>
+                    <input name="artifact_type" value="Trace Android App" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Download URL</label>
+                    <input name="download_url" type="url" placeholder="https://..." class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Release Notes</label>
+                    <textarea name="release_notes" rows="3" placeholder="What changed in this build?" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500"></textarea>
+                </div>
+                <button class="w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 py-3 font-bold text-sm text-white shadow-md shadow-indigo-600/30 transition">Archive Release</button>
             </form>
+
             <div class="space-y-3">
-                <h2 class="font-bold text-lg">Files in Archives/</h2>
-                {% for asset in archive_files %}<form method="post" action="/admin/archives/{{ asset.file_name }}" class="rounded-xl border border-slate-800 bg-slate-900 p-4 space-y-2">
-                    <div class="flex justify-between"><a class="font-semibold text-indigo-300 hover:underline" href="/admin/archives/{{ asset.file_name }}">{{ asset.file_name }}</a><span class="text-xs text-slate-500">{{ (asset.size / 1048576)|round(2) }} MB · {{ asset.modified_at.strftime('%Y-%m-%d') }}</span></div>
-                    <input name="display_name" value="{{ asset.display_name }}" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
-                    <input name="artifact_type" value="{{ asset.artifact_type }}" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
-                    <textarea name="release_notes" rows="2" placeholder="Archive notes" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm">{{ asset.release_notes or '' }}</textarea>
-                    <button class="rounded-lg bg-slate-700 px-3 py-2 text-xs">Save archive details</button>
-                </form>{% else %}<p class="text-slate-500">No files found in Archives/.</p>{% endfor %}
-                {% for release in releases %}<div class="rounded-xl border border-slate-800 bg-slate-900 p-4"><div class="flex justify-between"><b>v{{ release.version }}</b><span class="text-xs text-slate-500">{{ release.artifact_type }}</span></div>{% if release.download_url %}<a class="text-sm text-indigo-400 hover:underline" href="{{ release.download_url }}" target="_blank" rel="noopener">Download</a>{% endif %}<p class="text-sm text-slate-400 mt-2">{{ release.release_notes or 'No release notes.' }}</p></div>{% endfor %}
+                <h2 class="font-bold text-base text-white">Logged Releases</h2>
+                {% for release in releases %}
+                <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-2 shadow">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-indigo-300 text-base">v{{ release.version }}</span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400">{{ release.artifact_type }}</span>
+                    </div>
+                    {% if release.download_url %}
+                    <a href="{{ release.download_url }}" target="_blank" class="text-xs text-indigo-400 hover:underline block truncate">{{ release.download_url }}</a>
+                    {% endif %}
+                    <p class="text-xs text-slate-300 whitespace-pre-line">{{ release.release_notes or 'No release notes.' }}</p>
+                </div>
+                {% else %}
+                <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center text-slate-500 text-sm">No releases archived yet.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- SECTION: THE OVERSEER (LIVE WIRETAP & COMMAND CENTER) -->
+        {% elif section == 'overseer' %}
+        <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">👁️</span>
+                    <p class="text-xs uppercase tracking-widest text-rose-400 font-extrabold">Superuser Command Center</p>
+                </div>
+                <h1 class="text-3xl font-black text-white tracking-tight mt-1">THE OVERSEER</h1>
+                <p class="text-sm text-slate-400 mt-1">Live HTTP wiretap, infrastructure connection status, and on-demand module diagnostics.</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="runAllModuleTests()" id="btn-run-all" class="rounded-xl bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white px-4 py-2.5 text-xs font-black shadow-lg shadow-rose-600/30 transition flex items-center gap-2">
+                    <span>⚡ RUN FULL SYSTEM DIAGNOSTIC</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Infrastructure & Connection Mesh -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <!-- Neon PostgreSQL -->
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-lg relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                        <h3 class="font-bold text-sm text-white">Neon Database</h3>
+                    </div>
+                    <button onclick="runModuleTest('neon_db')" class="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/20">Ping</button>
+                </div>
+                <p class="text-xs text-slate-400 mt-2 font-mono truncate" title="{{ neon_host }}">{{ neon_host }}</p>
+                <div class="mt-3 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-500">Driver</span>
+                    <span class="font-semibold text-emerald-400">{{ db_type }}</span>
+                </div>
+            </div>
+
+            <!-- Hugging Face Space -->
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                        <h3 class="font-bold text-sm text-white">Hugging Face Space</h3>
+                    </div>
+                    <button onclick="runModuleTest('huggingface')" class="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/20">Check</button>
+                </div>
+                <p class="text-xs text-slate-400 mt-2 font-mono truncate">{{ hf_space_id }}</p>
+                <div class="mt-3 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-500">Deployment</span>
+                    <a href="https://{{ hf_host }}" target="_blank" class="font-semibold text-indigo-400 hover:underline">Launch Space &nearr;</a>
+                </div>
+            </div>
+
+            <!-- Gemini AI Engine -->
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse"></span>
+                        <h3 class="font-bold text-sm text-white">Gemini AI Engine</h3>
+                    </div>
+                    <button onclick="runModuleTest('socratic_ai')" class="text-[11px] font-bold text-purple-400 hover:text-purple-300 bg-purple-500/10 px-2 py-1 rounded border border-purple-500/20">Probe</button>
+                </div>
+                <p class="text-xs text-slate-400 mt-2">Socratic &amp; Quiz Reasoning</p>
+                <div class="mt-3 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-500">Key Quota</span>
+                    <span class="font-semibold {{ 'text-emerald-400' if gemini_active else 'text-rose-400' }}">{{ 'Active' if gemini_active else 'Missing' }}</span>
+                </div>
+            </div>
+
+            <!-- GitHub Source Repo -->
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                        <h3 class="font-bold text-sm text-white">GitHub Repository</h3>
+                    </div>
+                    <a href="{{ git_repo }}" target="_blank" class="text-[11px] font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">Repo &nearr;</a>
+                </div>
+                <p class="text-xs text-slate-400 mt-2 font-mono truncate">Agent606/Edu-AI</p>
+                <div class="mt-3 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-500">Branch</span>
+                    <span class="font-semibold text-slate-300 font-mono">main</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Module Diagnostic Runner Results -->
+        <div id="diagnostics-panel" class="mb-8 rounded-2xl border border-slate-800 bg-slate-900/90 p-6 shadow-xl hidden">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-black text-base text-white flex items-center gap-2">
+                    <span>🧪</span>
+                    <span>Module Diagnostic Suite Execution</span>
+                </h2>
+                <button onclick="document.getElementById('diagnostics-panel').classList.add('hidden')" class="text-xs text-slate-500 hover:text-slate-300">Close Panel</button>
+            </div>
+            <div id="diagnostic-results" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+        <!-- Individual Module Trigger Ribbon -->
+        <div class="mb-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Live Test Individual Modules</h3>
+            <div class="flex flex-wrap gap-2.5">
+                <button onclick="runModuleTest('neon_db')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 transition">
+                    🗄️ Neon DB Roundtrip
+                </button>
+                <button onclick="runModuleTest('socratic_ai')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 transition">
+                    🧠 Socratic AI Tutor
+                </button>
+                <button onclick="runModuleTest('quiz_engine')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 transition">
+                    🎯 Active Recall Quiz
+                </button>
+                <button onclick="runModuleTest('syllabus_parser')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 transition">
+                    📑 Syllabus Ingestion
+                </button>
+                <button onclick="runModuleTest('user_sync')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 transition">
+                    🔄 Bidirectional Sync
+                </button>
+                <button onclick="runModuleTest('auth_security')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 transition">
+                    🔐 Bcrypt &amp; JWT Signer
+                </button>
+            </div>
+        </div>
+
+        <!-- Live Incoming Requests Wiretap Feed -->
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/90 shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <div>
+                        <h2 class="font-extrabold text-base text-white">Live HTTP Wiretap &amp; Traffic Feed</h2>
+                        <p class="text-xs text-slate-400">Incoming student API consults, syncing payloads, and admin operations.</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="toggleTrafficStream()" id="btn-stream-toggle" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+                        Pause Stream
+                    </button>
+                    <button onclick="clearTrafficFeed()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-rose-400 transition">
+                        Clear Wiretap
+                    </button>
+                </div>
+            </div>
+
+            <div class="max-h-[500px] overflow-y-auto">
+                <table class="w-full text-left text-xs font-mono">
+                    <thead class="sticky top-0 bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
+                        <tr>
+                            <th class="p-3.5">Time</th>
+                            <th class="p-3.5">Method</th>
+                            <th class="p-3.5">Endpoint Path</th>
+                            <th class="p-3.5">Status</th>
+                            <th class="p-3.5">Latency</th>
+                            <th class="p-3.5">IP Source</th>
+                            <th class="p-3.5">Agent</th>
+                        </tr>
+                    </thead>
+                    <tbody id="traffic-table-body" class="divide-y divide-slate-800/60 font-medium">
+                        {% for req in traffic %}
+                        <tr class="hover:bg-slate-800/30 transition {{ 'bg-rose-500/5 text-rose-300' if req.is_error else 'text-slate-300' }}">
+                            <td class="p-3 text-slate-500 whitespace-nowrap">{{ req.time_str }}</td>
+                            <td class="p-3">
+                                <span class="px-1.5 py-0.5 rounded font-bold text-[10px] {{ 'bg-emerald-500/20 text-emerald-300' if req.method == 'GET' else ('bg-indigo-500/20 text-indigo-300' if req.method == 'POST' else 'bg-rose-500/20 text-rose-300') }}">
+                                    {{ req.method }}
+                                </span>
+                            </td>
+                            <td class="p-3 font-semibold text-slate-200">{{ req.path }}</td>
+                            <td class="p-3">
+                                <span class="px-1.5 py-0.5 rounded font-bold text-[10px] {{ 'bg-emerald-500/20 text-emerald-400' if req.status_code < 400 else 'bg-rose-500/20 text-rose-400' }}">
+                                    {{ req.status_code }}
+                                </span>
+                            </td>
+                            <td class="p-3 text-slate-400">{{ req.duration_ms }}ms</td>
+                            <td class="p-3 text-slate-500">{{ req.ip }}</td>
+                            <td class="p-3 text-slate-500 truncate max-w-xs">{{ req.user_agent }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="7" class="p-8 text-center text-slate-500">No incoming HTTP requests captured in current session buffer.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
         {% endif %}
     </main>
 </div>
+
+<!-- Slide-Over Notifications Drawer -->
+<div id="notifications-drawer" class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl transform translate-x-full transition-transform duration-300 flex flex-col">
+    <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div class="flex items-center gap-2">
+            <span class="text-lg">🔔</span>
+            <h3 class="font-bold text-white text-base">Superuser Alert Center</h3>
+        </div>
+        <button onclick="toggleNotificationsDrawer()" class="text-slate-400 hover:text-white p-1">✕</button>
+    </div>
+    <div class="p-4 bg-slate-950/30 flex items-center justify-between border-b border-slate-800/80">
+        <span class="text-xs text-slate-400">All glitches, errors &amp; registrations</span>
+        <button onclick="clearAllNotifications()" class="text-xs font-semibold text-indigo-400 hover:underline">Mark all read</button>
+    </div>
+    <div id="drawer-alerts-list" class="flex-1 overflow-y-auto p-4 space-y-3">
+        <!-- Injected dynamically via JS -->
+    </div>
+</div>
+
+<!-- Modal: Report Glitch / Bug -->
+<div id="bug-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-white text-lg">Report Glitch / Bug</h3>
+            <button onclick="closeBugReportModal()" class="text-slate-400 hover:text-white">✕</button>
+        </div>
+        <form onsubmit="submitBugReport(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Issue Title</label>
+                <input id="bug-title" required placeholder="e.g. Ingestion failed on Module 3" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Description</label>
+                <textarea id="bug-desc" required rows="3" placeholder="Explain what occurred..." class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500"></textarea>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Reporter</label>
+                <input id="bug-reporter" placeholder="Admin or Student Username" value="Admin" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+            </div>
+            <button type="submit" class="w-full rounded-xl bg-amber-600 hover:bg-amber-500 py-3 font-bold text-sm text-white transition">Log Issue &amp; Alert Superuser</button>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Create User -->
+<div id="create-user-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-white text-lg">Create New Account</h3>
+            <button onclick="closeCreateUserModal()" class="text-slate-400 hover:text-white">✕</button>
+        </div>
+        <form method="post" action="/admin/users/create" class="space-y-3">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Username</label>
+                <input name="username" required class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Email</label>
+                <input name="email" type="email" required class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Password</label>
+                <input name="password" type="password" required class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Role</label>
+                <select name="role" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+                    <option value="Student">Student</option>
+                    <option value="Teacher">Teacher</option>
+                    <option value="Admin">Admin (Superuser)</option>
+                </select>
+            </div>
+            <button type="submit" class="w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 py-3 font-bold text-sm text-white shadow-md shadow-indigo-600/30 transition mt-2">Create Account</button>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Broadcast Alert -->
+<div id="broadcast-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-white text-lg">Broadcast System Alert</h3>
+            <button onclick="closeBroadcastModal()" class="text-slate-400 hover:text-white">✕</button>
+        </div>
+        <form onsubmit="submitBroadcast(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Alert Headline</label>
+                <input id="broadcast-title" required placeholder="e.g. Scheduled Maintenance" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Message</label>
+                <textarea id="broadcast-msg" required rows="3" placeholder="Details for all connected users..." class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500"></textarea>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Severity Level</label>
+                <select id="broadcast-level" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+                    <option value="info">Info</option>
+                    <option value="warning">Warning</option>
+                    <option value="error">Critical</option>
+                </select>
+            </div>
+            <button type="submit" class="w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 py-3 font-bold text-sm text-white shadow-md shadow-indigo-600/30 transition">Dispatch Broadcast</button>
+        </form>
+    </div>
+</div>
+
 <script>
+    // Sidebar toggle persistence
     (() => {
         const sidebar = document.getElementById("admin-sidebar");
         const toggle = document.getElementById("admin-nav-toggle");
         const key = "trace-admin-sidebar-collapsed";
         const setCollapsed = (collapsed) => {
-            sidebar.classList.toggle("sidebar-collapsed", collapsed);
-            toggle.setAttribute("aria-expanded", String(!collapsed));
+            if (collapsed) {
+                sidebar.classList.add("sidebar-collapsed");
+            } else {
+                sidebar.classList.remove("sidebar-collapsed");
+            }
         };
-        setCollapsed(window.localStorage.getItem(key) === "true");
+        if (window.localStorage.getItem(key) === "true") {
+            setCollapsed(true);
+        }
         toggle.addEventListener("click", () => {
-            const collapsed = !sidebar.classList.contains("sidebar-collapsed");
-            setCollapsed(collapsed);
-            window.localStorage.setItem(key, String(collapsed));
+            const isNowCollapsed = !sidebar.classList.contains("sidebar-collapsed");
+            setCollapsed(isNowCollapsed);
+            window.localStorage.setItem(key, String(isNowCollapsed));
         });
     })();
+
+    // Notifications Drawer & Auto-Poll
+    function toggleNotificationsDrawer() {
+        const drawer = document.getElementById("notifications-drawer");
+        drawer.classList.toggle("translate-x-full");
+        if (!drawer.classList.contains("translate-x-full")) {
+            fetchNotifications();
+        }
+    }
+
+    async function fetchNotifications() {
+        try {
+            const res = await fetch("/admin/api/notifications");
+            const data = await res.json();
+            
+            // Update unread pill
+            const pill = document.getElementById("unread-pill");
+            if (pill) {
+                if (data.unread_count > 0) {
+                    pill.textContent = data.unread_count;
+                    pill.classList.remove("hidden");
+                } else {
+                    pill.classList.add("hidden");
+                }
+            }
+            const statUnread = document.getElementById("stat-unread-count");
+            if (statUnread) {
+                statUnread.textContent = data.unread_count;
+            }
+
+            // Populate drawer
+            const drawerList = document.getElementById("drawer-alerts-list");
+            if (drawerList) {
+                if (data.notifications.length === 0) {
+                    drawerList.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">No notifications on record.</p>`;
+                } else {
+                    drawerList.innerHTML = data.notifications.map(n => `
+                        <div class="rounded-xl border border-slate-800 bg-slate-950/80 p-3 text-xs space-y-1 ${n.is_read ? 'opacity-60' : 'border-l-4 border-l-indigo-500'}">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-200">${n.title}</span>
+                                <span class="text-[10px] text-slate-500">${n.time_str || ''}</span>
+                            </div>
+                            <p class="text-slate-300">${n.message}</p>
+                            ${!n.is_read ? `<button onclick="markNotificationRead(${n.id}, this)" class="text-[11px] text-indigo-400 hover:underline">Mark read</button>` : ''}
+                        </div>
+                    `).join("");
+                }
+            }
+        } catch (e) {
+            console.error("Failed to fetch notifications:", e);
+        }
+    }
+
+    async function markNotificationRead(id, btnElement) {
+        try {
+            await fetch(`/admin/api/notifications/${id}/read`, { method: "POST" });
+            if (btnElement) {
+                const parent = btnElement.closest(".rounded-xl");
+                if (parent) parent.classList.add("opacity-60");
+                btnElement.remove();
+            }
+            fetchNotifications();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function clearAllNotifications() {
+        try {
+            await fetch("/admin/api/notifications/clear", { method: "POST" });
+            fetchNotifications();
+            window.location.reload();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // Auto-poll notifications every 10 seconds
+    setInterval(fetchNotifications, 10000);
+
+    // AI Engine Test
+    async function testAiEngine() {
+        const btn = event.target;
+        btn.textContent = "Testing...";
+        try {
+            const formData = new FormData();
+            formData.append("prompt", "Superuser latency check");
+            const res = await fetch("/admin/api/system/test-ai", { method: "POST", body: formData });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`✨ AI Engine Online! Latency: ${data.latency_ms}ms\n\nResponse snippet: ${data.response?.substring(0, 120)}...`);
+            } else {
+                alert(`⚠️ AI Engine Notice: ${data.detail || 'Connection test failed'}`);
+            }
+        } catch (e) {
+            alert(`Error pinging AI engine: ${e.message}`);
+        } finally {
+            btn.textContent = "✨ Test AI Engine";
+        }
+    }
+
+    // Modal helpers
+    function openBugReportModal() { document.getElementById("bug-modal").classList.remove("hidden"); }
+    function closeBugReportModal() { document.getElementById("bug-modal").classList.add("hidden"); }
+
+    function openCreateUserModal() { document.getElementById("create-user-modal").classList.remove("hidden"); }
+    function closeCreateUserModal() { document.getElementById("create-user-modal").classList.add("hidden"); }
+
+    function openBroadcastModal() { document.getElementById("broadcast-modal").classList.remove("hidden"); }
+    function closeBroadcastModal() { document.getElementById("broadcast-modal").classList.add("hidden"); }
+
+    async function submitBugReport(e) {
+        e.preventDefault();
+        const title = document.getElementById("bug-title").value;
+        const desc = document.getElementById("bug-desc").value;
+        const reporter = document.getElementById("bug-reporter").value;
+
+        const formData = new FormData();
+        formData.append("title", title);
+        formData.append("description", desc);
+        formData.append("reporter", reporter);
+
+        await fetch("/admin/report-bug", { method: "POST", body: formData });
+        closeBugReportModal();
+        alert("Bug reported and added to Superuser Alerts!");
+        fetchNotifications();
+        window.location.reload();
+    }
+
+    async function submitBroadcast(e) {
+        e.preventDefault();
+        const title = document.getElementById("broadcast-title").value;
+        const msg = document.getElementById("broadcast-msg").value;
+        const level = document.getElementById("broadcast-level").value;
+
+        const formData = new FormData();
+        formData.append("title", title);
+        formData.append("message", msg);
+        formData.append("level", level);
+
+        await fetch("/admin/api/broadcast", { method: "POST", body: formData });
+        closeBroadcastModal();
+        alert("Broadcast dispatched to system alerts!");
+        fetchNotifications();
+        window.location.reload();
+    }
+
+    // ==========================================
+    // THE OVERSEER LIVE WIRETAP & MODULE RUNNER
+    // ==========================================
+    let isWiretapStreaming = true;
+
+    function toggleTrafficStream() {
+        isWiretapStreaming = !isWiretapStreaming;
+        const btn = document.getElementById("btn-stream-toggle");
+        if (btn) {
+            btn.textContent = isWiretapStreaming ? "Pause Stream" : "Resume Stream";
+            btn.classList.toggle("bg-amber-600", !isWiretapStreaming);
+        }
+    }
+
+    function clearTrafficFeed() {
+        const tbody = document.getElementById("traffic-table-body");
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">Wiretap log cleared. Awaiting new requests...</td></tr>`;
+        }
+    }
+
+    async function fetchLiveTraffic() {
+        if (!isWiretapStreaming) return;
+        const tbody = document.getElementById("traffic-table-body");
+        if (!tbody) return;
+
+        try {
+            const res = await fetch("/admin/api/live-traffic");
+            const data = await res.json();
+            if (data.traffic && data.traffic.length > 0) {
+                tbody.innerHTML = data.traffic.map(req => `
+                    <tr class="hover:bg-slate-800/30 transition ${req.is_error ? 'bg-rose-500/5 text-rose-300' : 'text-slate-300'}">
+                        <td class="p-3 text-slate-500 whitespace-nowrap">${req.time_str}</td>
+                        <td class="p-3">
+                            <span class="px-1.5 py-0.5 rounded font-bold text-[10px] ${req.method === 'GET' ? 'bg-emerald-500/20 text-emerald-300' : (req.method === 'POST' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-rose-500/20 text-rose-300')}">
+                                ${req.method}
+                            </span>
+                        </td>
+                        <td class="p-3 font-semibold text-slate-200">${req.path}</td>
+                        <td class="p-3">
+                            <span class="px-1.5 py-0.5 rounded font-bold text-[10px] ${req.status_code < 400 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
+                                ${req.status_code}
+                            </span>
+                        </td>
+                        <td class="p-3 text-slate-400">${req.duration_ms}ms</td>
+                        <td class="p-3 text-slate-500">${req.ip}</td>
+                        <td class="p-3 text-slate-500 truncate max-w-xs">${req.user_agent || ''}</td>
+                    </tr>
+                `).join("");
+            }
+        } catch (e) {
+            console.error("Traffic poll failed:", e);
+        }
+    }
+
+    if (window.location.pathname.includes("overseer")) {
+        setInterval(fetchLiveTraffic, 2500);
+    }
+
+    async function runModuleTest(moduleName) {
+        const panel = document.getElementById("diagnostics-panel");
+        const resultsContainer = document.getElementById("diagnostic-results");
+        if (panel) panel.classList.remove("hidden");
+
+        const tempCardId = `test-${moduleName}`;
+        let existingCard = document.getElementById(tempCardId);
+        if (!existingCard && resultsContainer) {
+            existingCard = document.createElement("div");
+            existingCard.id = tempCardId;
+            existingCard.className = "rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-2";
+            resultsContainer.prepend(existingCard);
+        }
+
+        if (existingCard) {
+            existingCard.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-xs text-slate-200 capitalize">${moduleName.replace('_', ' ')}</span>
+                    <span class="text-[10px] text-amber-400 animate-pulse">Running...</span>
+                </div>
+                <p class="text-[11px] text-slate-500">Dispatching diagnostic probe to backend module...</p>
+            `;
+        }
+
+        try {
+            const res = await fetch(`/admin/api/test-module/${moduleName}`, { method: "POST" });
+            const data = await res.json();
+            const isPass = data.status === "PASS";
+
+            if (existingCard) {
+                existingCard.className = `rounded-xl border p-4 space-y-2 ${isPass ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-rose-500/40 bg-rose-500/5'}`;
+                existingCard.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-xs text-white">${data.module || moduleName}</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[10px] font-mono font-bold text-slate-400">${data.latency_ms}ms</span>
+                            <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded ${isPass ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">${data.status}</span>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-300">${data.details || data.detail || 'Executed successfully.'}</p>
+                `;
+            }
+            return data;
+        } catch (e) {
+            if (existingCard) {
+                existingCard.className = "rounded-xl border border-rose-500/40 bg-rose-500/5 p-4 space-y-2";
+                existingCard.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-xs text-white">${moduleName}</span>
+                        <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-rose-500/20 text-rose-300">FAIL</span>
+                    </div>
+                    <p class="text-[11px] text-rose-300">Connection error: ${e.message}</p>
+                `;
+            }
+        }
+    }
+
+    async function runAllModuleTests() {
+        const modules = ["neon_db", "socratic_ai", "quiz_engine", "syllabus_parser", "user_sync", "auth_security", "huggingface"];
+        const btn = document.getElementById("btn-run-all");
+        if (btn) btn.innerHTML = `<span>⏳ RUNNING DIAGNOSTICS...</span>`;
+        for (const m of modules) {
+            await runModuleTest(m);
+        }
+        if (btn) btn.innerHTML = `<span>⚡ RUN FULL SYSTEM DIAGNOSTIC</span>`;
+    }
 </script>
 </body>
 </html>

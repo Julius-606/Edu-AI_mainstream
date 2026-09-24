@@ -1,5 +1,0 @@
-# Windows (Command Prompt)
-set GEMINI_API_KEY=AIzaSyDmvjVkFmt0RoTMNER8fYoIKfy7Pkw1sfo
-
-# Run the server!
-uvicorn main:app --reload

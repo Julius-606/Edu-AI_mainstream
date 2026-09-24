@@ -3,29 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trace Admin Login</title>
+    <title>Edu-AI Trace | Superuser Admin Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4">
-    <main class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
-        <div class="flex items-center gap-3 mb-8">
-            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-bold">T</div>
+<body class="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4 py-12 relative overflow-hidden">
+    <!-- Ambient Background Glows -->
+    <div class="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-600/15 rounded-full blur-3xl pointer-events-none"></div>
+
+    <main class="w-full max-w-md bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 sm:p-10 shadow-2xl relative z-10">
+        <!-- Logo & Header -->
+        <div class="flex items-center gap-3.5 mb-8">
+            <div class="w-12 h-12 bg-gradient-to-tr from-indigo-600 to-indigo-500 rounded-2xl flex items-center justify-center font-extrabold text-white text-xl shadow-lg shadow-indigo-500/30">
+                T
+            </div>
             <div>
-                <h1 class="text-xl font-bold">Trace Backend Admin</h1>
-                <p class="text-xs text-slate-500">Backend v{{ version }}</p>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-xl font-bold tracking-tight text-white">Edu-AI Trace</h1>
+                    <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Superuser</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">Backend &amp; Database Admin Portal v{{ version }}</p>
             </div>
         </div>
+
         {% if error %}
-        <div class="mb-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+        <div class="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300 flex items-start gap-2.5">
+            <span class="text-red-400 font-bold text-base">⚠️</span>
+            <span>{{ error }}</span>
+        </div>
         {% endif %}
+
+        <!-- Login Form -->
         <form method="post" action="/admin/login" class="space-y-4">
-            <input type="email" name="email" required placeholder="Admin email"
-                class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500">
-            <input type="password" name="password" required placeholder="Password"
-                class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500">
-            <button class="w-full rounded-xl bg-indigo-600 py-3 font-bold hover:bg-indigo-500">Sign in</button>
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Admin Email</label>
+                <input type="email" name="email" required placeholder="admin@trace.edu" value="admin@trace.edu"
+                    class="w-full rounded-xl border border-slate-700/80 bg-slate-950/80 px-4 py-3.5 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Password</label>
+                <input type="password" name="password" required placeholder="••••••••" value="admin123"
+                    class="w-full rounded-xl border border-slate-700/80 bg-slate-950/80 px-4 py-3.5 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition">
+            </div>
+
+            <button type="submit"
+                class="w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] py-3.5 font-bold text-sm text-white shadow-lg shadow-indigo-600/30 transition duration-200 mt-2 flex items-center justify-center gap-2">
+                <span>Access Admin Control Center</span>
+                <span>&rarr;</span>
+            </button>
         </form>
-        <p class="mt-6 text-xs text-slate-500">Configure ADMIN_EMAIL and ADMIN_PASSWORD in the backend environment before signing in.</p>
+
+        <!-- Quick Access & Navigation Links -->
+        <div class="mt-8 pt-6 border-t border-slate-800/80 space-y-3">
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">Looking for student portal?</span>
+                <a href="/signup" class="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline">Open Signup Form &rarr;</a>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500">
+                <a href="/docs" target="_blank" class="hover:text-slate-300 transition flex items-center gap-1">
+                    <span>⚡ Swagger Docs</span>
+                </a>
+                <a href="/health" target="_blank" class="hover:text-slate-300 transition flex items-center gap-1">
+                    <span>🟢 System Health</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="mt-6 rounded-xl bg-slate-950/60 border border-slate-800/60 p-3 text-[11px] text-slate-400 text-center">
+            Default credentials: <code class="text-indigo-300 font-mono">admin@trace.edu</code> / <code class="text-indigo-300 font-mono">admin123</code> (or configure <code class="text-slate-300">ADMIN_EMAIL</code> / <code class="text-slate-300">ADMIN_PASSWORD</code>).
+        </div>
     </main>
 </body>
 </html>

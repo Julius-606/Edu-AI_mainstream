@@ -1,3 +1,13 @@
+# ==============================================================================
+# Edu-AI Trace Modular Backend Dockerfile
+#
+# ENTRYPOINT / ROUTING INSTRUCTION:
+# The web interface of this backend opens directly at the Superuser Admin Login:
+#   -> backend/templates/admin/login.html (served at / and /admin/login)
+#
+# The public student / user registration portal is directly accessible at:
+#   -> backend/templates/public/signup.html (served at /signup, /Edu_AI/signup.html)
+# ==============================================================================
 
 FROM python:3.10-slim
 
@@ -10,19 +20,16 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-# This assumes requirements.txt is in the same folder as Dockerfile
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all files from the current directory (the backend folder)
+# Copy all files from backend into container
 COPY . .
 
-# Hugging Face Spaces uses port 7860 by default
+# Hugging Face Spaces uses port 7860 by default; local runs use 8000 / 8001
 ENV PORT=7860
 EXPOSE 7860
 
-# Run uvicorn. Using modular structure
+# Launch Uvicorn server hosting the modular FastAPI application
+# Serves Superuser Admin Login at root '/' and Public Registration at '/signup'
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
-
-
- 

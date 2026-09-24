@@ -21,7 +21,7 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.db.session import engine, Base, get_db
-from app.api import auth, users, ai, teacher, parent, learning
+from app.api import auth, users, ai, teacher, parent, learning, admin
 from app.core import security
 from app.models import database_models as models
 from app.schemas import api_schemas as schemas
@@ -34,8 +34,25 @@ templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / 
 try:
     Base.metadata.create_all(bind=engine)
     logger.info("Database schemas verified successfully.")
+    with Session(bind=engine) as init_db:
+        admin_email = os.environ.get("ADMIN_EMAIL", "admin@trace.edu")
+        existing_admin = init_db.query(models.User).filter(models.User.email == admin_email).first()
+        if not existing_admin:
+            admin_pwd = os.environ.get("ADMIN_PASSWORD", "admin123")
+            super_user = models.User(
+                username="SuperAdmin",
+                email=admin_email,
+                hashed_password=security.get_password_hash(admin_pwd),
+                role="Admin",
+                difficulty="Hard (Advanced)",
+                ai_persona="Superuser",
+                semester_status="Superuser Administrator"
+            )
+            init_db.add(super_user)
+            init_db.commit()
+            logger.info(f"Default Superuser created: {admin_email}")
 except Exception as e:
-    logger.warning(f"Initial schema migration skipped or failed: {e}. Tables will initialize on request if needed.")
+    logger.warning(f"Initial schema migration or admin setup warning: {e}. Tables will initialize on request if needed.")
 
 app = FastAPI(title="Trace Modular API", version="3.0.0")
 
@@ -62,11 +79,20 @@ INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "64923e4d8f1a2c5b9e0f3d7a6
 # Global Security Middleware
 @app.middleware("http")
 async def api_key_middleware(request: Request, call_next):
-    # Paths that bypass API key (root, health, docs, web signup, syllabus ingestion)
+    # Paths that bypass API key (root, health, docs, web signup, admin, syllabus ingestion, public home)
+    path = request.url.path
     if (
-        request.url.path in ["/", "/health", "/docs", "/openapi.json", "/favicon.ico", "/signup", "/api/auth/login", "/api/auth/signup-form", "/ingest", "/delete-unit", "/update-unit"]
-        or request.url.path.startswith("/delete-unit/")
-        or request.url.path.startswith("/update-unit/")
+        path in [
+            "/", "/health", "/api/health", "/docs", "/openapi.json", "/favicon.ico",
+            "/home", "/welcome", "/index.html",
+            "/login", "/signup", "/signup.html", "/Edu_AI/signup.html", "/Edu_AI/sign up.html",
+            "/api/auth/login", "/api/auth/signup-form", "/api/report-bug",
+            "/ingest", "/delete-unit", "/update-unit"
+        ]
+        or path.startswith("/admin")
+        or path.startswith("/Edu_AI")
+        or path.startswith("/delete-unit/")
+        or path.startswith("/update-unit/")
     ):
         return await call_next(request)
 
@@ -86,8 +112,31 @@ async def log_requests_middleware(request: Request, call_next):
         process_time_ms = round((time.time() - start_time) * 1000, 2)
         status_code = response.status_code
         log_msg = f"[BACKEND API] {request.method} {request.url.path} -> {status_code} ({process_time_ms}ms)"
+        
+        # Stream into OVERSEER live wiretap buffer
+        admin.record_live_request(
+            method=request.method,
+            path=request.url.path,
+            status_code=status_code,
+            duration_ms=process_time_ms,
+            ip=request.client.host if request.client else "local",
+            user_agent=request.headers.get("user-agent", "")
+        )
+
         if status_code >= 500:
             logger.error(log_msg)
+            try:
+                with Session(bind=engine) as db_log:
+                    admin.notify_admin(
+                        db=db_log,
+                        category="BACKEND_ERROR",
+                        title=f"HTTP 500: {request.method} {request.url.path}",
+                        message=f"Request failed with status {status_code} after {process_time_ms}ms.",
+                        level="error",
+                        details=f"Path: {request.url.path}\nMethod: {request.method}\nClient: {request.client.host if request.client else 'unknown'}"
+                    )
+            except Exception:
+                pass
         elif status_code >= 400:
             logger.warning(log_msg)
         else:
@@ -96,6 +145,28 @@ async def log_requests_middleware(request: Request, call_next):
     except Exception as exc:
         process_time_ms = round((time.time() - start_time) * 1000, 2)
         logger.error(f"[BACKEND ERROR] {request.method} {request.url.path} -> 500 ({process_time_ms}ms): {exc}")
+        
+        admin.record_live_request(
+            method=request.method,
+            path=request.url.path,
+            status_code=500,
+            duration_ms=process_time_ms,
+            ip=request.client.host if request.client else "local",
+            user_agent=request.headers.get("user-agent", "")
+        )
+
+        try:
+            with Session(bind=engine) as db_log:
+                admin.notify_admin(
+                    db=db_log,
+                    category="BACKEND_ERROR",
+                    title=f"Exception on {request.method} {request.url.path}",
+                    message=str(exc),
+                    level="critical",
+                    details=f"Path: {request.url.path}\nMethod: {request.method}\nError: {str(exc)}"
+                )
+        except Exception:
+            pass
         raise exc
 
 app.add_middleware(
@@ -107,6 +178,7 @@ app.add_middleware(
 )
 
 # Include Routers
+app.include_router(admin.router)
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(users.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
@@ -123,6 +195,23 @@ def health_check():
         "hasGeminiKey": bool(os.environ.get("GEMINI_API_KEY"))
     }
 
+# Public Homepage (Inspiring, Welcoming, Quotes of the Day, Architecture Tour)
+@app.get("/home", response_class=HTMLResponse)
+@app.get("/welcome", response_class=HTMLResponse)
+@app.get("/index.html", response_class=HTMLResponse)
+async def public_home_page(request: Request, db: Session = Depends(get_db)):
+    total_users = db.query(models.User).count()
+    db_name = "PostgreSQL" if "postgres" in str(engine.url) else "SQLite Vault"
+    return templates.TemplateResponse(
+        "public/home.html",
+        {
+            "request": request,
+            "version": admin.BACKEND_VERSION,
+            "total_users": total_users,
+            "db_type": db_name
+        }
+    )
+
 @app.get("/")
 def root(request: Request, db: Session = Depends(get_db)):
     # Support Hugging Face container health and logs probing
@@ -134,53 +223,37 @@ def root(request: Request, db: Session = Depends(get_db)):
             "timestamp": time.time()
         })
 
-    try:
-        units = ingestion_engine.get_global_units(db)
-        total_users = db.query(models.User).count()
-        total_subtopics = db.query(models.Subtopic).count()
-        total_quizzes = db.query(models.QuizHistory).count()
-        quizzes = db.query(models.QuizHistory).all()
-        avg_pnl = f"{round(sum([q.pnl for q in quizzes if q.pnl is not None] or [82.4]) / max(len(quizzes), 1), 1)}%"
-        stats = {
-            "total_users": total_users,
-            "total_subtopics": total_subtopics,
-            "total_quizzes": total_quizzes,
-            "avg_pnl": avg_pnl
-        }
-        return templates.TemplateResponse("ingestion.html", {"request": request, "units": units, "stats": stats})
-    except Exception as e:
-        logger.warning(f"Root endpoint template fallback triggered: {e}")
-        return HTMLResponse(
-            f"""
-            <html>
-                <head><title>Trace Backend API</title></head>
-                <body style="font-family:sans-serif; background:#0f172a; color:#f8fafc; padding:40px;">
-                    <h1 style="color:#6366f1;">Trace Modular Learning API is Running</h1>
-                    <p>Status: <strong>Online</strong></p>
-                    <p><a href="/docs" style="color:#38bdf8;">Interactive Swagger API Docs &rarr;</a></p>
-                </body>
-            </html>
-            """
-        )
+    # Default landing screen opens at Admin Login
+    if admin.is_authenticated_admin(request, db):
+        return RedirectResponse(url="/admin", status_code=302)
+
+    return templates.TemplateResponse(
+        "admin/login.html",
+        {"request": request, "version": admin.BACKEND_VERSION, "error": None}
+    )
 
 @app.post("/ingest", response_class=HTMLResponse)
 async def handle_ingestion(request: Request, markdown: str = Form(...), db: Session = Depends(get_db)):
     syllabus_data = ingestion_engine.parse_syllabus_markdown(markdown)
     ingestion_engine.save_syllabus_to_db(db, syllabus_data)
-    units = ingestion_engine.get_global_units(db)
-    return templates.TemplateResponse("ingestion.html", {"request": request, "units": units})
+    admin.notify_admin(
+        db=db,
+        category="SYSTEM_ALERT",
+        title="Syllabus Ingested",
+        message=f"Admin ingested syllabus: {syllabus_data.get('syllabus_title', 'General')}.",
+        level="info"
+    )
+    return RedirectResponse(url="/admin/catalogue", status_code=303)
 
 @app.post("/delete-unit/{unit_id}", response_class=HTMLResponse)
 async def handle_delete_unit(request: Request, unit_id: int, db: Session = Depends(get_db)):
     ingestion_engine.delete_unit(db, unit_id)
-    units = ingestion_engine.get_global_units(db)
-    return templates.TemplateResponse("ingestion.html", {"request": request, "units": units})
+    return RedirectResponse(url="/admin/catalogue", status_code=303)
 
 @app.post("/update-unit/{unit_id}", response_class=HTMLResponse)
 async def handle_update_unit(request: Request, unit_id: int, name: str = Form(...), db: Session = Depends(get_db)):
     ingestion_engine.update_unit(db, unit_id, name)
-    units = ingestion_engine.get_global_units(db)
-    return templates.TemplateResponse("ingestion.html", {"request": request, "units": units})
+    return RedirectResponse(url="/admin/catalogue", status_code=303)
 
 @app.post("/api/units/library/add/{unit_id}")
 async def add_unit_to_user(unit_id: int, user_id: int, db: Session = Depends(get_db)):
@@ -194,12 +267,21 @@ async def get_library_units(db: Session = Depends(get_db)):
     units = ingestion_engine.get_global_units(db)
     return [{"id": u.id, "name": u.name, "category": u.category} for u in units]
 
+# Public Signup routes (supporting direct /signup, /signup.html, /Edu_AI/signup.html, etc.)
 @app.get("/signup", response_class=HTMLResponse)
+@app.get("/signup.html", response_class=HTMLResponse)
+@app.get("/Edu_AI/signup.html", response_class=HTMLResponse)
+@app.get("/Edu_AI/sign up.html", response_class=HTMLResponse)
+@app.get("/Edu_AI/signup", response_class=HTMLResponse)
 async def signup_page(request: Request):
     return templates.TemplateResponse("public/signup.html", {"request": request})
 
 @app.post("/signup", response_class=HTMLResponse)
+@app.post("/signup.html", response_class=HTMLResponse)
+@app.post("/Edu_AI/signup.html", response_class=HTMLResponse)
+@app.post("/Edu_AI/sign up.html", response_class=HTMLResponse)
 async def handle_browser_signup(
+    request: Request,
     username: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
@@ -208,7 +290,23 @@ async def handle_browser_signup(
 ):
     existing_user = db.query(models.User).filter((models.User.email == email) | (models.User.username == username)).first()
     if existing_user:
-        return HTMLResponse("<h2>Error: Email or Username already exists. Please go back.</h2>", status_code=400)
+        return HTMLResponse(
+            """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head><meta charset="UTF-8"><title>Registration Error</title><script src="https://cdn.tailwindcss.com"></script></head>
+            <body class="bg-slate-950 text-slate-100 flex items-center justify-center min-h-screen p-4">
+                <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center shadow-2xl">
+                    <div class="w-12 h-12 bg-rose-500/20 text-rose-400 rounded-xl flex items-center justify-center mx-auto text-xl font-bold mb-3">!</div>
+                    <h2 class="text-xl font-bold text-white mb-2">Account Already Exists</h2>
+                    <p class="text-slate-400 text-xs">An account with that username or email address is already registered.</p>
+                    <a href="/signup" class="mt-6 inline-block bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl">&larr; Return to Sign Up</a>
+                </div>
+            </body>
+            </html>
+            """,
+            status_code=400
+        )
 
     new_user = models.User(
         username=username,
@@ -219,11 +317,40 @@ async def handle_browser_signup(
     db.add(new_user)
     db.commit()
 
-    return """
-    <body style="font-family: sans-serif; text-align: center; padding-top: 100px;">
-        <h1 style="color: #059669;">Account Created Successfully!</h1>
-        <p>You can now return to the Edu-AI app and log in.</p>
+    # Instant Superuser Alert: Every time a new user enters the system!
+    admin.notify_admin(
+        db=db,
+        category="NEW_USER",
+        title="New User Registration",
+        message=f"User '{username}' registered as {role} ({email}).",
+        level="info",
+        details=f"Username: {username}\nRole: {role}\nEmail: {email}\nSource: Web Signup Portal ({request.client.host if request.client else 'remote'})"
+    )
+
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Account Created | Edu-AI</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-slate-950 text-slate-100 flex items-center justify-center min-h-screen p-4">
+        <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center shadow-2xl">
+            <div class="w-14 h-14 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto text-2xl font-black mb-4">
+                ✓
+            </div>
+            <h1 class="text-2xl font-black text-white">Account Created Successfully!</h1>
+            <p class="text-slate-300 text-sm mt-2">Welcome to Edu-AI, <strong class="text-indigo-400">{username}</strong> ({role}).</p>
+            <p class="text-xs text-slate-500 mt-2">You can now return to the Edu-AI app and log in.</p>
+            <div class="mt-6 pt-6 border-t border-slate-800 flex flex-col gap-2.5">
+                <a href="/signup" class="text-xs text-indigo-400 hover:underline">Create another account</a>
+                <a href="/admin/login" class="text-xs text-slate-500 hover:text-slate-400">Admin Login Portal &rarr;</a>
+            </div>
+        </div>
     </body>
+    </html>
     """
 
 # Helper to find user by ID (int) or Username (string)

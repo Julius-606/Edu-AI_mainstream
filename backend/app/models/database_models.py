@@ -37,6 +37,8 @@ class Unit(Base):
     name = Column(String(200), index=True)
     is_active = Column(Boolean, default=True)
     category = Column(String(100), default="General")
+    course = Column(String(100), default="General")
+    unit_group = Column(String(100), nullable=True)
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="units")
@@ -177,6 +179,32 @@ class Bookmark(Base):
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="bookmarks")
+
+
+class AdminNotification(Base):
+    __tablename__ = "admin_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String(50), index=True) # "NEW_USER", "BACKEND_ERROR", "BUG_REPORT", "SYSTEM_ALERT", "SECURITY"
+    level = Column(String(20), default="info") # "info", "warning", "error", "critical"
+    title = Column(String(200))
+    message = Column(Text)
+    details = Column(Text, nullable=True) # JSON, URL or stacktrace
+    is_read = Column(Boolean, default=False)
+    timestamp = Column(Float) # epoch time
+
+
+class SystemRelease(Base):
+    __tablename__ = "system_releases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    version = Column(String(50))
+    artifact_type = Column(String(100), default="Trace Mobile App")
+    download_url = Column(String(500), nullable=True)
+    release_notes = Column(Text, nullable=True)
+    is_current = Column(Boolean, default=False)
+    timestamp = Column(Float)
+
 
 
  

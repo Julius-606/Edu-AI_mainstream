@@ -43,6 +43,20 @@ async def handle_signup(
     )
     db.add(new_user)
     db.commit()
+
+    try:
+        from app.api import admin
+        admin.notify_admin(
+            db=db,
+            category="NEW_USER",
+            title="New User Registration",
+            message=f"User '{username}' registered as {role} ({email}) via API.",
+            level="info",
+            details=f"Username: {username}\nRole: {role}\nEmail: {email}\nSource: /api/auth/signup-form"
+        )
+    except Exception:
+        pass
+
     return {"status": "success", "message": "Account created"}
 
 
