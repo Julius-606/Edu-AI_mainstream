@@ -104,6 +104,10 @@ app.use("/api", async (req, res, next) => {
     }
 
     const response = await fetch(targetUrl, fetchOptions);
+    if (response.status === 404) {
+      console.warn(`[Proxy Fallback] ${targetUrl} returned 404, falling back to Express mock.`);
+      return next();
+    }
     const contentType = response.headers.get("content-type");
 
     res.status(response.status);

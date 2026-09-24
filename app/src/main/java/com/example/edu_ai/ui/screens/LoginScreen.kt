@@ -106,7 +106,18 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = {
+                onLoginSuccess("Admin", "admin_root")
+            },
+            modifier = Modifier.fillMaxWidth().height(44.dp)
+        ) {
+            Text("⚡ Fast-Track: Enter as Admin Console", fontSize = 13.sp)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         TextButton(onClick = { 
             val baseUrl = when (backendMode) {

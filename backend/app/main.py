@@ -37,6 +37,24 @@ except Exception as e:
 
 app = FastAPI(title="Trace Modular API", version="3.0.0")
 
+class HFSpacePrefixMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            path = scope.get("path", "")
+            prefix = "/spaces/Agent606/Edu-AI"
+            if path.startswith(prefix):
+                scope["path"] = path[len(prefix):] or "/"
+                if "raw_path" in scope:
+                    raw_path = scope["raw_path"].decode("ascii", "ignore")
+                    if raw_path.startswith(prefix):
+                        scope["raw_path"] = raw_path[len(prefix):].encode("ascii")
+        await self.app(scope, receive, send)
+
+app.add_middleware(HFSpacePrefixMiddleware)
+
 INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "DEVELOPMENT_KEY")
 
 # Global Security Middleware
@@ -167,7 +185,7 @@ async def get_library_units(db: Session = Depends(get_db)):
 
 @app.get("/signup", response_class=HTMLResponse)
 async def signup_page(request: Request):
-    return templates.TemplateResponse("signup.html", {"request": request})
+    return templates.TemplateResponse("public/signup.html", {"request": request})
 
 @app.post("/signup", response_class=HTMLResponse)
 async def handle_browser_signup(

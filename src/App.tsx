@@ -14,7 +14,13 @@ import {
   Search,
   Bell,
   ShieldAlert,
-  Laptop
+  Smartphone,
+  Tablet,
+  Wifi,
+  Battery,
+  Home,
+  CheckCircle2,
+  RefreshCw
 } from 'lucide-react';
 import { User, Unit, UserRole } from './types';
 import { TraceStore } from './lib/store';
@@ -44,14 +50,8 @@ export const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [units, setUnits] = useState<Unit[]>(TraceStore.getUnits());
 
-  // Dedicated / Standalone Admin Isolation Mode (via URL query param ?view=admin or superuser mode)
-  const [isStandaloneAdmin, setIsStandaloneAdmin] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('view') === 'admin' || params.get('mode') === 'admin';
-    }
-    return false;
-  });
+  // Preview Mode: 'mobile' (Android phone mockup preview) or 'responsive' (full-width)
+  const [previewMode, setPreviewMode] = useState<'mobile' | 'responsive'>('mobile');
 
   // Screen Routing
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
@@ -105,14 +105,18 @@ export const App: React.FC = () => {
         semesterStatus: 'System Administration & Oversight',
         aiPersona: 'System Architect & Lead Consultant',
         sensoryMode: 'Standard',
-        activeUnits: ['Biochemistry II', 'General Surgery', 'Internal Medicine']
+        activeUnits: ['Biochemistry II', 'General Surgery', 'Internal Medicine', 'Pathology & Diagnostics']
       };
       TraceStore.setUser(matched);
     }
     if (matched) {
       setUser(matched);
       TraceStore.setUser(matched);
-      setCurrentTab('dashboard');
+      if (role === 'Admin') {
+        setCurrentTab('admin');
+      } else {
+        setCurrentTab('dashboard');
+      }
     }
   };
 
@@ -123,78 +127,349 @@ export const App: React.FC = () => {
 
   const activeUnit = units.find((u) => u.id === activeUnitId) || units[0];
 
-  if (isStandaloneAdmin) {
-    const adminUser: User = {
-      id: '4',
-      username: 'Superuser Admin',
-      email: 'admin@trace.edu',
-      role: 'Admin',
-      difficulty: 'Superuser',
-      semesterStatus: 'System Administration & Oversight',
-      aiPersona: 'System Architect & Lead Consultant',
-      sensoryMode: 'Standard',
-      activeUnits: ['Biochemistry II', 'General Surgery', 'Internal Medicine']
-    };
+  const adminUser: User = {
+    id: '4',
+    username: 'Admin Root',
+    email: 'admin@trace.edu',
+    role: 'Admin',
+    difficulty: 'Superuser',
+    semesterStatus: 'System Administration & Oversight',
+    aiPersona: 'System Architect & Lead Consultant',
+    sensoryMode: 'Standard',
+    activeUnits: ['Biochemistry II', 'General Surgery', 'Internal Medicine', 'Pathology & Diagnostics']
+  };
 
+  // Main screen routing element
+  const renderMainScreen = () => {
+    if (currentTab === 'admin' || user.role === 'Admin') {
+      return (
+        <AdminDashboard
+          currentUser={user.role === 'Admin' ? user : adminUser}
+          onNavigateToTab={(t) => setCurrentTab(t as any)}
+          onRefreshData={() => setUnits(TraceStore.getUnits())}
+        />
+      );
+    }
+
+    if (user.role === 'Teacher') {
+      return <TeacherDashboard user={user} />;
+    }
+
+    if (user.role === 'Parent') {
+      return <ParentDashboard user={user} />;
+    }
+
+    // Student Role
     return (
-      <div className="min-h-screen text-slate-100 bg-slate-950 font-sans selection:bg-indigo-500/30 selection:text-indigo-200 relative">
-        <DynamicBackground />
-        
-        {/* Dedicated Admin Header */}
-        <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/80">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-red-600/20 border border-red-500/40 flex items-center justify-center text-red-400 font-black text-sm shadow-sm">
-                <ShieldAlert className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-base font-extrabold text-white tracking-tight">
-                  Trace Backend Control & Telemetry
-                </span>
-                <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-red-500/20 text-red-300 border border-red-500/30">
-                  Isolated Admin Preview
-                </span>
-              </div>
-            </div>
+      <>
+        {currentTab === 'dashboard' && (
+          <StudentDashboard
+            user={user}
+            units={units}
+            timetable={timetable}
+            onOpenUnit={(unitId) => handleSelectUnitToLearn(unitId)}
+            onOpenConsultation={() => setCurrentTab('consultations')}
+            onOpenQuizzes={() => setCurrentTab('quizzes')}
+            onOpenTimetable={() => setCurrentTab('timetable')}
+            onOpenLibrary={() => setCurrentTab('library')}
+          />
+        )}
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setIsStandaloneAdmin(false);
-                  if (typeof window !== 'undefined') {
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete('view');
-                    url.searchParams.delete('mode');
-                    window.history.replaceState({}, '', url.pathname);
+        {currentTab === 'learn' && activeUnit && (
+          <LearnScreen
+            unit={activeUnit}
+            subtopicId={activeSubtopicId}
+            onBack={() => setCurrentTab('dashboard')}
+            onLaunchQuiz={(uName, tName) => handleLaunchQuiz(uName, tName)}
+            onOpenBrowser={(url) => setBrowserUrl(url ?? null)}
+          />
+        )}
+
+        {currentTab === 'quizzes' && (
+          <QuizInterface
+            units={units}
+            initialUnitName={quizUnitName}
+            initialTopicName={quizTopicName}
+            onBack={() => setCurrentTab('dashboard')}
+          />
+        )}
+
+        {currentTab === 'consultations' && (
+          <ChatInterface user={user} onOpenBrowser={(url) => setBrowserUrl(url ?? null)} />
+        )}
+
+        {currentTab === 'timetable' && (
+          <TimetableTab
+            user={user}
+            onOpenUnitByName={(name) => {
+              const found = units.find((u) => u.unitName.toLowerCase() === name.toLowerCase());
+              if (found) handleSelectUnitToLearn(found.id);
+            }}
+            onOpenQuizzes={() => setCurrentTab('quizzes')}
+          />
+        )}
+
+        {currentTab === 'library' && (
+          <LibraryScreen
+            units={units}
+            onToggleEnroll={handleToggleActiveUnit}
+            onSelectUnit={(unitId) => {
+              setActiveUnitId(unitId);
+              setCurrentTab('unit-outline');
+            }}
+            onBack={() => setCurrentTab('dashboard')}
+          />
+        )}
+
+        {currentTab === 'unit-outline' && activeUnit && (
+          <UnitOutlineScreen
+            unit={activeUnit}
+            onBack={() => setCurrentTab('library')}
+            onOpenSubtopic={(uId, sId) => handleSelectUnitToLearn(uId, sId)}
+            onLaunchQuiz={(uName, tName) => handleLaunchQuiz(uName, tName)}
+          />
+        )}
+
+        {currentTab === 'repository' && (
+          <LearningRepositoryScreen
+            onBack={() => setCurrentTab('dashboard')}
+            onOpenSubtopicByName={(subName) => {
+              for (const u of units) {
+                for (const m of u.modules) {
+                  for (const t of m.topics) {
+                    for (const s of t.subtopics) {
+                      if (s.name.toLowerCase() === subName.toLowerCase()) {
+                        handleSelectUnitToLearn(u.id, s.id);
+                        return;
+                      }
+                    }
                   }
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-white border border-indigo-500/30 text-xs font-bold transition-all shadow-sm"
-              >
-                <span>Switch to Student App Preview</span>
-              </button>
-            </div>
-          </div>
-        </header>
+                }
+              }
+              setCurrentTab('dashboard');
+            }}
+          />
+        )}
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
-          <AdminDashboard
-            currentUser={adminUser}
-            isStandalone={true}
-            onExitStandalone={() => {
-              setIsStandaloneAdmin(false);
-              if (typeof window !== 'undefined') {
-                const url = new URL(window.location.href);
-                url.searchParams.delete('view');
-                url.searchParams.delete('mode');
-                window.history.replaceState({}, '', url.pathname);
+        {currentTab === 'connect' && <ConnectTab user={user} />}
+      </>
+    );
+  };
+
+  // App Content (Navigation, Header, Screen Content, Bottom Nav)
+  const appContent = (
+    <div className="flex flex-col h-full text-slate-100 bg-slate-950 font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
+      <DynamicBackground />
+
+      {/* Navigation Drawer */}
+      <NavigationDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        user={user}
+        onSelectTab={(tab) => setCurrentTab(tab)}
+        onOpenAccount={() => setIsAccountOpen(true)}
+        onOpenArchives={() => setIsArchivesOpen(true)}
+        onOpenManageUnits={() => setIsManageUnitsOpen(true)}
+        onOpenSync={() => setIsSyncOpen(true)}
+        onOpenBrowser={(url) => setBrowserUrl(url || 'https://en.wikipedia.org/wiki/Medicine')}
+        onChangeRole={handleChangeRole}
+        onLogout={() => setIsLoggedIn(false)}
+        onOpenAdminConsole={() => {
+          handleChangeRole('Admin');
+          setCurrentTab('admin');
+        }}
+      />
+
+      {/* App Top Bar */}
+      <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/80 px-4 h-14 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setIsDrawerOpen(true)}
+            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+            title="Navigation Menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+
+          <div
+            onClick={() => {
+              if (user.role === 'Admin') {
+                setCurrentTab('admin');
+              } else {
+                setCurrentTab('dashboard');
               }
             }}
-            onRefreshData={() => setUnits(TraceStore.getUnits())}
-          />
-        </main>
-      </div>
-    );
-  }
+            className="flex items-center gap-2 cursor-pointer select-none"
+          >
+            <div className="w-7 h-7 rounded-lg bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-black text-xs shadow-sm">
+              T
+            </div>
+            <span className="text-sm font-bold text-white tracking-tight">Trace</span>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              {user.role}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          {/* Direct Admin Console Switcher */}
+          <button
+            onClick={() => {
+              if (currentTab === 'admin' || user.role === 'Admin') {
+                handleChangeRole('Student');
+                setCurrentTab('dashboard');
+              } else {
+                handleChangeRole('Admin');
+                setCurrentTab('admin');
+              }
+            }}
+            className={`px-2 py-1 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 ${
+              currentTab === 'admin' || user.role === 'Admin'
+                ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                : 'bg-slate-900 text-slate-400 hover:text-red-300 border-slate-800'
+            }`}
+            title="Toggle Admin Superuser Console"
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
+            <span className="hidden sm:inline">Admin</span>
+          </button>
+
+          <button
+            onClick={() => setIsSyncOpen(true)}
+            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-300"
+            title="Settings & Sync"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => setIsAccountOpen(true)}
+            className="w-7 h-7 rounded-lg bg-indigo-600/30 border border-indigo-500/40 text-indigo-200 flex items-center justify-center font-bold text-xs"
+            title={user.username}
+          >
+            {user.username.charAt(0)}
+          </button>
+        </div>
+      </header>
+
+      {/* Main Scrollable View Area */}
+      <main className="flex-1 overflow-y-auto px-3.5 py-4 pb-20">
+        {renderMainScreen()}
+      </main>
+
+      {/* Android Mobile Navigation Bar */}
+      <nav className="fixed bottom-0 inset-x-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/90 py-1.5 px-3 flex items-center justify-around shadow-2xl">
+        <button
+          onClick={() => setCurrentTab('dashboard')}
+          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all ${
+            currentTab === 'dashboard'
+              ? 'text-indigo-400 font-bold'
+              : 'text-slate-400 hover:text-slate-200 font-medium'
+          }`}
+        >
+          <Home className="w-4 h-4" />
+          <span className="text-[10px]">Home</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('learn')}
+          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all ${
+            currentTab === 'learn'
+              ? 'text-indigo-400 font-bold'
+              : 'text-slate-400 hover:text-slate-200 font-medium'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span className="text-[10px]">Learn</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('quizzes')}
+          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all ${
+            currentTab === 'quizzes'
+              ? 'text-indigo-400 font-bold'
+              : 'text-slate-400 hover:text-slate-200 font-medium'
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          <span className="text-[10px]">Quizzes</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('consultations')}
+          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all ${
+            currentTab === 'consultations'
+              ? 'text-indigo-400 font-bold'
+              : 'text-slate-400 hover:text-slate-200 font-medium'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span className="text-[10px]">Consult</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('timetable')}
+          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all ${
+            currentTab === 'timetable'
+              ? 'text-indigo-400 font-bold'
+              : 'text-slate-400 hover:text-slate-200 font-medium'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span className="text-[10px]">Schedule</span>
+        </button>
+
+        <button
+          onClick={() => {
+            handleChangeRole('Admin');
+            setCurrentTab('admin');
+          }}
+          className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all ${
+            currentTab === 'admin' || user.role === 'Admin'
+              ? 'text-red-400 font-bold'
+              : 'text-slate-400 hover:text-red-300 font-medium'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4 text-red-400" />
+          <span className="text-[10px]">Admin</span>
+        </button>
+      </nav>
+
+      {/* Modals */}
+      {browserUrl && <InAppBrowser url={browserUrl} onClose={() => setBrowserUrl(null)} />}
+      {isAccountOpen && (
+        <AccountModal
+          user={user}
+          onClose={() => setIsAccountOpen(false)}
+          onSave={(updated) => {
+            setUser(updated);
+            TraceStore.setUser(updated);
+          }}
+        />
+      )}
+      {isArchivesOpen && (
+        <ArchivesModal
+          units={units}
+          quizHistory={TraceStore.getQuizHistory(user.id)}
+          onClose={() => setIsArchivesOpen(false)}
+          onRestoreUnit={handleRestoreArchivedUnit}
+        />
+      )}
+      {isManageUnitsOpen && (
+        <ManageUnitsModal
+          units={units}
+          onClose={() => setIsManageUnitsOpen(false)}
+          onToggleActive={handleToggleActiveUnit}
+        />
+      )}
+      {isSyncOpen && (
+        <SyncModal
+          onClose={() => setIsSyncOpen(false)}
+          onSnapshotRestored={handleSnapshotRestored}
+        />
+      )}
+    </div>
+  );
 
   if (!isLoggedIn) {
     return (
@@ -212,320 +487,73 @@ export const App: React.FC = () => {
     );
   }
 
+  // If in 'mobile' preview mode, wrap the Android App in an interactive phone frame
   return (
-    <div className="min-h-screen text-slate-100 bg-slate-950 font-sans selection:bg-indigo-500/30 selection:text-indigo-200 relative">
-      <DynamicBackground />
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-2 sm:py-6 px-1 sm:px-4 font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
+      {/* Top Preview Control Bar */}
+      <div className="w-full max-w-xl mb-3 flex items-center justify-between gap-2 px-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-xs font-bold text-slate-300">
+            Android App Preview (Trace OS)
+          </span>
+        </div>
 
-      {/* Navigation Drawer */}
-      <NavigationDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        user={user}
-        onSelectTab={(tab) => setCurrentTab(tab)}
-        onOpenAccount={() => setIsAccountOpen(true)}
-        onOpenArchives={() => setIsArchivesOpen(true)}
-        onOpenManageUnits={() => setIsManageUnitsOpen(true)}
-        onOpenSync={() => setIsSyncOpen(true)}
-        onOpenBrowser={(url) => setBrowserUrl(url || 'https://en.wikipedia.org/wiki/Medicine')}
-        onChangeRole={handleChangeRole}
-        onLogout={() => setIsLoggedIn(false)}
-        onOpenAdminConsole={() => {
-          setIsStandaloneAdmin(true);
-          if (typeof window !== 'undefined') {
-            const url = new URL(window.location.href);
-            url.searchParams.set('view', 'admin');
-            window.history.replaceState({}, '', url.pathname + '?' + url.searchParams.toString());
-          }
-        }}
-      />
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setPreviewMode(previewMode === 'mobile' ? 'responsive' : 'mobile')}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-semibold text-slate-300 transition-colors"
+          >
+            {previewMode === 'mobile' ? (
+              <>
+                <Tablet className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Expanded</span>
+              </>
+            ) : (
+              <>
+                <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Phone View</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
 
-      {/* Top Application Header Bar */}
-      <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          {/* Left: Drawer Trigger + Brand Logo */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsDrawerOpen(true)}
-              className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Open Navigation Menu"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+      {previewMode === 'mobile' ? (
+        /* Authentic Android Smartphone Device Frame */
+        <div className="relative w-full max-w-[420px] h-[860px] bg-slate-950 rounded-[44px] border-[8px] border-slate-800 shadow-[0_25px_70px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden ring-1 ring-slate-700/50">
+          {/* Android Status Bar */}
+          <div className="h-8 bg-slate-950/95 border-b border-slate-800/50 px-6 flex items-center justify-between text-[11px] font-semibold text-slate-400 select-none z-50 shrink-0">
+            <span>9:41</span>
+            
+            {/* Center Camera Punch Hole */}
+            <div className="w-3.5 h-3.5 rounded-full bg-black border border-slate-800 shadow-inner" />
 
-            <div
-              onClick={() => setCurrentTab('dashboard')}
-              className="flex items-center gap-2.5 cursor-pointer select-none"
-            >
-              <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-black text-sm shadow-sm">
-                T
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-400">5G</span>
+              <Wifi className="w-3.5 h-3.5 text-slate-400" />
+              <div className="flex items-center gap-1">
+                <span className="text-[10px]">98%</span>
+                <Battery className="w-3.5 h-3.5 text-emerald-400" />
               </div>
-              <span className="text-base font-extrabold text-white tracking-tight hidden sm:inline">
-                Trace Learning System
-              </span>
             </div>
           </div>
 
-          {/* Center: Quick Role & Perspective Bar */}
-          <div className="hidden md:flex items-center gap-1 bg-slate-900/90 border border-slate-800 rounded-2xl p-1 text-xs">
-            <button
-              onClick={() => setCurrentTab('dashboard')}
-              className={`px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                currentTab === 'dashboard'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setCurrentTab('consultations')}
-              className={`px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                currentTab === 'consultations'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Consultations
-            </button>
-            <button
-              onClick={() => setCurrentTab('quizzes')}
-              className={`px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                currentTab === 'quizzes'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Quizzes
-            </button>
-            <button
-              onClick={() => setCurrentTab('timetable')}
-              className={`px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                currentTab === 'timetable'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Timetable
-            </button>
-            <button
-              onClick={() => setCurrentTab('library')}
-              className={`px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                currentTab === 'library'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Library
-            </button>
+          {/* Phone Screen Body */}
+          <div className="flex-1 relative overflow-hidden flex flex-col">
+            {appContent}
           </div>
 
-          {/* Right: Quick Tools + Profile Badge */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setBrowserUrl('https://en.wikipedia.org/wiki/Medicine')}
-              className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Trace Reference Browser"
-            >
-              <Globe className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={() => setCurrentTab('repository')}
-              className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition-colors"
-              title="Saved Bookmarks & Vault"
-            >
-              <Bookmark className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={() => setIsSyncOpen(true)}
-              className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-emerald-300 hover:bg-slate-800 transition-colors"
-              title="Settings & Sync"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-
-            {/* Direct Shortcut to Isolated Superuser Dashboard */}
-            <button
-              onClick={() => {
-                setIsStandaloneAdmin(true);
-                if (typeof window !== 'undefined') {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set('view', 'admin');
-                  window.history.replaceState({}, '', url.pathname + '?' + url.searchParams.toString());
-                }
-              }}
-              className="p-2 rounded-xl bg-red-950/40 border border-red-800/50 text-red-400 hover:text-red-200 hover:bg-red-900/50 transition-colors"
-              title="Open Isolated Admin & Backend Telemetry Dashboard (?view=admin)"
-            >
-              <ShieldAlert className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={() => setIsAccountOpen(true)}
-              className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors"
-            >
-              <div className="w-6 h-6 rounded-lg bg-indigo-600/30 text-indigo-300 flex items-center justify-center font-bold text-xs">
-                {user.username.charAt(0)}
-              </div>
-              <span className="text-xs font-semibold text-slate-200 hidden sm:inline">
-                {user.username.split(' ')[0]}
-              </span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                {user.role}
-              </span>
-            </button>
+          {/* Android Navigation Pill Bar */}
+          <div className="h-4 bg-slate-950 flex items-center justify-center shrink-0 z-50">
+            <div className="w-28 h-1 bg-slate-600/70 rounded-full" />
           </div>
         </div>
-      </header>
-
-      {/* Main Screen Router Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
-        {user.role === 'Admin' ? (
-          <AdminDashboard currentUser={user} onNavigateToTab={(t) => setCurrentTab(t as any)} onRefreshData={() => setUnits(TraceStore.getUnits())} />
-        ) : user.role === 'Teacher' ? (
-          <TeacherDashboard user={user} />
-        ) : user.role === 'Parent' ? (
-          <ParentDashboard user={user} />
-        ) : (
-          /* Student Role Screens */
-          <>
-            {currentTab === 'dashboard' && (
-              <StudentDashboard
-                user={user}
-                units={units}
-                timetable={timetable}
-                onOpenUnit={(unitId) => handleSelectUnitToLearn(unitId)}
-                onOpenConsultation={() => setCurrentTab('consultations')}
-                onOpenQuizzes={() => setCurrentTab('quizzes')}
-                onOpenTimetable={() => setCurrentTab('timetable')}
-                onOpenLibrary={() => setCurrentTab('library')}
-              />
-            )}
-
-            {currentTab === 'learn' && activeUnit && (
-              <LearnScreen
-                unit={activeUnit}
-                subtopicId={activeSubtopicId}
-                onBack={() => setCurrentTab('dashboard')}
-                onLaunchQuiz={(uName, tName) => handleLaunchQuiz(uName, tName)}
-                onOpenBrowser={(url) => setBrowserUrl(url ?? null)}
-              />
-            )}
-
-            {currentTab === 'quizzes' && (
-              <QuizInterface
-                units={units}
-                initialUnitName={quizUnitName}
-                initialTopicName={quizTopicName}
-                onBack={() => setCurrentTab('dashboard')}
-              />
-            )}
-
-            {currentTab === 'consultations' && (
-              <ChatInterface user={user} onOpenBrowser={(url) => setBrowserUrl(url ?? null)} />
-            )}
-
-            {currentTab === 'timetable' && (
-              <TimetableTab
-                user={user}
-                onOpenUnitByName={(name) => {
-                  const found = units.find((u) => u.unitName.toLowerCase() === name.toLowerCase());
-                  if (found) handleSelectUnitToLearn(found.id);
-                }}
-                onOpenQuizzes={() => setCurrentTab('quizzes')}
-              />
-            )}
-
-            {currentTab === 'library' && (
-              <LibraryScreen
-                units={units}
-                onToggleEnroll={handleToggleActiveUnit}
-                onSelectUnit={(unitId) => {
-                  setActiveUnitId(unitId);
-                  setCurrentTab('unit-outline');
-                }}
-                onBack={() => setCurrentTab('dashboard')}
-              />
-            )}
-
-            {currentTab === 'unit-outline' && activeUnit && (
-              <UnitOutlineScreen
-                unit={activeUnit}
-                onBack={() => setCurrentTab('library')}
-                onOpenSubtopic={(uId, sId) => handleSelectUnitToLearn(uId, sId)}
-                onLaunchQuiz={(uName, tName) => handleLaunchQuiz(uName, tName)}
-              />
-            )}
-
-            {currentTab === 'repository' && (
-              <LearningRepositoryScreen
-                onBack={() => setCurrentTab('dashboard')}
-                onOpenSubtopicByName={(subName) => {
-                  for (const u of units) {
-                    for (const m of u.modules) {
-                      for (const t of m.topics) {
-                        for (const s of t.subtopics) {
-                          if (s.name.toLowerCase() === subName.toLowerCase()) {
-                            handleSelectUnitToLearn(u.id, s.id);
-                            return;
-                          }
-                        }
-                      }
-                    }
-                  }
-                  setCurrentTab('dashboard');
-                }}
-              />
-            )}
-
-            {currentTab === 'connect' && <ConnectTab user={user} />}
-          </>
-        )}
-      </main>
-
-      {/* In-App Browser Modal */}
-      {browserUrl && (
-        <InAppBrowser url={browserUrl} onClose={() => setBrowserUrl(null)} />
-      )}
-
-      {/* Account Settings Modal */}
-      {isAccountOpen && (
-        <AccountModal
-          user={user}
-          onClose={() => setIsAccountOpen(false)}
-          onSave={(updated) => {
-            setUser(updated);
-            TraceStore.setUser(updated);
-          }}
-        />
-      )}
-
-      {/* Archives Modal */}
-      {isArchivesOpen && (
-        <ArchivesModal
-          units={units}
-          quizHistory={TraceStore.getQuizHistory(user.id)}
-          onClose={() => setIsArchivesOpen(false)}
-          onRestoreUnit={handleRestoreArchivedUnit}
-        />
-      )}
-
-      {/* Manage Units Modal */}
-      {isManageUnitsOpen && (
-        <ManageUnitsModal
-          units={units}
-          onClose={() => setIsManageUnitsOpen(false)}
-          onToggleActive={handleToggleActiveUnit}
-        />
-      )}
-
-      {/* Settings & Sync Modal */}
-      {isSyncOpen && (
-        <SyncModal
-          onClose={() => setIsSyncOpen(false)}
-          onSnapshotRestored={handleSnapshotRestored}
-        />
+      ) : (
+        /* Full Expanded View */
+        <div className="w-full max-w-7xl flex-1 bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+          {appContent}
+        </div>
       )}
     </div>
   );

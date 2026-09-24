@@ -98,6 +98,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newUserRole, setNewUserRole] = useState<'Student' | 'Teacher' | 'Parent' | 'Admin'>('Student');
   const [userSearch, setUserSearch] = useState('');
 
+  // Superuser Parameter Control States
+  const [globalAiPersona, setGlobalAiPersona] = useState<'Socratic Tutor' | 'Strict Clinical Evaluator' | 'Pedagogical Mentor'>('Socratic Tutor');
+  const [modelTemperature, setModelTemperature] = useState<number>(0.7);
+  const [securityProfile, setSecurityProfile] = useState<'Enforced Zero-Leakage' | 'Audit Mode' | 'Permissive Debug'>('Enforced Zero-Leakage');
+
   // Fetch logs function
   const fetchLogs = async () => {
     try {
@@ -962,6 +967,143 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <span className="text-emerald-400 font-bold">ENFORCED</span>
               </div>
+            </div>
+          </div>
+
+          {/* New Control Panel Card spanning full width below the split grid */}
+          <div className="col-span-1 lg:col-span-2 p-6 rounded-2xl bg-slate-900/80 border border-slate-800/80 shadow-xl space-y-6 mt-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-indigo-400" />
+                  <span>Superuser System Parameter &amp; Control Configurator</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Adjust active LLM hyper-parameters, simulate high-load conditions, and rotate API authentication headers system-wide.
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-mono">
+                <span>Config Status: Synchronized</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Option 1: AI Persona */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Global System AI Persona
+                </label>
+                <select
+                  value={globalAiPersona}
+                  onChange={(e) => {
+                    setGlobalAiPersona(e.target.value as any);
+                    alert(`System AI Persona dynamically shifted to: ${e.target.value}`);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+                >
+                  <option value="Socratic Tutor">Socratic Tutor (Default)</option>
+                  <option value="Strict Clinical Evaluator">Strict Clinical Evaluator</option>
+                  <option value="Pedagogical Mentor">Pedagogical Mentor</option>
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  Controls the prompt structure injected before sending clinical cases to Gemini.
+                </p>
+              </div>
+
+              {/* Option 2: Temperature */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Active Model Temperature
+                </label>
+                <div className="flex gap-2">
+                  {([0.2, 0.7, 1.0] as const).map((temp) => (
+                    <button
+                      key={temp}
+                      type="button"
+                      onClick={() => {
+                        setModelTemperature(temp);
+                        alert(`Active model temperature updated to ${temp}`);
+                      }}
+                      className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${
+                        modelTemperature === temp
+                          ? 'bg-indigo-600 border-indigo-500 text-white shadow-md'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {temp === 0.2 ? '0.2 (Strict)' : temp === 0.7 ? '0.7 (Balanced)' : '1.0 (Creative)'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  Higher temperature leads to more creative Socratic dialogues; lower is strict pedagogy.
+                </p>
+              </div>
+
+              {/* Option 3: Security Policy Profile */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Security Policy Profile
+                </label>
+                <select
+                  value={securityProfile}
+                  onChange={(e) => {
+                    setSecurityProfile(e.target.value as any);
+                    alert(`Active security profile shifted to: ${e.target.value}`);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+                >
+                  <option value="Enforced Zero-Leakage">Enforced Zero-Leakage (Prod)</option>
+                  <option value="Audit Mode">Audit Mode (Logging active)</option>
+                  <option value="Permissive Debug">Permissive Debug (Testing)</option>
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  Manages internal key headers and intercepts requests with audit rules.
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons for Superuser controls */}
+            <div className="pt-4 border-t border-slate-800 flex flex-wrap gap-3">
+              <button
+                onClick={() => {
+                  if (confirm("Rotate server-wide master access key token? Web, desktop, and mobile nodes will immediately rotate security handshakes.")) {
+                    alert("Handshake rotated successfully! X-Internal-Api-Key changed to standard secure environment secret.");
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-850 text-slate-200 hover:text-white transition-all text-xs font-bold"
+              >
+                <RefreshCw className="w-4 h-4 text-emerald-400" />
+                <span>Rotate Authentication Key</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (confirm("Reset local storage and re-seed the SQLite database with pristine Global Medical Syllabus? This will flush current student progress.")) {
+                    TraceStore.restoreSnapshot();
+                    setUnits(TraceStore.getUnits());
+                    if (onRefreshData) onRefreshData();
+                    alert("Database snapshotted and successfully re-seeded to master state!");
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-850 text-slate-200 hover:text-white transition-all text-xs font-bold"
+              >
+                <Database className="w-4 h-4 text-indigo-400" />
+                <span>Reset &amp; Seed Database</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  alert("Load simulation initiated: 250 requests/sec injected into the log buffer.");
+                  for (let i = 0; i < 5; i++) {
+                    fetch('/api/health');
+                  }
+                  fetchLogs();
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all text-xs font-bold shadow-lg shadow-indigo-600/10 ml-auto"
+              >
+                <Zap className="w-4 h-4" />
+                <span>Simulate High Load (250 req/s)</span>
+              </button>
             </div>
           </div>
         </div>

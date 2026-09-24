@@ -20,6 +20,7 @@ import com.example.edu_ai.ui.screens.teacher.TeacherDashboard
 import com.example.edu_ai.ui.screens.teacher.TeacherViewModel
 import com.example.edu_ai.ui.screens.teacher.TeacherViewModelFactory
 import com.example.edu_ai.ui.screens.parent.ParentDashboard
+import com.example.edu_ai.ui.screens.admin.AdminDashboardScreen
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
@@ -38,6 +39,7 @@ fun AppNavigation() {
             val destination = when (user.role) {
                 "Teacher" -> "teacher_dashboard"
                 "Parent" -> "parent_dashboard/${user.id}"
+                "Admin" -> "admin_dashboard"
                 else -> "student_dashboard/${user.id}"
             }
             navController.navigate(destination) {
@@ -54,6 +56,7 @@ fun AppNavigation() {
                     val destination = when (role) {
                         "Teacher" -> "teacher_dashboard"
                         "Parent" -> "parent_dashboard/$userId"
+                        "Admin" -> "admin_dashboard"
                         else -> "student_dashboard/$userId"
                     }
                     navController.navigate(destination) {
@@ -139,6 +142,19 @@ fun AppNavigation() {
             ParentDashboard(
                 studentId = studentId,
                 repository = repository,
+                onLogout = {
+                    scope.launch {
+                        repository.logout(context)
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                }
+            )
+        }
+
+        composable("admin_dashboard") {
+            AdminDashboardScreen(
                 onLogout = {
                     scope.launch {
                         repository.logout(context)
