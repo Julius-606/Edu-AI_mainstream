@@ -74,94 +74,133 @@ export const App: React.FC = () => {
   const triggerCloudSync = async (userId: string) => {
     try {
       const res = await fetch(`/api/user/${userId}/sync`);
-      if (!res.ok) return;
-      const data = await res.json();
-      
-      if (data.progress && data.progress.length > 0) {
-        const localUnits = TraceStore.getUnits();
-        for (const p of data.progress) {
-          if (p.node_type === 'subtopic' && p.status === 'Completed') {
-            for (const unit of localUnits) {
-              for (const mod of unit.modules) {
-                for (const topic of mod.topics) {
-                  for (const sub of topic.subtopics) {
-                    if (sub.id === p.node_id) {
-                      sub.isCompleted = true;
+      if (res.ok) {
+        const data = await res.json();
+        
+        if (data.progress && data.progress.length > 0) {
+          const localUnits = TraceStore.getUnits();
+          for (const p of data.progress) {
+            if (p.node_type === 'subtopic' && p.status === 'Completed') {
+              for (const unit of localUnits) {
+                for (const mod of unit.modules) {
+                  for (const topic of mod.topics) {
+                    for (const sub of topic.subtopics) {
+                      if (sub.id === p.node_id) {
+                        sub.isCompleted = true;
+                      }
                     }
                   }
                 }
               }
             }
           }
+          TraceStore.saveUnits(localUnits);
+          setUnits([...localUnits]);
         }
-        TraceStore.saveUnits(localUnits);
-        setUnits([...localUnits]);
+
+        if (data.bookmarks && data.bookmarks.length > 0) {
+          const localBookmarks = TraceStore.getBookmarks();
+          for (const b of data.bookmarks) {
+            const exists = localBookmarks.some((lb) => lb.target === b.target || (lb.subtopicId === b.subtopicId && lb.objectiveDescription === b.objectiveDescription));
+            if (!exists) {
+              localBookmarks.unshift({
+                id: b.id ? String(b.id) : `bm-${Date.now()}-${Math.random()}`,
+                userId: userId,
+                subtopicId: b.subtopicId || 0,
+                subtopicName: b.subtopicName || b.title || 'Saved Item',
+                objectiveDescription: b.objectiveDescription || '',
+                excerpt: b.excerpt || b.context || '',
+                timestamp: b.timestamp * 1000 || Date.now(),
+                notes: b.notes || '',
+                type: b.type,
+                title: b.title,
+                target: b.target
+              } as any);
+            }
+          }
+          localStorage.setItem('trace_bookmarks', JSON.stringify(localBookmarks));
+        }
+
+        if (data.quizzes && data.quizzes.length > 0) {
+          const localHistory = TraceStore.getQuizHistory();
+          for (const q of data.quizzes) {
+            const exists = localHistory.some((lh) => lh.timestamp === q.timestamp || lh.id === String(q.id));
+            if (!exists) {
+              localHistory.unshift({
+                id: String(q.id),
+                userId: userId,
+                unitName: q.unit_name,
+                score: q.score,
+                total: q.total,
+                pnlScore: Math.round(q.pnl * 100) || Math.round((q.score / q.total) * 100),
+                timestamp: typeof q.timestamp === 'number' ? q.timestamp : Date.now()
+              });
+            }
+          }
+          localStorage.setItem('trace_quiz_history', JSON.stringify(localHistory));
+        }
+
+        if (data.chats && data.chats.length > 0) {
+          const localSessions = TraceStore.getChatSessions();
+          for (const s of data.chats) {
+            const exists = localSessions.some((ls) => ls.id === String(s.id));
+            if (!exists) {
+              localSessions.unshift({
+                id: String(s.id),
+                userId: userId,
+                title: s.title,
+                description: s.description || '',
+                timestamp: s.timestamp * 1000 || Date.now(),
+                messages: (s.messages || []).map((m: any) => ({
+                  id: String(m.id),
+                  sender: m.role === 'user' ? 'user' : 'assistant',
+                  text: m.content,
+                  timestamp: typeof m.timestamp === 'number' ? m.timestamp : Date.now()
+                }))
+              });
+            }
+          }
+          localStorage.setItem('trace_chat_sessions', JSON.stringify(localSessions));
+        }
       }
 
-      if (data.bookmarks && data.bookmarks.length > 0) {
-        const localBookmarks = TraceStore.getBookmarks();
-        for (const b of data.bookmarks) {
-          const exists = localBookmarks.some((lb) => lb.target === b.target || (lb.subtopicId === b.subtopicId && lb.objectiveDescription === b.objectiveDescription));
-          if (!exists) {
-            localBookmarks.unshift({
-              id: b.id ? String(b.id) : `bm-${Date.now()}-${Math.random()}`,
-              userId: userId,
-              subtopicId: b.subtopicId || 0,
-              subtopicName: b.subtopicName || b.title || 'Saved Item',
-              objectiveDescription: b.objectiveDescription || '',
-              excerpt: b.excerpt || b.context || '',
-              timestamp: b.timestamp * 1000 || Date.now(),
-              notes: b.notes || '',
-              type: b.type,
-              title: b.title,
-              target: b.target
-            } as any);
+      // 2. Post merged client state back to the FastAPI cloud backend
+      const localUnits = TraceStore.getUnits();
+      const progressItems: any[] = [];
+      for (const unit of localUnits) {
+        for (const mod of unit.modules) {
+          for (const topic of mod.topics) {
+            for (const sub of topic.subtopics) {
+              if (sub.isCompleted) {
+                progressItems.push({
+                  node_id: sub.id,
+                  node_type: 'subtopic',
+                  status: 'Completed',
+                  last_studied_at: Date.now() / 1000
+                });
+              }
+            }
           }
         }
-        localStorage.setItem('trace_bookmarks', JSON.stringify(localBookmarks));
       }
 
-      if (data.quizzes && data.quizzes.length > 0) {
-        const localHistory = TraceStore.getQuizHistory();
-        for (const q of data.quizzes) {
-          const exists = localHistory.some((lh) => lh.timestamp === q.timestamp || lh.id === String(q.id));
-          if (!exists) {
-            localHistory.unshift({
-              id: String(q.id),
-              userId: userId,
-              unitName: q.unit_name,
-              score: q.score,
-              total: q.total,
-              pnlScore: Math.round(q.pnl * 100) || Math.round((q.score / q.total) * 100),
-              timestamp: typeof q.timestamp === 'number' ? q.timestamp : Date.now()
-            });
-          }
-        }
-        localStorage.setItem('trace_quiz_history', JSON.stringify(localHistory));
-      }
+      const localBookmarks = TraceStore.getBookmarks();
+      const bookmarksItems = localBookmarks.map((b) => ({
+        type: b.type || 'learn',
+        title: b.title || b.subtopicName || 'Saved Item',
+        target: b.target || String(b.subtopicId || ''),
+        context: b.excerpt || b.objectiveDescription || '',
+        timestamp: b.timestamp / 1000 || Date.now() / 1000
+      }));
 
-      if (data.chats && data.chats.length > 0) {
-        const localSessions = TraceStore.getChatSessions();
-        for (const s of data.chats) {
-          const exists = localSessions.some((ls) => ls.id === String(s.id));
-          if (!exists) {
-            localSessions.unshift({
-              id: String(s.id),
-              userId: userId,
-              title: s.title,
-              description: s.description || '',
-              timestamp: s.timestamp * 1000 || Date.now(),
-              messages: (s.messages || []).map((m: any) => ({
-                id: String(m.id),
-                sender: m.role === 'user' ? 'user' : 'assistant',
-                text: m.content,
-                timestamp: typeof m.timestamp === 'number' ? m.timestamp : Date.now()
-              }))
-            });
-          }
-        }
-        localStorage.setItem('trace_chat_sessions', JSON.stringify(localSessions));
-      }
+      await fetch(`/api/user/${userId}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          progress: progressItems,
+          bookmarks: bookmarksItems
+        })
+      });
 
     } catch (err) {
       console.error("Cloud synchronization failed:", err);

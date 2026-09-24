@@ -51,15 +51,49 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       });
       const data = await res.json();
 
-      let targetUser = INITIAL_USERS.find((u) => u.id === data.user_id);
-      if (!targetUser) {
-        targetUser = {
-          ...INITIAL_USERS[0],
-          username: data.username || 'Student User',
-          role: data.role || 'Student'
-        };
+      if (data && data.access_token) {
+        // Store access token
+        localStorage.setItem('trace_access_token', data.access_token);
+        
+        try {
+          // Fetch full user profile using bearer token
+          const profileRes = await fetch(`/api/users/${data.user_id}`, {
+            headers: {
+              'Authorization': `Bearer ${data.access_token}`
+            }
+          });
+          const profileData = await profileRes.json();
+          
+          const targetUser: User = {
+            id: String(profileData.id || data.user_id),
+            username: profileData.username || data.username || 'Student User',
+            email: email,
+            role: (profileData.role || data.role || 'Student') as UserRole,
+            difficulty: profileData.difficulty || 'Medium (Standard)',
+            semesterStatus: profileData.semester_status || 'Year 4 - Redemption Arc',
+            aiPersona: profileData.ai_persona || 'Socratic Tutor',
+            sensoryMode: profileData.sensory_mode || 'Standard',
+            activeUnits: profileData.active_units || []
+          };
+          onLoginSuccess(targetUser);
+        } catch (profileErr) {
+          console.warn("Failed to fetch detailed profile, using login token data:", profileErr);
+          const targetUser: User = {
+            id: String(data.user_id),
+            username: data.username || 'Student User',
+            email: email,
+            role: (data.role || 'Student') as UserRole,
+            difficulty: 'Medium (Standard)',
+            semesterStatus: 'Year 4 - Redemption Arc',
+            aiPersona: 'Socratic Tutor',
+            sensoryMode: 'Standard',
+            activeUnits: []
+          };
+          onLoginSuccess(targetUser);
+        }
+      } else {
+        throw new Error("Invalid access token");
       }
-      onLoginSuccess(targetUser);
     } catch {
       // Offline fallback login
       const fallbackUser = INITIAL_USERS[selectedDemoIndex] || INITIAL_USERS[0];

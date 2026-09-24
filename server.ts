@@ -683,6 +683,29 @@ Translate technical performance rubrics into supportive guidance for student and
 // VITE & STATIC SERVING
 // ==========================================
 async function startServer() {
+  // Start Python FastAPI backend in the background on port 8001
+  try {
+    const { spawn } = require("child_process");
+    const pythonBackend = spawn("python3", ["run_modular.py"], {
+      cwd: path.join(process.cwd(), "backend"),
+      env: { ...process.env, BACKEND_PORT: "8001" }
+    });
+
+    pythonBackend.stdout.on("data", (data: any) => {
+      console.log(`[FastAPI Backend] ${data.toString().trim()}`);
+    });
+
+    pythonBackend.stderr.on("data", (data: any) => {
+      console.error(`[FastAPI Backend Error] ${data.toString().trim()}`);
+    });
+
+    pythonBackend.on("close", (code: number) => {
+      console.log(`[FastAPI Backend] process exited with code ${code}`);
+    });
+  } catch (err) {
+    console.error("Failed to start FastAPI backend child process:", err);
+  }
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

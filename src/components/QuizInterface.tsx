@@ -74,18 +74,26 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
   const handleGenerateAiQuiz = async () => {
     setIsGenerating(true);
     try {
-      const res = await fetch('/api/quiz/generate', {
+      const res = await fetch(`/api/ai/quiz${selectedTopic ? `?topic=${encodeURIComponent(selectedTopic)}` : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          unitName: selectedUnit,
-          topicName: selectedTopic,
-          studentLevel: TraceStore.getUser().semesterStatus
+          unit_name: selectedUnit,
+          user_id: TraceStore.getUser().id
         })
       });
       const data = await res.json();
       if (data.questions && data.questions.length > 0) {
-        setQuestions(data.questions);
+        const mappedQuestions = data.questions.map((q: any, i: number) => ({
+          id: `ai-q-${Date.now()}-${i}`,
+          unitName: selectedUnit,
+          topicName: selectedTopic || selectedUnit,
+          question: q.question_text || q.question,
+          options: q.options,
+          correctIndex: typeof q.correct_option_index === 'number' ? q.correct_option_index : (q.correctIndex || 0),
+          explanation: q.explanation || 'High-yield clinical explanation confirmed.'
+        }));
+        setQuestions(mappedQuestions);
         setCurrentIndex(0);
         setSelectedOption(null);
         setUserAnswers({});
@@ -139,7 +147,7 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
 
     const pnlScore = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
 
-    // Record in history
+    // Record in local history
     TraceStore.recordQuizResult({
       userId: TraceStore.getUser().id,
       unitName: selectedUnit,
@@ -151,6 +159,19 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
       questions,
       userAnswers
     });
+
+    // Record in backend database
+    fetch('/api/quiz/record', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        unit_name: selectedUnit,
+        score: correctCount,
+        total: questions.length,
+        user_id: TraceStore.getUser().id,
+        timestamp: String(Date.now())
+      })
+    }).catch((err) => console.error("Failed to record quiz result on backend:", err));
 
     // Fire celebratory confetti if passing (≥ 70%)
     if (pnlScore >= 70) {

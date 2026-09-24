@@ -105,13 +105,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ user, onOpenBrowse
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/chat/message', {
+      const mappedHistory = updatedMessages.slice(-6).map((m) => ({
+        role: m.sender === 'user' ? 'user' : 'model',
+        content: m.text
+      }));
+
+      const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: textToSend,
-          persona: activePersona,
-          history: updatedMessages.slice(-6)
+          prompt: textToSend,
+          user_id: user.id,
+          history: mappedHistory
         })
       });
       const data = await res.json();
@@ -119,7 +124,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ user, onOpenBrowse
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: 'assistant',
-        text: data.text || 'I have analyzed your inquiry.',
+        text: data.response || 'I have analyzed your inquiry.',
         timestamp: Date.now()
       };
 

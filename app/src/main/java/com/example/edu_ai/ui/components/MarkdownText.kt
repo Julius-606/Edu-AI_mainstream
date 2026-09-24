@@ -22,7 +22,8 @@ fun FormattedText(
     modifier: Modifier = Modifier,
     style: TextStyle = LocalTextStyle.current,
     maxLines: Int = Int.MAX_VALUE,
-    overflow: TextOverflow = TextOverflow.Clip
+    overflow: TextOverflow = TextOverflow.Clip,
+    onLinkClicked: ((String) -> Unit)? = null
 ) {
     val annotatedString = parseMarkdown(text)
     Text(

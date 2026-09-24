@@ -114,6 +114,15 @@ app.include_router(teacher.router, prefix="/api")
 app.include_router(parent.router, prefix="/api")
 app.include_router(learning.router, prefix="/api")
 
+@app.get("/health")
+@app.get("/api/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "service": "Trace FastAPI Backend",
+        "hasGeminiKey": bool(os.environ.get("GEMINI_API_KEY"))
+    }
+
 @app.get("/")
 def root(request: Request, db: Session = Depends(get_db)):
     # Support Hugging Face container health and logs probing
