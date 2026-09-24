@@ -22,7 +22,7 @@ data class StudentUiState(
     val error: String? = null
 )
 
-class StudentViewModel(private val repository: EduAIRepository, private val dao: com.example.edu_ai.data.local.EduAIDao) : ViewModel() {
+class StudentViewModel(val repository: EduAIRepository, private val dao: com.example.edu_ai.data.local.EduAIDao) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
@@ -41,6 +41,44 @@ class StudentViewModel(private val repository: EduAIRepository, private val dao:
         initialValue = StudentUiState(isLoading = true)
     )
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val bookmarks: Flow<List<com.example.edu_ai.data.local.BookmarkEntity>> = uiState.flatMapLatest { state ->
+        val userId = state.user?.id ?: ""
+        repository.getLocalBookmarks(userId)
+    }
+
+    suspend fun addBookmark(
+        userId: String,
+        type: String,
+        title: String,
+        target: String,
+        context: String,
+        notes: String?
+    ) {
+        repository.saveBookmarkAndSync(userId, type, title, target, context, notes)
+    }
+
+    suspend fun deleteBookmark(bookmarkId: String) {
+        repository.deleteLocalBookmark(bookmarkId)
+    }
+
+    suspend fun toggleSubtopicCompleted(userId: String, subtopicId: Long, isCompleted: Boolean) {
+        repository.updateSubtopicStatusAndSync(userId, subtopicId, isCompleted)
+    }
+
+    fun triggerCloudSync(userId: String) {
+        viewModelScope.launch {
+            repository.triggerSync(userId)
+        }
+    }
+
+    suspend fun repositoryChat(userId: String, currentTopic: String): String {
+        val prompt = "Provide a very concise, structured medical/biochemical high-yield study review for: $currentTopic. Limit to 3 sentences emphasizing diagnostic tips or common exam traps."
+        val userContext = dao.getUserById(userId) ?: UserEntity(id = userId, username = "Student", role = "student", sensoryMode = "Visual", semesterStatus = "Active", aiPersona = "Helper")
+        val aiService = com.example.edu_ai.data.remote.ai.AiServiceFactory().createService(isProMode = false)
+        return aiService.getChatResponse(prompt, userContext, emptyList())
+    }
+
     fun refreshDashboard(userId: String) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -48,6 +86,8 @@ class StudentViewModel(private val repository: EduAIRepository, private val dao:
             try {
                 // repository.getDashboardData(userId) already updates the DAO
                 repository.getDashboardData(userId).collect()
+                // Auto trigger sync on refresh to make sure we are synchronized!
+                repository.triggerSync(userId)
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {

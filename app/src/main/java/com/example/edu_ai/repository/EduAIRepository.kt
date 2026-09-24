@@ -186,6 +186,101 @@ class EduAIRepository(
     // --- Ingestion / Library Methods ---
     suspend fun getLibraryUnits() = api.getLibraryUnits()
     suspend fun addUnitToUser(unitId: Int, userId: String) = api.addUnitToUser(unitId, userId)
+
+    // --- Bookmarking & Synchronization Methods ---
+
+    fun getLocalBookmarks(userId: String): Flow<List<BookmarkEntity>> = dao.getBookmarks(userId)
+
+    suspend fun deleteLocalBookmark(bookmarkId: String) {
+        dao.deleteBookmark(bookmarkId)
+    }
+
+    suspend fun saveBookmarkAndSync(
+        userId: String,
+        type: String,
+        title: String,
+        target: String,
+        context: String,
+        notes: String?
+    ) {
+        val id = "bm-${System.currentTimeMillis()}"
+        val entity = BookmarkEntity(
+            id = id,
+            userId = userId,
+            type = type,
+            title = title,
+            target = target,
+            context = context,
+            timestamp = System.currentTimeMillis(),
+            notes = notes
+        )
+        dao.insertBookmark(entity)
+        try {
+            val apiItem = com.example.edu_ai.data.remote.ApiBookmarkItem(
+                id = id,
+                type = type,
+                title = title,
+                target = target,
+                context = context,
+                timestamp = System.currentTimeMillis() / 1000.0,
+                notes = notes
+            )
+            api.saveBookmark(userId, apiItem)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    suspend fun updateSubtopicStatusAndSync(userId: String, subtopicId: Long, isCompleted: Boolean) {
+        dao.updateSubtopicStatus(subtopicId, isCompleted)
+        try {
+            val progressItem = com.example.edu_ai.data.remote.ApiProgressItem(
+                nodeId = subtopicId.toInt(),
+                nodeType = "subtopic",
+                status = if (isCompleted) "Completed" else "Unlocked",
+                lastStudiedAt = System.currentTimeMillis() / 1000.0
+            )
+            api.sendSyncData(
+                userId = userId,
+                request = com.example.edu_ai.data.remote.ApiSyncRequest(progress = listOf(progressItem))
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    suspend fun triggerSync(userId: String) {
+        try {
+            val response = api.getSyncData(userId)
+
+            // 1. Update local progress status
+            response.progress.forEach { item ->
+                if (item.nodeType == "subtopic") {
+                    val isComp = item.status == "Completed"
+                    dao.updateSubtopicStatus(item.nodeId.toLong(), isComp)
+                }
+            }
+
+            // 2. Load bookmarks from server
+            val bookmarksToInsert = response.bookmarks.map { b ->
+                BookmarkEntity(
+                    id = b.id ?: "bm-${System.currentTimeMillis()}-${(100..999).random()}",
+                    userId = userId,
+                    type = b.type,
+                    title = b.title,
+                    target = b.target,
+                    context = b.context,
+                    timestamp = (b.timestamp * 1000).toLong(),
+                    notes = b.notes
+                )
+            }
+            if (bookmarksToInsert.isNotEmpty()) {
+                dao.insertBookmarks(bookmarksToInsert)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 }
 
 

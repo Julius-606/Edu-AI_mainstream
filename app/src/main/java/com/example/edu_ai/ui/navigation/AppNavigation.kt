@@ -86,7 +86,84 @@ fun AppNavigation() {
                 },
                 onOpenLibrary = {
                     navController.navigate("library_screen/$userId")
+                },
+                onLaunchUnit = { unitId ->
+                    navController.navigate("unit_outline/$userId/$unitId")
+                },
+                onOpenBookmarks = {
+                    navController.navigate("bookmarks_screen/$userId")
                 }
+            )
+        }
+
+        composable(
+            route = "unit_outline/{userId}/{unitId}",
+            arguments = listOf(
+                navArgument("userId") { type = NavType.StringType },
+                navArgument("unitId") { type = NavType.LongType }
+            )
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            val unitId = backStackEntry.arguments?.getLong("unitId") ?: 0L
+            com.example.edu_ai.ui.screens.student.UnitOutlineScreen(
+                userId = userId,
+                unitId = unitId,
+                onBack = { navController.popBackStack() },
+                onNavigateToLearn = { subtopicId ->
+                    navController.navigate("learn_screen/$userId/$subtopicId")
+                }
+            )
+        }
+
+        composable(
+            route = "learn_screen/{userId}/{subtopicId}",
+            arguments = listOf(
+                navArgument("userId") { type = NavType.StringType },
+                navArgument("subtopicId") { type = NavType.LongType }
+            )
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            val subtopicId = backStackEntry.arguments?.getLong("subtopicId") ?: 0L
+            com.example.edu_ai.ui.screens.student.LearnScreen(
+                userId = userId,
+                subtopicId = subtopicId,
+                onBack = { navController.popBackStack() },
+                onNavigateToBrowser = { url ->
+                    navController.navigate("browser_screen/$userId?url=$url")
+                }
+            )
+        }
+
+        composable(
+            route = "bookmarks_screen/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            com.example.edu_ai.ui.screens.student.BookmarksScreen(
+                userId = userId,
+                onBack = { navController.popBackStack() },
+                onNavigateToLearn = { subtopicId ->
+                    navController.navigate("learn_screen/$userId/$subtopicId")
+                },
+                onNavigateToBrowser = { url ->
+                    navController.navigate("browser_screen/$userId?url=$url")
+                }
+            )
+        }
+
+        composable(
+            route = "browser_screen/{userId}?url={url}",
+            arguments = listOf(
+                navArgument("userId") { type = NavType.StringType },
+                navArgument("url") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            val url = backStackEntry.arguments?.getString("url") ?: "https://statpearls.com/articles/hemolytic_anemia"
+            com.example.edu_ai.ui.screens.student.BrowserScreen(
+                userId = userId,
+                url = url,
+                onBack = { navController.popBackStack() }
             )
         }
 

@@ -40,6 +40,8 @@ fun StudentDashboard(
     onLogout: () -> Unit,
     onLaunchModule: () -> Unit,
     onOpenLibrary: () -> Unit,
+    onLaunchUnit: (Long) -> Unit,
+    onOpenBookmarks: () -> Unit,
     viewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -65,7 +67,9 @@ fun StudentDashboard(
         timetableUiState = timetableUiState,
         onLogout = onLogout,
         onLaunchModule = onLaunchModule,
-        onOpenLibrary = onOpenLibrary
+        onOpenLibrary = onOpenLibrary,
+        onLaunchUnit = onLaunchUnit,
+        onOpenBookmarks = onOpenBookmarks
     )
 }
 
@@ -78,7 +82,9 @@ fun StudentDashboardContent(
     timetableUiState: TimetableUiState,
     onLogout: () -> Unit,
     onLaunchModule: () -> Unit,
-    onOpenLibrary: () -> Unit
+    onOpenLibrary: () -> Unit,
+    onLaunchUnit: (Long) -> Unit,
+    onOpenBookmarks: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         DynamicBackground()
@@ -94,6 +100,9 @@ fun StudentDashboardContent(
                         }
                     },
                     actions = {
+                        IconButton(onClick = onOpenBookmarks) {
+                            Icon(Icons.Default.Bookmark, contentDescription = "Saved Bookmarks", tint = MaterialTheme.colorScheme.primary)
+                        }
                         IconButton(onClick = onLogout) {
                             Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
                         }
@@ -103,11 +112,11 @@ fun StudentDashboardContent(
                     )
                 )
             }
-        ) { padding ->
+        ) { paddingValues ->
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(paddingValues)
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
@@ -262,7 +271,7 @@ fun StudentDashboardContent(
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Button(
-                                    onClick = onLaunchModule,
+                                    onClick = { onLaunchUnit(unit.localId) },
                                     shape = MaterialTheme.shapes.medium,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {

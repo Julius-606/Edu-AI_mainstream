@@ -164,5 +164,32 @@ data class LibraryUnit(
     @SerializedName("category") val category: String
 )
 
+data class ApiProgressItem(
+    @SerializedName("node_id") val nodeId: Int,
+    @SerializedName("node_type") val nodeType: String,
+    @SerializedName("status") val status: String,
+    @SerializedName("last_studied_at") val lastStudiedAt: Double
+)
+
+data class ApiBookmarkItem(
+    @SerializedName("id") val id: String? = null,
+    @SerializedName("type") val type: String,
+    @SerializedName("title") val title: String,
+    @SerializedName("target") val target: String,
+    @SerializedName("context") val context: String,
+    @SerializedName("timestamp") val timestamp: Double,
+    @SerializedName("notes") val notes: String? = null
+)
+
+data class ApiSyncResponse(
+    @SerializedName("progress") val progress: List<ApiProgressItem> = emptyList(),
+    @SerializedName("bookmarks") val bookmarks: List<ApiBookmarkItem> = emptyList()
+)
+
+data class ApiSyncRequest(
+    @SerializedName("progress") val progress: List<ApiProgressItem> = emptyList(),
+    @SerializedName("bookmarks") val bookmarks: List<ApiBookmarkItem> = emptyList()
+)
+
 
  

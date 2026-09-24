@@ -69,6 +69,23 @@ interface EduAIApi {
         @Path("unit_id") unitId: Int,
         @Query("user_id") userId: String
     ): Map<String, String>
+
+    // --- Synchronization & Bookmarking Endpoints ---
+
+    @GET("api/user/{user_id}/sync")
+    suspend fun getSyncData(@Path("user_id") userId: String): ApiSyncResponse
+
+    @POST("api/user/{user_id}/sync")
+    suspend fun sendSyncData(
+        @Path("user_id") userId: String,
+        @Body request: ApiSyncRequest
+    ): Map<String, Any?>
+
+    @POST("api/user/{user_id}/bookmarks")
+    suspend fun saveBookmark(
+        @Path("user_id") userId: String,
+        @Body bookmark: ApiBookmarkItem
+    ): Map<String, Any?>
 }
 
 

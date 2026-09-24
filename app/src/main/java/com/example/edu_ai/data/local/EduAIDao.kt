@@ -135,6 +135,22 @@ interface EduAIDao {
 
     @Query("DELETE FROM notes")
     suspend fun clearAllNotes()
+
+    // Bookmarks
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBookmark(bookmark: BookmarkEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBookmarks(bookmarks: List<BookmarkEntity>)
+
+    @Query("SELECT * FROM bookmarks WHERE userId = :userId ORDER BY timestamp DESC")
+    fun getBookmarks(userId: String): Flow<List<BookmarkEntity>>
+
+    @Query("DELETE FROM bookmarks WHERE id = :bookmarkId")
+    suspend fun deleteBookmark(bookmarkId: String)
+
+    @Query("DELETE FROM bookmarks")
+    suspend fun clearAllBookmarks()
 }
 
 
