@@ -53,6 +53,8 @@ def main():
                         help="Operating mode: 'local' (offline), 'cloud' (Hugging Face + Neon), 'hybrid' (preferred)")
     parser.add_argument("--backend-url", type=str, default="",
                         help="Custom backend URL (defaults to HF Space or local)")
+    parser.add_argument("--backend", choices=["cloud", "ngrok", "container"], default="cloud",
+                        help="Choose target gateway: 'cloud' (Hugging Face), 'ngrok' (Workstation), 'container' (AI Studio Container)")
     parser.add_argument("--headless", action="store_true",
                         help="Run without opening window")
     args = parser.parse_args()
@@ -63,16 +65,24 @@ def main():
     print("=" * 60)
 
     # Determine target URL
-    if args.mode == "cloud":
+    if args.backend == "cloud":
         target_url = args.backend_url or DEFAULT_HF_URL
+    elif args.backend == "ngrok":
+        target_url = "https://untropic-rozanne-noncomprehendingly.ngrok-free.dev"
+    elif args.backend == "container":
+        # Connect directly to the local container background service
+        target_url = "http://localhost:8001"
     else:
-        # Check if local web client is running
-        if is_port_in_use(LOCAL_WEB_PORT):
-            target_url = f"http://localhost:{LOCAL_WEB_PORT}"
-        elif is_port_in_use(LOCAL_API_PORT):
-            target_url = f"http://localhost:{LOCAL_API_PORT}/docs"
-        else:
+        if args.mode == "cloud":
             target_url = args.backend_url or DEFAULT_HF_URL
+        else:
+            # Check if local web client is running
+            if is_port_in_use(LOCAL_WEB_PORT):
+                target_url = f"http://localhost:{LOCAL_WEB_PORT}"
+            elif is_port_in_use(LOCAL_API_PORT):
+                target_url = f"http://localhost:{LOCAL_API_PORT}/docs"
+            else:
+                target_url = args.backend_url or DEFAULT_HF_URL
 
     print(f"[*] Launching Trace Desktop Interface -> {target_url}")
 

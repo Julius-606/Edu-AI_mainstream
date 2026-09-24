@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sparkles, Shield, GraduationCap, ArrowRight, UserCheck, KeyRound } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { INITIAL_USERS } from '../data/mockData';
@@ -12,6 +12,31 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('password123');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDemoIndex, setSelectedDemoIndex] = useState(0);
+  const [backendMode, setBackendMode] = useState<'cloud' | 'ngrok' | 'container'>('container');
+
+  useEffect(() => {
+    fetch('/api/config/backend')
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.activeMode) {
+          setBackendMode(data.activeMode);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleBackendChange = async (mode: 'cloud' | 'ngrok' | 'container') => {
+    setBackendMode(mode);
+    try {
+      await fetch('/api/config/backend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+      });
+    } catch (e) {
+      console.error("Failed to switch backend mode:", e);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,6 +156,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             )}
           </button>
         </form>
+
+        <div className="mt-6 pt-5 border-t border-slate-800/80">
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 text-center">
+            Backend Gateway Target
+          </label>
+          <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-950/80 border border-slate-800/80 rounded-2xl">
+            {(['cloud', 'ngrok', 'container'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => handleBackendChange(m)}
+                className={`py-2 px-1 rounded-xl text-center text-[10px] font-bold transition-all ${
+                  backendMode === m ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {m === 'cloud' && 'Cloud'}
+                {m === 'ngrok' && 'Ngrok'}
+                {m === 'container' && 'Container'}
+              </button>
+            ))}
+          </div>
+          <div className="text-[10px] text-slate-500 text-center mt-2.5 font-medium">
+            {backendMode === 'cloud' && 'Connected to: Hugging Face Production'}
+            {backendMode === 'ngrok' && 'Connected to: Ngrok Tunnel'}
+            {backendMode === 'container' && 'Connected to: AI Studio Background Service (Port 8001)'}
+          </div>
+        </div>
 
         <div className="mt-6 pt-5 border-t border-slate-800/80 text-center">
           <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5">

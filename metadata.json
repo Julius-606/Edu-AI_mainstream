@@ -1,0 +1,6 @@
+{
+  "name": "Trace",
+  "description": "An adaptive medical and academic learning platform with Zenith Insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

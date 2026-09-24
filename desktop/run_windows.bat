@@ -20,9 +20,23 @@ if exist requirements.txt (
     pip install -q -r requirements.txt
 )
 
+:: Select Backend Destination
+echo =============================================
+echo    SELECT BACKEND DESTINATION GATEWAY        
+echo =============================================
+echo  [1] Cloud Production (Hugging Face)
+echo  [2] Remote Workstation Tunnel (Ngrok)
+echo  [3] Local Container Service (Port 8001)
+echo =============================================
+set /p choice="Enter choice (1-3) [Default: 1]: "
+
+set BACKEND=cloud
+if "%choice%"=="2" set BACKEND=ngrok
+if "%choice%"=="3" set BACKEND=container
+
 :: Launch Desktop Client
-echo [*] Starting Trace Desktop Client...
-python main.py %*
+echo [*] Starting Trace Desktop Client with backend: %BACKEND%...
+python main.py --backend %BACKEND% %*
 if %errorlevel% neq 0 (
     echo.
     echo [INFO] Exited.

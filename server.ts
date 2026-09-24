@@ -48,8 +48,77 @@ async function callGeminiSafe(prompt: string, config?: any): Promise<string | nu
 }
 
 // ==========================================
-// API ROUTES
+// API ROUTES & DYNAMIC PROXY GATEWAY
 // ==========================================
+
+const BACKEND_TARGETS = {
+  cloud: "https://huggingface.co/spaces/Agent606/Edu-AI",
+  ngrok: "https://untropic-rozanne-noncomprehendingly.ngrok-free.dev",
+  container: "http://127.0.0.1:8001"
+};
+
+let activeBackendMode: 'cloud' | 'ngrok' | 'container' = 'container';
+
+// Config endpoints for web interface
+app.get("/api/config/backend", (req, res) => {
+  res.json({ activeMode: activeBackendMode, targets: BACKEND_TARGETS });
+});
+
+app.post("/api/config/backend", (req, res) => {
+  const { mode } = req.body;
+  if (mode === 'cloud' || mode === 'ngrok' || mode === 'container') {
+    activeBackendMode = mode;
+    console.log(`[Proxy] Active gateway shifted to: ${mode} (${BACKEND_TARGETS[mode]})`);
+    return res.json({ success: true, activeMode: activeBackendMode });
+  }
+  res.status(400).json({ error: "Invalid backend mode" });
+});
+
+// Proxy Middleware with Graceful Mock Fallback
+app.use("/api", async (req, res, next) => {
+  // Let configuration, logs, and health check bypass the proxy
+  if (req.path === "/config/backend" || req.path.startsWith("/admin/logs") || req.path === "/health") {
+    return next();
+  }
+
+  const targetUrl = `${BACKEND_TARGETS[activeBackendMode]}/api${req.path}`;
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    if (req.headers.authorization) {
+      headers["Authorization"] = req.headers.authorization;
+    }
+    // Forward custom headers
+    if (req.headers["x-internal-api-key"]) {
+      headers["X-Internal-Api-Key"] = req.headers["x-internal-api-key"] as string;
+    }
+
+    const fetchOptions: RequestInit = {
+      method: req.method,
+      headers
+    };
+
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      fetchOptions.body = JSON.stringify(req.body);
+    }
+
+    const response = await fetch(targetUrl, fetchOptions);
+    const contentType = response.headers.get("content-type");
+
+    res.status(response.status);
+    if (contentType && contentType.includes("application/json")) {
+      const data = await response.json();
+      res.json(data);
+    } else {
+      const text = await response.text();
+      res.send(text);
+    }
+  } catch (err) {
+    console.warn(`[Proxy Warning] ${targetUrl} unavailable, falling back to local Express mocks.`);
+    next(); // Fallback to local mocks
+  }
+});
 
 
 // ==========================================

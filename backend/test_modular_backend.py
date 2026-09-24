@@ -6,7 +6,7 @@ import subprocess
 import os
 
 # Configuration
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "http://127.0.0.1:8001"
 HEADERS = {
     "X-Internal-Api-Key": "DEVELOPMENT_KEY",
     "Content-Type": "application/json"
@@ -25,6 +25,18 @@ def wait_for_server():
 
 def test_modular_api():
     print("\n--- Testing Modular API ---")
+
+    # 0. Sign up / Prepare User
+    print("0. Preparing Test User...")
+    signup_data = {"username": "testuser", "email": "test@example.com", "password": "password123", "role": "Student"}
+    # The /api/auth/signup-form endpoint expects Form data
+    r = requests.post(f"{BASE_URL}/api/auth/signup-form", data=signup_data, headers={"X-Internal-Api-Key": "DEVELOPMENT_KEY"})
+    if r.status_code == 200 or (r.status_code == 400 and "already exists" in r.text):
+        print("✅ Test User is ready")
+    else:
+        print(f"❌ Signup Failed: {r.status_code}")
+        print(r.text)
+        return
 
     # 1. Login
     print("1. Testing Login...")

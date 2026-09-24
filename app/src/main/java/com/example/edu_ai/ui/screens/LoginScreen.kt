@@ -28,7 +28,7 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
     var isLoading by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
-    var isDeveloperMode by remember { mutableStateOf(PreferenceManager.isDeveloperMode(context)) }
+    var backendMode by remember { mutableStateOf(PreferenceManager.getBackendMode(context)) }
     val scope = rememberCoroutineScope()
 
     Column(
@@ -109,7 +109,11 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         TextButton(onClick = { 
-            val baseUrl = if (isDeveloperMode) "https://untropic-rozanne-noncomprehendingly.ngrok-free.dev/" else BuildConfig.BACKEND_BASE_URL
+            val baseUrl = when (backendMode) {
+                "ngrok" -> "https://untropic-rozanne-noncomprehendingly.ngrok-free.dev/"
+                "container" -> "http://10.0.2.2:8001/"
+                else -> BuildConfig.BACKEND_BASE_URL
+            }
             val signupUrl = baseUrl + "signup"
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(signupUrl))
             context.startActivity(intent)
@@ -119,19 +123,36 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        Text(
+            text = "Backend Gateway Target",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(8.dp)
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Text("Developer Mode (Local Backend)", fontSize = 14.sp)
-            Spacer(modifier = Modifier.width(8.dp))
-            Switch(
-                checked = isDeveloperMode,
-                onCheckedChange = { 
-                    isDeveloperMode = it
-                    PreferenceManager.saveDeveloperMode(context, it)
+            val modes = listOf("cloud" to "Cloud", "ngrok" to "Ngrok", "container" to "Container")
+            modes.forEach { (modeKey, modeName) ->
+                val isSelected = backendMode == modeKey
+                OutlinedButton(
+                    onClick = {
+                        backendMode = modeKey
+                        PreferenceManager.saveBackendMode(context, modeKey)
+                        PreferenceManager.saveDeveloperMode(context, modeKey != "cloud")
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                        contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                    ),
+                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp).height(40.dp)
+                ) {
+                    Text(modeName, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
-            )
+            }
         }
     }
 }

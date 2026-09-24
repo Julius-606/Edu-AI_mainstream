@@ -37,6 +37,14 @@ object PreferenceManager {
     fun isDeveloperMode(context: Context): Boolean {
         return getSharedPrefs(context).getBoolean(KEY_DEVELOPER_MODE, false)
     }
+
+    fun saveBackendMode(context: Context, mode: String) {
+        getSharedPrefs(context).edit().putString("backend_mode", mode).apply()
+    }
+
+    fun getBackendMode(context: Context): String {
+        return getSharedPrefs(context).getString("backend_mode", "cloud") ?: "cloud"
+    }
 }
 
 

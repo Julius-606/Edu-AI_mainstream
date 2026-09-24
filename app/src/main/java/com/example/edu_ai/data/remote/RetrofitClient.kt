@@ -29,20 +29,29 @@ object RetrofitClient {
         override fun intercept(chain: Interceptor.Chain): Response {
             val originalRequest = chain.request()
             
-            // Check Developer Mode first
+            // Resolve custom backend mode
             context?.let { ctx ->
-                if (PreferenceManager.isDeveloperMode(ctx)) {
-                    val developerUrl = originalRequest.url.newBuilder()
-                        .scheme("https")
-                        .host("untropic-rozanne-noncomprehendingly.ngrok-free.dev")
-                        .port(443)
+                val mode = PreferenceManager.getBackendMode(ctx)
+                if (mode != "cloud") {
+                    val customUrl = if (mode == "container") {
+                        originalRequest.url.newBuilder()
+                            .scheme("http")
+                            .host("10.0.2.2") // Loopback to host machine from Emulator
+                            .port(8001)
+                            .build()
+                    } else { // "ngrok"
+                        originalRequest.url.newBuilder()
+                            .scheme("https")
+                            .host("untropic-rozanne-noncomprehendingly.ngrok-free.dev")
+                            .port(443)
+                            .build()
+                    }
+                    
+                    val customRequest = originalRequest.newBuilder()
+                        .url(customUrl)
                         .build()
                     
-                    val developerRequest = originalRequest.newBuilder()
-                        .url(developerUrl)
-                        .build()
-                    
-                    return chain.proceed(developerRequest)
+                    return chain.proceed(customRequest)
                 }
             }
 
@@ -54,7 +63,7 @@ object RetrofitClient {
                 if (currentBaseUrl != FALLBACK_URL) {
                     currentBaseUrl = FALLBACK_URL
                     
-                    // Reconstruct request with new URL
+                    // Reconstruct request with fallback URL (Hugging Face / Ngrok as fallback)
                     val newUrl = originalRequest.url.newBuilder()
                         .scheme("https")
                         .host("untropic-rozanne-noncomprehendingly.ngrok-free.dev")

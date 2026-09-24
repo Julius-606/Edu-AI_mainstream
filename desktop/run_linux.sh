@@ -20,5 +20,20 @@ if [ -f "requirements.txt" ]; then
     pip3 install -q -r requirements.txt || true
 fi
 
-echo "[*] Launching Trace Desktop Client..."
-python3 main.py "$@"
+echo "============================================="
+echo "   SELECT BACKEND DESTINATION GATEWAY        "
+echo "============================================="
+echo " 1) Cloud Production (Hugging Face)"
+echo " 2) Remote Workstation Tunnel (Ngrok)"
+echo " 3) Local Container Service (Port 8001)"
+echo "============================================="
+read -p "Enter choice (1-3) [Default: 1]: " choice
+
+case "$choice" in
+    2) BACKEND="ngrok" ;;
+    3) BACKEND="container" ;;
+    *) BACKEND="cloud" ;;
+esac
+
+echo "[*] Launching Trace Desktop Client with backend: $BACKEND..."
+python3 main.py --backend "$BACKEND" "$@"
