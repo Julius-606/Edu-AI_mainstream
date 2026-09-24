@@ -242,16 +242,18 @@ fun LearnScreen(
                         ) {
                             StudyChip("Explain with analogy") {
                                 com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                aiQuestion = "Please explain the clinical mechanics of '${subtopic.name}' using a simple, relatable medical analogy."
-                                triggerAiConsultation(userId, studentViewModel, scope) { loading, res ->
+                                val q = "Please explain the clinical mechanics of '${subtopic.name}' using a simple, relatable medical analogy."
+                                aiQuestion = q
+                                triggerAiConsultation(userId, q, studentViewModel, scope) { loading, res ->
                                     isAiLoading = loading
                                     aiResponse = res
                                 }
                             }
                             StudyChip("Common exam traps") {
                                 com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                aiQuestion = "What are the common medical board exam traps, distractors, and high-yield test points regarding '${subtopic.name}'?"
-                                triggerAiConsultation(userId, studentViewModel, scope) { loading, res ->
+                                val q = "What are the common medical board exam traps, distractors, and high-yield test points regarding '${subtopic.name}'?"
+                                aiQuestion = q
+                                triggerAiConsultation(userId, q, studentViewModel, scope) { loading, res ->
                                     isAiLoading = loading
                                     aiResponse = res
                                 }
@@ -278,8 +280,9 @@ fun LearnScreen(
                             IconButton(
                                 onClick = {
                                     com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                    if (aiQuestion.trim().isNotEmpty()) {
-                                        triggerAiConsultation(userId, studentViewModel, scope) { loading, res ->
+                                    val q = aiQuestion.trim()
+                                    if (q.isNotEmpty()) {
+                                        triggerAiConsultation(userId, q, studentViewModel, scope) { loading, res ->
                                             isAiLoading = loading
                                             aiResponse = res
                                         }
@@ -406,6 +409,7 @@ fun StudyChip(text: String, onClick: () -> Unit) {
 
 private fun triggerAiConsultation(
     userId: String,
+    aiQuestion: String,
     viewModel: StudentViewModel,
     scope: kotlinx.coroutines.CoroutineScope,
     onResult: (Boolean, String?) -> Unit
@@ -413,7 +417,7 @@ private fun triggerAiConsultation(
     onResult(true, null)
     scope.launch {
         try {
-            val response = viewModel.repositoryChat(userId, "PFK-1 regulation diagnostics")
+            val response = viewModel.repositoryChat(userId, aiQuestion)
             onResult(false, response)
         } catch (e: Exception) {
             onResult(false, "System was unable to contact modular clinical AI. Please verify your connection status.")

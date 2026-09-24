@@ -652,74 +652,9 @@ export const App: React.FC = () => {
     );
   }
 
-  // If in 'mobile' preview mode, wrap the Android App in an interactive phone frame
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center py-2 sm:py-6 px-1 sm:px-4 font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
-      {/* Top Preview Control Bar */}
-      <div className="w-full max-w-xl mb-3 flex items-center justify-between gap-2 px-2">
-        <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-bold text-slate-300">
-            Android App Preview (Trace OS)
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setPreviewMode(previewMode === 'mobile' ? 'responsive' : 'mobile')}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-semibold text-slate-300 transition-colors"
-          >
-            {previewMode === 'mobile' ? (
-              <>
-                <Tablet className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Expanded</span>
-              </>
-            ) : (
-              <>
-                <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Phone View</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {previewMode === 'mobile' ? (
-        /* Authentic Android Smartphone Device Frame */
-        <div className="relative w-full max-w-[420px] h-[860px] bg-slate-950 rounded-[44px] border-[8px] border-slate-800 shadow-[0_25px_70px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden ring-1 ring-slate-700/50">
-          {/* Android Status Bar */}
-          <div className="h-8 bg-slate-950/95 border-b border-slate-800/50 px-6 flex items-center justify-between text-[11px] font-semibold text-slate-400 select-none z-50 shrink-0">
-            <span>9:41</span>
-            
-            {/* Center Camera Punch Hole */}
-            <div className="w-3.5 h-3.5 rounded-full bg-black border border-slate-800 shadow-inner" />
-
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-400">5G</span>
-              <Wifi className="w-3.5 h-3.5 text-slate-400" />
-              <div className="flex items-center gap-1">
-                <span className="text-[10px]">98%</span>
-                <Battery className="w-3.5 h-3.5 text-emerald-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Phone Screen Body */}
-          <div className="flex-1 relative overflow-hidden flex flex-col">
-            {appContent}
-          </div>
-
-          {/* Android Navigation Pill Bar */}
-          <div className="h-4 bg-slate-950 flex items-center justify-center shrink-0 z-50">
-            <div className="w-28 h-1 bg-slate-600/70 rounded-full" />
-          </div>
-        </div>
-      ) : (
-        /* Full Expanded View */
-        <div className="w-full max-w-7xl flex-1 bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
-          {appContent}
-        </div>
-      )}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
+      {appContent}
     </div>
   );
 };
