@@ -89,10 +89,8 @@ app.use("/api", async (req, res, next) => {
     if (req.headers.authorization) {
       headers["Authorization"] = req.headers.authorization;
     }
-    // Forward custom headers
-    if (req.headers["x-internal-api-key"]) {
-      headers["X-Internal-Api-Key"] = req.headers["x-internal-api-key"] as string;
-    }
+    // Forward custom headers with safe fallback
+    headers["X-Internal-Api-Key"] = (req.headers["x-internal-api-key"] as string) || process.env.INTERNAL_API_KEY || "64923e4d8f1a2c5b9e0f3d7a6c5b9eX0f3d7a6c5b9e0f3d7a";
 
     const fetchOptions: RequestInit = {
       method: req.method,

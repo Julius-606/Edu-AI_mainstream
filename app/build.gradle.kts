@@ -15,7 +15,7 @@ android {
     val fallbackBackendBaseUrl = (project.findProperty("fallbackBackendBaseUrl") as? String)
         ?: "https://untropic-rozanne-noncomprehendingly.ngrok-free.dev/"
 
-    val internalApiKey = (project.findProperty("INTERNAL_API_KEY") as? String) ?: "DEVELOPMENT_KEY"
+    val internalApiKey = (project.findProperty("INTERNAL_API_KEY") as? String) ?: "64923e4d8f1a2c5b9e0f3d7a6c5b9eX0f3d7a6c5b9e0f3d7a"
 
     defaultConfig {
         applicationId = "com.example.edu_ai"

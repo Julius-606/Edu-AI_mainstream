@@ -7,7 +7,7 @@ from jose import JWTError, jwt
 import bcrypt
 
 # Configuration
-SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your-super-secret-key-change-this-in-production")
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "ff5111ba29077ff43dbbe5184c5ce0d53cc79e324b22c49aa27c45f9b2f239f2")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
 

@@ -55,7 +55,7 @@ class HFSpacePrefixMiddleware:
 
 app.add_middleware(HFSpacePrefixMiddleware)
 
-INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "DEVELOPMENT_KEY")
+INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "64923e4d8f1a2c5b9e0f3d7a6c5b9eX0f3d7a6c5b9e0f3d7a")
 
 # Global Security Middleware
 @app.middleware("http")

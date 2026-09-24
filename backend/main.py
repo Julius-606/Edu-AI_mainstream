@@ -25,7 +25,7 @@ Base.metadata.create_all(bind=engine)
 
 templates = Jinja2Templates(directory=str(os.path.join(os.path.dirname(__file__), "templates")))
 
-INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "DEVELOPMENT_KEY")
+INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "64923e4d8f1a2c5b9e0f3d7a6c5b9eX0f3d7a6c5b9e0f3d7a")
 
 app = FastAPI(
     title="Trace Learning System",
