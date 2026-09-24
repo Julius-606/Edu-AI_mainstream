@@ -37,6 +37,7 @@ fun BrowserScreen(
 ) {
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var activeUrl by remember { mutableStateOf(url) }
     var bookmarkNote by remember { mutableStateOf("") }
@@ -114,7 +115,10 @@ fun BrowserScreen(
                             }
                         },
                         navigationIcon = {
-                            IconButton(onClick = onBack) {
+                            IconButton(onClick = {
+                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                onBack()
+                            }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                             }
                         },
@@ -157,6 +161,7 @@ fun BrowserScreen(
 
                                 IconButton(
                                     onClick = {
+                                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
                                         if (isBookmarked) {
                                             scope.launch {
                                                 val bm = localBookmarks.find { it.target == activeUrl && it.type == "browser" }
@@ -180,7 +185,13 @@ fun BrowserScreen(
                             }
                         }
                         Spacer(modifier = Modifier.width(6.dp))
-                        IconButton(onClick = { /* Refresh page */ }, modifier = Modifier.size(32.dp)) {
+                        IconButton(
+                            onClick = {
+                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                /* Refresh page */
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                         }
                     }

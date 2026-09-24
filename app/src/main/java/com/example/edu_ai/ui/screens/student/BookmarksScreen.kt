@@ -38,6 +38,7 @@ fun BookmarksScreen(
 ) {
     val bookmarks by studentViewModel.bookmarks.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("All Clips", "Syllabus", "Browser")
@@ -65,7 +66,10 @@ fun BookmarksScreen(
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = {
+                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                            onBack()
+                        }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     },
@@ -88,7 +92,10 @@ fun BookmarksScreen(
                     tabs.forEachIndexed { index, title ->
                         Tab(
                             selected = selectedTab == index,
-                            onClick = { selectedTab = index },
+                            onClick = {
+                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                selectedTab = index
+                            },
                             text = { Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                         )
                     }
@@ -154,6 +161,7 @@ fun BookmarkRowCard(
     onDelete: () -> Unit,
     onStudyNow: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val dateStr = remember(bookmark.timestamp) {
         try {
             val sdf = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
@@ -191,7 +199,13 @@ fun BookmarkRowCard(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-                IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                IconButton(
+                    onClick = {
+                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                        onDelete()
+                    },
+                    modifier = Modifier.size(24.dp)
+                ) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Delete",
@@ -240,7 +254,10 @@ fun BookmarkRowCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
                 Button(
-                    onClick = onStudyNow,
+                    onClick = {
+                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                        onStudyNow()
+                    },
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.height(30.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 2.dp)

@@ -93,6 +93,8 @@ fun LearnScreen(
     var aiResponse by remember { mutableStateOf<String?>(null) }
     var isAiLoading by remember { mutableStateOf(false) }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     // Check existing bookmarks
     val localBookmarks by studentViewModel.bookmarks.collectAsState(initial = emptyList())
     LaunchedEffect(localBookmarks, subtopicId) {
@@ -115,12 +117,16 @@ fun LearnScreen(
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = {
+                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                            onBack()
+                        }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     },
                     actions = {
                         IconButton(onClick = {
+                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
                             if (isBookmarked) {
                                 scope.launch {
                                     val bm = localBookmarks.find { it.target == subtopicId.toString() && it.type == "learn" }
@@ -235,6 +241,7 @@ fun LearnScreen(
                                 .padding(bottom = 6.dp)
                         ) {
                             StudyChip("Explain with analogy") {
+                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
                                 aiQuestion = "Please explain the clinical mechanics of '${subtopic.name}' using a simple, relatable medical analogy."
                                 triggerAiConsultation(userId, studentViewModel, scope) { loading, res ->
                                     isAiLoading = loading
@@ -242,6 +249,7 @@ fun LearnScreen(
                                 }
                             }
                             StudyChip("Common exam traps") {
+                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
                                 aiQuestion = "What are the common medical board exam traps, distractors, and high-yield test points regarding '${subtopic.name}'?"
                                 triggerAiConsultation(userId, studentViewModel, scope) { loading, res ->
                                     isAiLoading = loading
@@ -269,6 +277,7 @@ fun LearnScreen(
                             Spacer(modifier = Modifier.width(6.dp))
                             IconButton(
                                 onClick = {
+                                    com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
                                     if (aiQuestion.trim().isNotEmpty()) {
                                         triggerAiConsultation(userId, studentViewModel, scope) { loading, res ->
                                             isAiLoading = loading
@@ -299,7 +308,10 @@ fun LearnScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
-                        onClick = { if (currentStep > 0) currentStep-- },
+                        onClick = {
+                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                            if (currentStep > 0) currentStep--
+                        },
                         enabled = currentStep > 0,
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                     ) {
@@ -309,6 +321,7 @@ fun LearnScreen(
                     if (currentStep == objectives.lastIndex) {
                         Button(
                             onClick = {
+                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
                                 scope.launch {
                                     studentViewModel.toggleSubtopicCompleted(userId, subtopicId, true)
                                 }
@@ -322,7 +335,10 @@ fun LearnScreen(
                         }
                     } else {
                         Button(
-                            onClick = { if (currentStep < objectives.lastIndex) currentStep++ },
+                            onClick = {
+                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                if (currentStep < objectives.lastIndex) currentStep++
+                            },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
                             Text("NEXT PART", fontWeight = FontWeight.Bold)

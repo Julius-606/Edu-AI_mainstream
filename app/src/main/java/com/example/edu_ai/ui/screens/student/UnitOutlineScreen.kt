@@ -36,6 +36,7 @@ fun UnitOutlineScreen(
 ) {
     val uiState by studentViewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val unitWithModules = uiState.unitsWithModules.find { it.unit.localId == unitId }
 
@@ -54,7 +55,10 @@ fun UnitOutlineScreen(
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = {
+                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                            onBack()
+                        }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     },
@@ -166,6 +170,7 @@ fun ModuleOutlineCard(
     onNavigateToLearn: (Long) -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(true) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -178,7 +183,10 @@ fun ModuleOutlineCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { isExpanded = !isExpanded },
+                    .clickable {
+                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                        isExpanded = !isExpanded
+                    },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -200,7 +208,10 @@ fun ModuleOutlineCard(
                         lineHeight = 22.sp
                     )
                 }
-                IconButton(onClick = { isExpanded = !isExpanded }) {
+                IconButton(onClick = {
+                    com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                    isExpanded = !isExpanded
+                }) {
                     Icon(
                         imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = "Toggle"
@@ -233,11 +244,15 @@ fun ModuleOutlineCard(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 5.dp)
-                                        .clickable { onNavigateToLearn(subtopic.subtopicId) },
+                                        .clickable {
+                                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                            onNavigateToLearn(subtopic.subtopicId)
+                                        },
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     IconButton(
                                         onClick = {
+                                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
                                             onSubtopicCheckToggle(subtopic.subtopicId, !subtopic.isCompleted)
                                         },
                                         modifier = Modifier.size(24.dp)
@@ -270,7 +285,10 @@ fun ModuleOutlineCard(
                                         modifier = Modifier.weight(1f)
                                     )
                                     Button(
-                                        onClick = { onNavigateToLearn(subtopic.subtopicId) },
+                                        onClick = {
+                                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                            onNavigateToLearn(subtopic.subtopicId)
+                                        },
                                         shape = MaterialTheme.shapes.small,
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
                                         modifier = Modifier.height(28.dp),
