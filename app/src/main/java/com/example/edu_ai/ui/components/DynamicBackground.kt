@@ -21,6 +21,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
+import com.example.edu_ai.ui.theme.NeonBlue
+import com.example.edu_ai.ui.theme.NeonIndigo
+import com.example.edu_ai.ui.theme.DarkSlateBg
+
 @Composable
 fun DynamicBackground(modifier: Modifier = Modifier) {
     val infiniteTransition = rememberInfiniteTransition(label = "BackgroundTransition")
@@ -35,9 +39,9 @@ fun DynamicBackground(modifier: Modifier = Modifier) {
         label = "GradientPhase"
     )
 
-    val color1 = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-    val color2 = MaterialTheme.colorScheme.surface
-    val color3 = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.1f)
+    val color1 = NeonBlue.copy(alpha = 0.15f)
+    val color2 = DarkSlateBg
+    val color3 = NeonIndigo.copy(alpha = 0.18f)
 
     val animatedBrush = Brush.linearGradient(
         colors = listOf(color1, color2, color3),

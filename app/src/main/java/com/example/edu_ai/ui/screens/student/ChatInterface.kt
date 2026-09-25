@@ -30,10 +30,13 @@ import com.example.edu_ai.ui.components.FormattedText
 import kotlinx.coroutines.delay
 import java.util.regex.Pattern
 
+import androidx.compose.material.icons.filled.History
+
 @Composable
 fun ChatInterface(
     viewModel: ChatViewModel,
     onCloseChat: () -> Unit,
+    onNavigateToHistory: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -68,6 +71,11 @@ fun ChatInterface(
                     )
                 }
                 Row {
+                    onNavigateToHistory?.let {
+                        IconButton(onClick = { it() }) {
+                            Icon(Icons.Default.History, contentDescription = "Consultation Vault", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
                     IconButton(onClick = { viewModel.startNewChat() }) {
                         Icon(Icons.Default.Add, contentDescription = "New Chat", tint = MaterialTheme.colorScheme.primary)
                     }
@@ -212,25 +220,45 @@ fun TypingIndicator() {
 fun ChatBubble(message: ChatMessage) {
     val isUser = message.role == "user"
     val alignment = if (isUser) Alignment.End else Alignment.Start
-    val containerColor = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val contentColor = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+    
+    // Brand Creative Neon styling
+    val containerColor = if (isUser) {
+        com.example.edu_ai.ui.theme.NeonIndigo.copy(alpha = 0.85f)
+    } else {
+        com.example.edu_ai.ui.theme.SlateCard
+    }
+    val contentColor = if (isUser) {
+        Color.White
+    } else {
+        Color(0xFFE2E8F0)
+    }
+    
+    val borderStroke = if (isUser) {
+        androidx.compose.foundation.BorderStroke(1.dp, com.example.edu_ai.ui.theme.NeonBlue.copy(alpha = 0.5f))
+    } else {
+        androidx.compose.foundation.BorderStroke(1.5.dp, androidx.compose.ui.graphics.Brush.linearGradient(
+            colors = listOf(com.example.edu_ai.ui.theme.NeonBlue.copy(alpha = 0.4f), com.example.edu_ai.ui.theme.NeonIndigo.copy(alpha = 0.4f))
+        ))
+    }
 
-    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = alignment) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalAlignment = alignment) {
         Surface(
             color = containerColor,
             contentColor = contentColor,
+            border = borderStroke,
             shape = RoundedCornerShape(
                 topStart = 16.dp,
                 topEnd = 16.dp,
                 bottomStart = if (isUser) 16.dp else 4.dp,
                 bottomEnd = if (isUser) 4.dp else 16.dp
             ),
-            tonalElevation = if (isUser) 0.dp else 1.dp
+            tonalElevation = if (isUser) 0.dp else 2.dp,
+            modifier = Modifier.widthIn(max = 300.dp)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 FormattedText(
                     text = message.content,
-                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp)
+                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 19.sp, fontSize = 13.sp)
                 )
                 
                 // Detect YouTube Links

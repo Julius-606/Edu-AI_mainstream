@@ -1,4 +1,3 @@
-
 package com.example.edu_ai.ui.screens.student
 
 import androidx.compose.animation.AnimatedVisibility
@@ -86,36 +85,36 @@ fun UnitSelectionScreen(
     var focusArea by remember { mutableStateOf("") }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Knowledge Retrieval", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Text("Select a unit from your syllabus to start a personalized quiz.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Knowledge Retrieval", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+        Text("Select a unit from your syllabus to start a personalized quiz.", fontSize = 11.sp, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
         
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("AI is drafting your assessment...", style = MaterialTheme.typography.bodyMedium)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("AI is drafting your assessment...", style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
                 }
             }
         } else {
             error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 16.dp))
+                Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, modifier = Modifier.padding(bottom = 12.dp))
             }
             
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Active Contracts (Units)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Icon(Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Active Contracts (Units)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
 
@@ -126,15 +125,15 @@ fun UnitSelectionScreen(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onUnitClicked(unit.unitName) },
                         colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                         )
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(unit.unitName, fontWeight = FontWeight.Bold)
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(unit.unitName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             
                             AnimatedVisibility(visible = isSelected) {
                                 Column {
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(6.dp))
                                     unitWithModules.modules.forEach { moduleWithTopics ->
                                         ModuleAccordion(
                                             moduleWithTopics = moduleWithTopics,
@@ -142,21 +141,21 @@ fun UnitSelectionScreen(
                                         )
                                     }
                                     
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Spacer(modifier = Modifier.height(10.dp))
                                     OutlinedTextField(
                                         value = focusArea,
                                         onValueChange = { focusArea = it },
-                                        placeholder = { Text("Area of focus (Optional)") },
+                                        placeholder = { Text("Area of focus (Optional)", fontSize = 11.sp) },
                                         modifier = Modifier.fillMaxWidth(),
-                                        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
+                                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
                                         shape = MaterialTheme.shapes.medium
                                     )
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Button(
                                         onClick = { onStartQuiz(unit.unitName, focusArea.ifBlank { null }) },
-                                        modifier = Modifier.fillMaxWidth()
+                                        modifier = Modifier.fillMaxWidth().height(40.dp)
                                     ) {
-                                        Text("GENERATE FULL UNIT QUIZ 🧠")
+                                        Text("GENERATE FULL UNIT QUIZ 🧠", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -168,9 +167,9 @@ fun UnitSelectionScreen(
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Recent Trades (Performance)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Recent Trades (Performance)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
 
@@ -182,14 +181,14 @@ fun UnitSelectionScreen(
                             )
                         ) {
                             Row(
-                                modifier = Modifier.padding(16.dp),
+                                modifier = Modifier.padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(record.unitName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text(record.unitName, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                     Text(
                                         SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(record.timestamp)),
-                                        fontSize = 12.sp,
+                                        fontSize = 10.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -199,10 +198,10 @@ fun UnitSelectionScreen(
                                     Text(
                                         "${record.pnlScore.toInt()}%",
                                         fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 18.sp,
+                                        fontSize = 14.sp,
                                         color = pnlColor
                                     )
-                                    Text("PnL", fontSize = 10.sp, color = pnlColor)
+                                    Text("PnL", fontSize = 8.sp, color = pnlColor)
                                 }
                             }
                         }
@@ -219,24 +218,25 @@ fun ModuleAccordion(
     onSubtopicClicked: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+    Column(modifier = Modifier.padding(vertical = 2.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { expanded = !expanded }
-                .padding(vertical = 4.dp),
+                .padding(vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(16.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 moduleWithTopics.module.name,
                 style = MaterialTheme.typography.bodyMedium,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -246,19 +246,20 @@ fun ModuleAccordion(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onSubtopicClicked(subtopic.name) }
-                        .padding(start = 28.dp, top = 4.dp, bottom = 4.dp),
+                        .padding(start = 24.dp, top = 3.dp, bottom = 3.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = if (subtopic.isCompleted) Icons.Default.CheckCircle else Icons.Default.School,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(12.dp),
                         tint = if (subtopic.isCompleted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         subtopic.name,
                         style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -280,21 +281,25 @@ fun QuizQuestionScreen(
     val scrollState = rememberScrollState()
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp)
+        modifier = Modifier.fillMaxSize().padding(12.dp)
     ) {
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             LinearProgressIndicator(
                 progress = { (currentIdx + 1).toFloat() / quiz.questions.size },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().height(4.dp),
+                color = MaterialTheme.colorScheme.primary
             )
-            Text("Question ${currentIdx + 1} of ${quiz.questions.size}", style = MaterialTheme.typography.labelMedium)
+            Text("Question ${currentIdx + 1} of ${quiz.questions.size}", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp)
 
-            FormattedText(text = currentQuestion.text, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+            FormattedText(
+                text = currentQuestion.text, 
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+            )
 
             currentQuestion.options.forEachIndexed { index, option ->
                 val isThisOptionSelected = selectedIdx == index
@@ -304,22 +309,30 @@ fun QuizQuestionScreen(
                     isSubmitted && isCorrect -> Color.Green
                     isSubmitted && isThisOptionSelected && !isCorrect -> Color.Red
                     isThisOptionSelected -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.outline
+                    else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                 }
+
+                val cardBg = if (isThisOptionSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent
 
                 OutlinedCard(
                     onClick = { if (!isSubmitted) viewModel.selectOption(index) },
                     modifier = Modifier.fillMaxWidth(),
-                    border = BorderStroke(2.dp, borderColor)
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
+                    border = BorderStroke(1.5.dp, borderColor)
                 ) {
                     Row(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = option, modifier = Modifier.weight(1f))
+                        Text(
+                            text = option, 
+                            style = MaterialTheme.typography.bodyMedium, 
+                            fontSize = 12.sp, 
+                            modifier = Modifier.weight(1f)
+                        )
                         if (isSubmitted) {
-                            if (isCorrect) Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.Green)
-                            else if (isThisOptionSelected) Icon(Icons.Default.Error, contentDescription = null, tint = Color.Red)
+                            if (isCorrect) Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.Green, modifier = Modifier.size(16.dp))
+                            else if (isThisOptionSelected) Icon(Icons.Default.Error, contentDescription = null, tint = Color.Red, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -327,48 +340,56 @@ fun QuizQuestionScreen(
 
             if (isSubmitted) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                    modifier = Modifier.fillMaxWidth()
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)),
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f))
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("Explanation", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        FormattedText(text = currentQuestion.explanation, style = MaterialTheme.typography.bodyMedium)
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text("Explanation", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        FormattedText(
+                            text = currentQuestion.explanation, 
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp, lineHeight = 15.sp)
+                        )
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedButton(
                 onClick = { viewModel.previousQuestion() },
                 enabled = currentIdx > 0,
-                modifier = Modifier.weight(1f).height(56.dp)
+                modifier = Modifier.weight(1f).height(44.dp)
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("PREV")
+                Text("PREV", fontSize = 11.sp)
             }
 
             if (!isSubmitted) {
                 Button(
                     onClick = { viewModel.submitAnswer() },
                     enabled = selectedIdx != null,
-                    modifier = Modifier.weight(1f).height(56.dp)
+                    modifier = Modifier.weight(1f).height(44.dp)
                 ) {
-                    Text("SUBMIT")
+                    Text("SUBMIT", fontSize = 11.sp)
                 }
             } else {
                 Button(
                     onClick = { viewModel.nextQuestion() },
-                    modifier = Modifier.weight(1f).height(56.dp)
+                    modifier = Modifier.weight(1f).height(44.dp)
                 ) {
-                    Text(if (currentIdx + 1 < quiz.questions.size) "NEXT" else if (uiState.isReviewMode) "BACK TO RESULT" else "FINISH")
+                    Text(
+                        text = if (currentIdx + 1 < quiz.questions.size) "NEXT" else if (uiState.isReviewMode) "BACK TO RESULT" else "FINISH",
+                        fontSize = 11.sp
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -387,54 +408,51 @@ fun QuizResultScreen(
     val percentage = (score.toDouble() / total * 100).toInt()
     
     val congratulationMessage = when {
-        percentage == 100 -> "UNSTOPPABLE! 🏆 Perfect score. You've mastered this contract."
-        percentage >= 80 -> "EXCELLENT! 🌟 High-tier performance. You're dominating the syllabus."
+        percentage == 100 -> "UNSTOPPABLE! 🏆 Perfect score."
+        percentage >= 80 -> "EXCELLENT! 🌟 High-tier performance."
         else -> "Assessment Complete!"
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
             text = congratulationMessage, 
-            fontSize = 24.sp, 
+            fontSize = 18.sp, 
             fontWeight = FontWeight.Bold, 
             textAlign = TextAlign.Center,
             color = if (percentage >= 80) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         )
         
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("Your PnL (Accuracy)", fontSize = 16.sp)
-        Text("$percentage%", fontSize = 64.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-        Text("Score: $score / $total", fontSize = 20.sp)
+        Spacer(modifier = Modifier.height(12.dp))
+        Text("Your PnL Accuracy", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+        Text("$percentage%", fontSize = 44.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+        Text("Score: $score / $total", fontSize = 14.sp, fontWeight = FontWeight.Medium)
         
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(32.dp))
         
         // Options Grid
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onReview, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
-                    Icon(Icons.Default.Search, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("REVIEW")
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = onReview, modifier = Modifier.weight(1f).height(44.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
+                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("REVIEW", fontSize = 11.sp)
                 }
-                Button(onClick = onRetake, modifier = Modifier.weight(1f).height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("RETAKE")
+                Button(onClick = onRetake, modifier = Modifier.weight(1f).height(44.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("RETAKE", fontSize = 11.sp)
                 }
             }
-            Button(onClick = onTakeNew, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-                Text("TAKE NEW ASSESSMENT")
+            Button(onClick = onTakeNew, modifier = Modifier.fillMaxWidth().height(44.dp)) {
+                Text("TAKE NEW ASSESSMENT", fontSize = 11.sp)
             }
             TextButton(onClick = onGoBack) {
-                Text("Go Back to Units")
+                Text("Go Back to Units", fontSize = 12.sp)
             }
         }
     }
 }
-
-
- 

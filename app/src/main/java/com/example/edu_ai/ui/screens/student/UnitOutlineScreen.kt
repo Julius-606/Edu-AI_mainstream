@@ -250,12 +250,10 @@ fun ModuleOutlineCard(
                                         },
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    IconButton(
-                                        onClick = {
-                                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                            onSubtopicCheckToggle(subtopic.subtopicId, !subtopic.isCompleted)
-                                        },
-                                        modifier = Modifier.size(24.dp)
+                                    // Read-only indicator (no manual toggle)
+                                    Box(
+                                        modifier = Modifier.size(24.dp),
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = if (subtopic.isCompleted) {
@@ -263,7 +261,7 @@ fun ModuleOutlineCard(
                                             } else {
                                                 Icons.Outlined.Circle
                                             },
-                                            contentDescription = "Toggle Completed",
+                                            contentDescription = if (subtopic.isCompleted) "Completed" else "Incomplete",
                                             tint = if (subtopic.isCompleted) {
                                                 MaterialTheme.colorScheme.primary
                                             } else {

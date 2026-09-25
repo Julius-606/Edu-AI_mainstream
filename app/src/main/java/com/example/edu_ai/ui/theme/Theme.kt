@@ -13,43 +13,40 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = NeonBlue,
+    secondary = NeonIndigo,
+    tertiary = androidx.compose.ui.graphics.Color(0xFFEC4899),
+    background = DarkSlateBg,
+    surface = SlateCard,
+    onPrimary = androidx.compose.ui.graphics.Color.Black,
+    onSecondary = androidx.compose.ui.graphics.Color.White,
+    onBackground = androidx.compose.ui.graphics.Color(0xFFF8FAFC),
+    onSurface = androidx.compose.ui.graphics.Color(0xFFF8FAFC),
+    surfaceVariant = SlateCardLight,
+    onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFFCBD5E1),
+    primaryContainer = NeonIndigo.copy(alpha = 0.35f),
+    secondaryContainer = NeonBlue.copy(alpha = 0.25f)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = NeonIndigo,
+    secondary = NeonBlue,
+    tertiary = androidx.compose.ui.graphics.Color(0xFFEC4899),
+    background = androidx.compose.ui.graphics.Color(0xFFF8FAFC),
+    surface = androidx.compose.ui.graphics.Color.White,
+    onPrimary = androidx.compose.ui.graphics.Color.White,
+    onSecondary = androidx.compose.ui.graphics.Color.Black,
+    onBackground = androidx.compose.ui.graphics.Color(0xFF0F172A),
+    onSurface = androidx.compose.ui.graphics.Color(0xFF0F172A)
 )
 
 @Composable
 fun TraceTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    darkTheme: Boolean = true, // Force Dark theme for Trace slate aesthetics
+    dynamicColor: Boolean = false, // Set to false to preserve brand blue/indigo neon gradients
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

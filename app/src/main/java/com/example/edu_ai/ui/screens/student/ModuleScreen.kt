@@ -148,7 +148,8 @@ fun ChatTabWrapper(user: UserEntity?, onNavigateToHistory: () -> Unit) {
         )
         ChatInterface(
             viewModel = chatViewModel,
-            onCloseChat = onNavigateToHistory
+            onCloseChat = {},
+            onNavigateToHistory = onNavigateToHistory
         )
     }
 }

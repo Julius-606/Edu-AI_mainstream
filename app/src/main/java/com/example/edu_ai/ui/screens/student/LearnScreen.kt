@@ -1,6 +1,7 @@
 package com.example.edu_ai.ui.screens.student
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -65,28 +67,34 @@ fun LearnScreen(
         isCompleted = false
     )
 
-    // Educational Slide Objectives
-    val objectives = remember(subtopicId) {
+    // Educational Slide Objectives - Formulated dynamically based on the subtopic
+    val objectives = remember(subtopic.name) {
         listOf(
             SyllabusObjective(
-                title = "Pathophysiology & Metabolic Mechanics",
-                content = "Phosphofructokinase-1 (PFK-1) is the core rate-limiting enzyme of glycolysis. Highly regulated by fructose-2,6-bisphosphate (F-2,6-BP) and AMP (allosteric activators), and ATP and citrate (allosteric inhibitors). In erythrocytes, ATP homeostasis is crucial to drive the Na+/K+ ATPase pump, preserving RBC structural integrity. \n\n*Key Clinical Point:* Decreased PFK-1 activity triggers premature haemolytic anemia as RBCs fail to maintain cellular shape, causing splenic sequestration."
+                title = "Pathophysiology & Molecular Mechanics",
+                prompt = "Teach me the core cellular pathophysiology, biochemical regulation, and molecular mechanics of '${subtopic.name}'. Structure the notes with high-yield bullet points suitable for medical board exams."
             ),
             SyllabusObjective(
                 title = "Clinical Presentation & Diagnoses",
-                content = "Patients with PFK deficiency (Tarui Disease / Glycogen Storage Disease Type VII) present with muscle cramping, exercise-induced fatigue, and haemolytic anemia. Laboratory evaluation reveals increased reticulocyte counts, hyperbilirubinaemia, and elevated lactate dehydrogenase (LDH). \n\n*Diagnostic Test:* Clinical diagnosis is confirmed by demonstrating deficient PFK activity in erythrocytes or muscle biopsies."
+                prompt = "Teach me the clinical presentations, typical patient symptoms, laboratory diagnostic markers, and diagnostic confirmation protocols for '${subtopic.name}'."
             ),
             SyllabusObjective(
-                title = "Exam Traps & Patient Management Guidelines",
-                content = "⚠️ **Exam Trap Alert:** Do not confuse PFK deficiency with pyruvate kinase (PK) deficiency. While both cause haemolysis, PFK deficiency uniquely exhibits exercise intolerance with myogenic hyperuricaemia. \n\n*Management:* Avoid strenuous exertion, maintain active hydration, and manage metabolic crises with clinical supportive transfusions. Review details on [StatPearls Haemolytic Anemia](https://en.wikipedia.org/wiki/Hemolytic_anemia)."
+                title = "Exam Traps & Therapeutic Guidelines",
+                prompt = "Explain high-yield medical board exam traps, distractors, therapeutic guidelines, and advanced patient management parameters regarding '${subtopic.name}'."
             )
         )
     }
 
+    var isStudyingStarted by remember { mutableStateOf(false) }
     var currentStep by remember { mutableIntStateOf(0) }
     var bookmarkNote by remember { mutableStateOf("") }
     var showBookmarkDialog by remember { mutableStateOf(false) }
     var isBookmarked by remember { mutableStateOf(false) }
+
+    // Dynamic study notes cache
+    val studyNotes = remember { mutableStateMapOf<Int, String>() }
+    val studyLoading = remember { mutableStateMapOf<Int, Boolean>() }
+    val studyErrors = remember { mutableStateMapOf<Int, String?>() }
 
     // Chat AI state
     var aiQuestion by remember { mutableStateOf("") }
@@ -101,6 +109,25 @@ fun LearnScreen(
         isBookmarked = localBookmarks.any { it.target == subtopicId.toString() && it.type == "learn" }
     }
 
+    // Auto-fetch study content from AI when stepping onto an objective
+    LaunchedEffect(isStudyingStarted, currentStep) {
+        if (isStudyingStarted && studyNotes[currentStep] == null && studyLoading[currentStep] != true) {
+            studyLoading[currentStep] = true
+            studyErrors[currentStep] = null
+            scope.launch {
+                try {
+                    val prompt = objectives[currentStep].prompt
+                    val notes = studentViewModel.repositoryChat(userId, prompt)
+                    studyNotes[currentStep] = notes
+                } catch (e: Exception) {
+                    studyErrors[currentStep] = "Connection timed out. Tap retry to reload Socratic medical insights."
+                } finally {
+                    studyLoading[currentStep] = false
+                }
+            }
+        }
+    }
+
     val scrollState = rememberScrollState()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -112,7 +139,7 @@ fun LearnScreen(
                 TopAppBar(
                     title = {
                         Column {
-                            Text(subtopic.name, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, maxLines = 1)
+                            Text(subtopic.name, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, maxLines = 1)
                             Text(targetUnitName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         }
                     },
@@ -125,24 +152,26 @@ fun LearnScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = {
-                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                            if (isBookmarked) {
-                                scope.launch {
-                                    val bm = localBookmarks.find { it.target == subtopicId.toString() && it.type == "learn" }
-                                    if (bm != null) {
-                                        studentViewModel.deleteBookmark(bm.id)
+                        if (isStudyingStarted) {
+                            IconButton(onClick = {
+                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                if (isBookmarked) {
+                                    scope.launch {
+                                        val bm = localBookmarks.find { it.target == subtopicId.toString() && it.type == "learn" }
+                                        if (bm != null) {
+                                            studentViewModel.deleteBookmark(bm.id)
+                                        }
                                     }
+                                } else {
+                                    showBookmarkDialog = true
                                 }
-                            } else {
-                                showBookmarkDialog = true
+                            }) {
+                                Icon(
+                                    imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                    contentDescription = "Bookmark",
+                                    tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
                             }
-                        }) {
-                            Icon(
-                                imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                contentDescription = "Bookmark",
-                                tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -151,200 +180,332 @@ fun LearnScreen(
                 )
             }
         ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp)
-            ) {
-                // Topic objective slide
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(scrollState),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-                    ),
-                    shape = MaterialTheme.shapes.large
-                ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Text(
-                            text = objectives[currentStep].title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        FormattedText(
-                            text = objectives[currentStep].content,
-                            onLinkClicked = { link ->
-                                onNavigateToBrowser(link)
-                            }
-                        )
-
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        // AI Consultation window
-                        if (aiResponse != null || isAiLoading) {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 10.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+            androidx.compose.animation.Crossfade(
+                targetState = isStudyingStarted,
+                modifier = Modifier.padding(padding),
+                label = "StudyScreenFade"
+            ) { activeStudy ->
+                if (!activeStudy) {
+                    // STEP 1: Academic Objectives Overview Screen
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(20.dp)
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Surface(
+                            shape = MaterialTheme.shapes.extraLarge,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            modifier = Modifier.size(72.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.MenuBook,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(36.dp)
                                 )
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            Icons.Default.Star,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            "Socratic Consultation",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    if (isAiLoading) {
-                                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                                    } else {
-                                        FormattedText(text = aiResponse ?: "")
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text(
+                            text = "Academic Objectives Overview",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "Before you begin, review the academic scope mapped by Zenith AI for this topic.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.outline,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
+                        )
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        ) {
+                            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                objectives.forEachIndexed { i, obj ->
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        Surface(
+                                            shape = androidx.compose.foundation.shape.CircleShape,
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text("${i + 1}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column {
+                                            Text(obj.title, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                            Text("AI will draft specialized deep study notes.", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
+                                        }
                                     }
                                 }
                             }
+                        }
+
+                        Spacer(modifier = Modifier.height(36.dp))
+
+                        Button(
+                            onClick = {
+                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                isStudyingStarted = true
+                            },
+                            shape = MaterialTheme.shapes.large,
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("PROCEED TO ACTIVE STUDY 🚀", fontWeight = FontWeight.Bold)
                         }
                     }
-                }
+                } else {
+                    // STEP 2: Interactive sliding interface prompting AI on demand
+                    val isCurrentLoading = studyLoading[currentStep] == true
+                    val currentContent = studyNotes[currentStep]
+                    val currentError = studyErrors[currentStep]
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Bottom center Socratic Inquiry Box
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        // Topic objective slide
+                        Card(
                             modifier = Modifier
+                                .weight(1f)
                                 .fillMaxWidth()
-                                .padding(bottom = 6.dp)
+                                .verticalScroll(scrollState),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                            ),
+                            shape = MaterialTheme.shapes.large
                         ) {
-                            StudyChip("Explain with analogy") {
-                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                val q = "Please explain the clinical mechanics of '${subtopic.name}' using a simple, relatable medical analogy."
-                                aiQuestion = q
-                                triggerAiConsultation(userId, q, studentViewModel, scope) { loading, res ->
-                                    isAiLoading = loading
-                                    aiResponse = res
+                            Column(modifier = Modifier.padding(18.dp)) {
+                                Text(
+                                    text = objectives[currentStep].title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                
+                                if (isCurrentLoading) {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                                            Spacer(modifier = Modifier.height(16.dp))
+                                            Text("Socratic AI is formulating core notes...", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                                        }
+                                    }
+                                } else if (currentError != null) {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(currentError, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, textAlign = TextAlign.Center)
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Button(onClick = {
+                                            studyLoading[currentStep] = true
+                                            studyErrors[currentStep] = null
+                                            scope.launch {
+                                                try {
+                                                    val res = studentViewModel.repositoryChat(userId, objectives[currentStep].prompt)
+                                                    studyNotes[currentStep] = res
+                                                } catch (e: Exception) {
+                                                    studyErrors[currentStep] = "Failed to reconnect to Socratic Engine."
+                                                } finally {
+                                                    studyLoading[currentStep] = false
+                                                }
+                                            }
+                                        }) {
+                                            Text("Retry Connection")
+                                        }
+                                    }
+                                } else {
+                                    FormattedText(
+                                        text = currentContent ?: "",
+                                        onLinkClicked = { link ->
+                                            onNavigateToBrowser(link)
+                                        }
+                                    )
                                 }
-                            }
-                            StudyChip("Common exam traps") {
-                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                val q = "What are the common medical board exam traps, distractors, and high-yield test points regarding '${subtopic.name}'?"
-                                aiQuestion = q
-                                triggerAiConsultation(userId, q, studentViewModel, scope) { loading, res ->
-                                    isAiLoading = loading
-                                    aiResponse = res
+
+                                Spacer(modifier = Modifier.height(20.dp))
+
+                                // AI Consultation window
+                                if (aiResponse != null || isAiLoading) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 10.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.Default.Star,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    "Socratic Consultation",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            if (isAiLoading) {
+                                                CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                                            } else {
+                                                FormattedText(text = aiResponse ?: "")
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
 
-                        Row(
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Bottom Socratic Inquiry box
+                        Card(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedTextField(
-                                value = aiQuestion,
-                                onValueChange = { aiQuestion = it },
-                                placeholder = { Text("Ask Socratic AI about PFK regulation...", fontSize = 12.sp) },
-                                modifier = Modifier.weight(1f),
-                                textStyle = MaterialTheme.typography.bodyMedium,
-                                maxLines = 2,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                                )
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            IconButton(
-                                onClick = {
-                                    com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                    val q = aiQuestion.trim()
-                                    if (q.isNotEmpty()) {
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 6.dp)
+                                ) {
+                                    StudyChip("Explain with analogy") {
+                                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                        val q = "Please explain the clinical mechanics of '${subtopic.name}' using a simple, relatable medical analogy."
+                                        aiQuestion = q
                                         triggerAiConsultation(userId, q, studentViewModel, scope) { loading, res ->
                                             isAiLoading = loading
                                             aiResponse = res
                                         }
                                     }
-                                },
-                                enabled = !isAiLoading
-                            ) {
-                                Icon(
-                                    Icons.Default.Send,
-                                    contentDescription = "Send",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
+                                    StudyChip("Common exam traps") {
+                                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                        val q = "What are the common medical board exam traps, distractors, and high-yield test points regarding '${subtopic.name}'?"
+                                        aiQuestion = q
+                                        triggerAiConsultation(userId, q, studentViewModel, scope) { loading, res ->
+                                            isAiLoading = loading
+                                            aiResponse = res
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedTextField(
+                                        value = aiQuestion,
+                                        onValueChange = { aiQuestion = it },
+                                        placeholder = { Text("Ask Socratic AI about ${subtopic.name}...", fontSize = 11.sp) },
+                                        modifier = Modifier.weight(1f),
+                                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
+                                        maxLines = 2,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    IconButton(
+                                        onClick = {
+                                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                            val q = aiQuestion.trim()
+                                            if (q.isNotEmpty()) {
+                                                triggerAiConsultation(userId, q, studentViewModel, scope) { loading, res ->
+                                                    isAiLoading = loading
+                                                    aiResponse = res
+                                                }
+                                            }
+                                        },
+                                        enabled = !isAiLoading
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Send,
+                                            contentDescription = "Send",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
                             }
                         }
-                    }
-                }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                // Previous/Next controllers
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = {
-                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                            if (currentStep > 0) currentStep--
-                        },
-                        enabled = currentStep > 0,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Text("PREVIOUS", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                        // Previous/Next controllers
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = {
+                                    com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                    if (currentStep > 0) currentStep--
+                                },
+                                enabled = currentStep > 0,
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Text("PREVIOUS", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
 
-                    if (currentStep == objectives.lastIndex) {
-                        Button(
-                            onClick = {
-                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                scope.launch {
-                                    studentViewModel.toggleSubtopicCompleted(userId, subtopicId, true)
+                            if (currentStep == objectives.lastIndex) {
+                                Button(
+                                    onClick = {
+                                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                        scope.launch {
+                                            studentViewModel.toggleSubtopicCompleted(userId, subtopicId, true)
+                                        }
+                                        onBack()
+                                    },
+                                    enabled = !isCurrentLoading,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("COMPLETE & SYNC", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 }
-                                onBack()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                        ) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("COMPLETE & SYNC", fontWeight = FontWeight.Bold)
-                        }
-                    } else {
-                        Button(
-                            onClick = {
-                                com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                if (currentStep < objectives.lastIndex) currentStep++
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                        ) {
-                            Text("NEXT PART", fontWeight = FontWeight.Bold)
+                            } else {
+                                Button(
+                                    onClick = {
+                                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                        if (currentStep < objectives.lastIndex) currentStep++
+                                    },
+                                    enabled = !isCurrentLoading,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Text("NEXT PART", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
                         }
                     }
                 }
@@ -377,7 +538,7 @@ fun LearnScreen(
                             type = "learn",
                             title = subtopic.name,
                             target = subtopicId.toString(),
-                            context = objectives[currentStep].content.take(160) + "...",
+                            context = (studyNotes[currentStep] ?: "").take(160) + "...",
                             notes = bookmarkNote.trim().ifEmpty { null }
                         )
                         isBookmarked = true
@@ -397,7 +558,7 @@ fun LearnScreen(
     }
 }
 
-data class SyllabusObjective(val title: String, val content: String)
+data class SyllabusObjective(val title: String, val prompt: String)
 
 @Composable
 fun StudyChip(text: String, onClick: () -> Unit) {

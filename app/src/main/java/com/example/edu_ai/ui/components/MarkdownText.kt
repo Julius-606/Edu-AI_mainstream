@@ -26,13 +26,15 @@ fun FormattedText(
     onLinkClicked: ((String) -> Unit)? = null
 ) {
     val annotatedString = parseMarkdown(text)
-    Text(
-        text = annotatedString,
-        modifier = modifier,
-        style = style,
-        maxLines = maxLines,
-        overflow = overflow
-    )
+    androidx.compose.foundation.text.selection.SelectionContainer {
+        Text(
+            text = annotatedString,
+            modifier = modifier,
+            style = style,
+            maxLines = maxLines,
+            overflow = overflow
+        )
+    }
 }
 
 /**

@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.OfflineBolt
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,16 +62,29 @@ fun ConnectScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
+    // Dynamic lists of active connected peers
     val peers = remember {
-        listOf(
+        mutableStateListOf(
             Peer("2", "Dr. Neema Ongaga", "Faculty Mentor", "Online", true),
             Peer("102", "Grace Naliaka", "Clinical Peer", "Study Mode", true),
             Peer("103", "Rayvins Otieno", "Pre-med Peer", "In Assessment", false)
         )
     }
 
+    // Unconnected Searchable Catalog
+    val userCatalog = remember {
+        listOf(
+            Peer("104", "Julius Gachoki", "Cardiology Peer", "Reviewing Biochem", true),
+            Peer("105", "Mercy Wanjiku", "Research Assistant", "Online", true),
+            Peer("106", "Kevin Kiprop", "Anatomy Instructor", "Consultation", true),
+            Peer("107", "John Kamau", "Paediatric Resident", "Offline", false)
+        )
+    }
+
     var selectedPeer by remember { mutableStateOf(peers[0]) }
     var inputText by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
+    var showSearchResults by remember { mutableStateOf(false) }
     
     // In-memory chat storage for peer connection
     val chatHistory = remember { mutableStateMapOf<String, List<PeerMsg>>() }
@@ -99,18 +114,106 @@ fun ConnectScreen(
             .background(Color.Transparent)
     ) {
         // Upper Peer/Mentors Horizon Selection
-        Text(
-            text = "Study Connect & Mentors",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Study Connect & Mentors",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        // FIND OTHER USERS Search Bar
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { 
+                searchQuery = it
+                showSearchResults = it.isNotBlank()
+            },
+            placeholder = { Text("Find other users by name...", fontSize = 12.sp) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            shape = RoundedCornerShape(12.dp),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                focusedBorderColor = MaterialTheme.colorScheme.primary
+            )
         )
+
+        // Dropdown Search Results Overlay
+        if (showSearchResults) {
+            val filteredCatalog = userCatalog.filter { 
+                it.name.contains(searchQuery, ignoreCase = true) 
+            }
+            
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .heightIn(max = 180.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                if (filteredCatalog.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                        Text("No matching peers found.", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                    }
+                } else {
+                    LazyColumn {
+                        items(filteredCatalog) { peer ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        TactileFeedback.triggerSubtleClick(context)
+                                        // If peer is not in dynamic active lists, append them
+                                        if (peers.none { it.id == peer.id }) {
+                                            peers.add(peer)
+                                        }
+                                        selectedPeer = peer
+                                        searchQuery = ""
+                                        showSearchResults = false
+                                    }
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(peer.name.split(" ").last().take(1), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(peer.name, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(peer.role, fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+                                }
+                                Spacer(modifier = Modifier.weight(1f))
+                                Icon(Icons.Default.Add, contentDescription = "Add & Chat", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                        }
+                    }
+                }
+            }
+        }
         
         // Peer selector list (horizontal)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             peers.forEach { peer ->
@@ -129,32 +232,33 @@ fun ConnectScreen(
                     shape = MaterialTheme.shapes.medium
                 ) {
                     Column(
-                        modifier = Modifier.padding(10.dp),
+                        modifier = Modifier.padding(8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Surface(
                             shape = CircleShape,
                             color = if (peer.isOnline) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
                                     peer.name.split(" ").last().take(1),
                                     fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
                                     color = if (peer.isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             peer.name.split(" ").last(),
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1
                         )
                         Text(
                             peer.status,
-                            fontSize = 9.sp,
+                            fontSize = 8.sp,
                             color = if (peer.isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                         )
                     }
@@ -191,7 +295,7 @@ fun ConnectScreen(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(selectedPeer.name.take(1), fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            }
+                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {

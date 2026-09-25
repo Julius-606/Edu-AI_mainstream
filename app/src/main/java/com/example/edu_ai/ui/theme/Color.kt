@@ -11,4 +11,11 @@ val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
 
+// Trace Brand Neon Colors
+val NeonBlue = Color(0xFF00E5FF)
+val NeonIndigo = Color(0xFF6366F1)
+val DarkSlateBg = Color(0xFF020617)
+val SlateCard = Color(0xFF0F172A)
+val SlateCardLight = Color(0xFF1E293B)
+
  

@@ -219,6 +219,86 @@ fun AdminDashboardScreen(
                 }
             }
 
+            // Curriculum Hierarchy Administration (Fields > Courses > Units)
+            item {
+                var isCurriculumExpanded by remember { mutableStateOf(false) }
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isCurriculumExpanded = !isCurriculumExpanded },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.AccountTree, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Curriculum Hierarchy Administration", fontWeight = FontWeight.Bold)
+                            }
+                            Icon(
+                                imageVector = if (isCurriculumExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = "Toggle"
+                            )
+                        }
+                        
+                        AnimatedVisibility(visible = isCurriculumExpanded) {
+                            Column(modifier = Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(
+                                    "Master database structure of academic picks:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                
+                                val hierarchyData = listOf(
+                                    "Medical & Health Sciences" to listOf(
+                                        "MBChB" to listOf("Biochemistry II", "General Surgery", "Internal Medicine", "Clinical Science"),
+                                        "BSc. Nursing" to listOf("Anatomy & Physiology", "General Pharmacology", "Pathology")
+                                    ),
+                                    "Computer Science & IT" to listOf(
+                                        "BSc. Software Engineering" to listOf("Database Systems", "Advanced Algorithms", "Web Architecture"),
+                                        "BSc. Artificial Intelligence" to listOf("Machine Learning", "Neural Networks", "NLP & LLMs")
+                                    )
+                                )
+
+                                hierarchyData.forEach { (field, courses) ->
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(10.dp)) {
+                                            Text(field, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            courses.forEach { (course, units) ->
+                                                Column(modifier = Modifier.padding(start = 12.dp, top = 4.dp)) {
+                                                    Text("• $course", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
+                                                    Row(
+                                                        modifier = Modifier.padding(start = 12.dp, top = 2.dp),
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                    ) {
+                                                        units.forEach { unit ->
+                                                            SuggestionChip(
+                                                                onClick = {
+                                                                    statusMessage = "Admin: Selected syllabus target: $unit"
+                                                                },
+                                                                label = { Text(unit, fontSize = 10.sp) }
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Quick Superuser Action Controls
             item {
                 Card(
