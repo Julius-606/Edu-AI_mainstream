@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,6 +43,13 @@ fun LearnScreen(
 ) {
     val uiState by studentViewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
+    val gson = remember { com.google.gson.Gson() }
+
+    // Load subtopic directly from SQLite database to preserve local cached content and learning objectives
+    var dbSubtopic by remember { mutableStateOf<SubtopicEntity?>(null) }
+    LaunchedEffect(subtopicId) {
+        dbSubtopic = studentViewModel.getSubtopicById(subtopicId)
+    }
 
     // Find subtopic from memory state
     var targetSubtopic: SubtopicEntity? = null
@@ -60,27 +68,58 @@ fun LearnScreen(
         }
     }
 
-    val subtopic = targetSubtopic ?: SubtopicEntity(
+    val memorySubtopic = targetSubtopic ?: SubtopicEntity(
         subtopicId = subtopicId,
         topicId = 0L,
         name = "Regulation of PFK-1 in Erythrocytes",
         isCompleted = false
     )
 
-    // Educational Slide Objectives - Formulated dynamically based on the subtopic
-    val objectives = remember(subtopic.name) {
+    val subtopic = dbSubtopic ?: memorySubtopic
+
+    // Dynamic study notes cache
+    val studyNotes = remember { mutableStateMapOf<Int, String>() }
+    val studyLoading = remember { mutableStateMapOf<Int, Boolean>() }
+    val studyErrors = remember { mutableStateMapOf<Int, String?>() }
+
+    // Educational Slide Objectives - Formulated dynamically based on subtopic learning objectives
+    val parsedObjectives = remember(subtopic) {
+        val json = subtopic.learningObjectivesJson
+        if (!json.isNullOrBlank()) {
+            try {
+                val listType = object : com.google.gson.reflect.TypeToken<List<String>>() {}.type
+                val list = gson.fromJson<List<String>>(json, listType)
+                if (!list.isNullOrEmpty()) {
+                    list.mapIndexed { idx, desc ->
+                        SyllabusObjective(
+                            title = "Learning Objective ${idx + 1}",
+                            description = desc,
+                            prompt = "Teach me the core clinical concepts and advanced details to fulfill the objective: '$desc' regarding '${subtopic.name}'. Frame it in clear Socratic medical study notes with high-yield bullet points, formatting highlights, and YouTube / web video recommendations."
+                        )
+                    }
+                } else null
+            } catch (e: Exception) {
+                null
+            }
+        } else null
+    }
+
+    val objectives = parsedObjectives ?: remember(subtopic.name) {
         listOf(
             SyllabusObjective(
                 title = "Pathophysiology & Molecular Mechanics",
-                prompt = "Teach me the core cellular pathophysiology, biochemical regulation, and molecular mechanics of '${subtopic.name}'. Structure the notes with high-yield bullet points suitable for medical board exams."
+                description = "Cellular pathophysiology, biochemical regulation, and molecular mechanics of the topic.",
+                prompt = "Teach me the core cellular pathophysiology, biochemical regulation, and molecular mechanics of '${subtopic.name}'. Structure the notes with high-yield bullet points, flow diagrams, and recommended video references."
             ),
             SyllabusObjective(
                 title = "Clinical Presentation & Diagnoses",
-                prompt = "Teach me the clinical presentations, typical patient symptoms, laboratory diagnostic markers, and diagnostic confirmation protocols for '${subtopic.name}'."
+                description = "Clinical presentations, patient symptoms, laboratory markers, and diagnosis protocol.",
+                prompt = "Teach me the clinical presentations, typical patient symptoms, laboratory diagnostic markers, and diagnostic confirmation protocols for '${subtopic.name}'. Include clinical tables and video recommendations."
             ),
             SyllabusObjective(
                 title = "Exam Traps & Therapeutic Guidelines",
-                prompt = "Explain high-yield medical board exam traps, distractors, therapeutic guidelines, and advanced patient management parameters regarding '${subtopic.name}'."
+                description = "High-yield medical board exam traps, distractors, and patient management.",
+                prompt = "Explain high-yield medical board exam traps, distractors, therapeutic guidelines, and advanced patient management parameters regarding '${subtopic.name}'. Include online and YouTube resources."
             )
         )
     }
@@ -90,11 +129,6 @@ fun LearnScreen(
     var bookmarkNote by remember { mutableStateOf("") }
     var showBookmarkDialog by remember { mutableStateOf(false) }
     var isBookmarked by remember { mutableStateOf(false) }
-
-    // Dynamic study notes cache
-    val studyNotes = remember { mutableStateMapOf<Int, String>() }
-    val studyLoading = remember { mutableStateMapOf<Int, Boolean>() }
-    val studyErrors = remember { mutableStateMapOf<Int, String?>() }
 
     // Chat AI state
     var aiQuestion by remember { mutableStateOf("") }
@@ -109,7 +143,25 @@ fun LearnScreen(
         isBookmarked = localBookmarks.any { it.target == subtopicId.toString() && it.type == "learn" }
     }
 
-    // Auto-fetch study content from AI when stepping onto an objective
+    // Load cached study content from local database instantly on launch (offline-first support)
+    LaunchedEffect(subtopic) {
+        val cachedJson = subtopic.cachedContentJson
+        if (!cachedJson.isNullOrBlank()) {
+            try {
+                val mapType = object : com.google.gson.reflect.TypeToken<Map<Int, String>>() {}.type
+                val map = gson.fromJson<Map<Int, String>>(cachedJson, mapType)
+                map?.forEach { (k, v) ->
+                    if (v != null && !v.contains("consultation failed", ignoreCase = true) && !v.contains("unable to contact", ignoreCase = true) && !v.contains("failed to reconnect", ignoreCase = true)) {
+                        studyNotes[k] = v
+                    }
+                }
+            } catch (e: Exception) {
+                // Handle or ignore JSON errors
+            }
+        }
+    }
+
+    // Auto-fetch study content from AI when stepping onto an objective (if not cached locally)
     LaunchedEffect(isStudyingStarted, currentStep) {
         if (isStudyingStarted && studyNotes[currentStep] == null && studyLoading[currentStep] != true) {
             studyLoading[currentStep] = true
@@ -118,9 +170,16 @@ fun LearnScreen(
                 try {
                     val prompt = objectives[currentStep].prompt
                     val notes = studentViewModel.repositoryChat(userId, prompt)
-                    studyNotes[currentStep] = notes
+                    if (notes.isNotBlank() && !notes.contains("consultation failed", ignoreCase = true) && !notes.contains("unable to contact", ignoreCase = true) && !notes.contains("failed to reconnect", ignoreCase = true) && !notes.startsWith("Error", ignoreCase = true)) {
+                        studyNotes[currentStep] = notes
+                        // Instantly cache the notes in local Room SQLite Database (guarantees offline availability)
+                        studentViewModel.updateSubtopicCachedContent(subtopicId, gson.toJson(studyNotes.toMap()))
+                    } else {
+                        // DO NOT write the fail as learnt content!
+                        studyErrors[currentStep] = "Offline: Unable to download notes for this objective. Please verify your connection status and tap Retry."
+                    }
                 } catch (e: Exception) {
-                    studyErrors[currentStep] = "Connection timed out. Tap retry to reload Socratic medical insights."
+                    studyErrors[currentStep] = "Offline: Unable to download notes for this objective. Please verify your connection status and tap Retry."
                 } finally {
                     studyLoading[currentStep] = false
                 }
@@ -186,7 +245,7 @@ fun LearnScreen(
                 label = "StudyScreenFade"
             ) { activeStudy ->
                 if (!activeStudy) {
-                    // STEP 1: Academic Objectives Overview Screen
+                    // STEP 1: Academic Objectives Overview Screen (Exact Subunit Learning Objectives)
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -212,14 +271,14 @@ fun LearnScreen(
                         Spacer(modifier = Modifier.height(24.dp))
                         Text(
                             text = "Academic Objectives Overview",
-                            fontSize = 22.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Black,
                             color = MaterialTheme.colorScheme.primary,
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = "Before you begin, review the academic scope mapped by Zenith AI for this topic.",
-                            fontSize = 13.sp,
+                            text = "Before you begin, review the precise sub-unit learning objectives mapped for this syllabus node.",
+                            fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.outline,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
@@ -230,7 +289,7 @@ fun LearnScreen(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)),
                             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                         ) {
-                            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 objectives.forEachIndexed { i, obj ->
                                     Row(verticalAlignment = Alignment.Top) {
                                         Surface(
@@ -245,7 +304,7 @@ fun LearnScreen(
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Column {
                                             Text(obj.title, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                            Text("AI will draft specialized deep study notes.", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
+                                            Text(obj.description, fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
                                         }
                                     }
                                 }
@@ -295,7 +354,13 @@ fun LearnScreen(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = objectives[currentStep].description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                )
                                 
                                 if (isCurrentLoading) {
                                     Box(
@@ -321,9 +386,14 @@ fun LearnScreen(
                                             scope.launch {
                                                 try {
                                                     val res = studentViewModel.repositoryChat(userId, objectives[currentStep].prompt)
-                                                    studyNotes[currentStep] = res
+                                                    if (res.isNotBlank() && !res.contains("consultation failed", ignoreCase = true) && !res.contains("unable to contact", ignoreCase = true) && !res.contains("failed to reconnect", ignoreCase = true) && !res.startsWith("Error", ignoreCase = true)) {
+                                                        studyNotes[currentStep] = res
+                                                        studentViewModel.updateSubtopicCachedContent(subtopicId, gson.toJson(studyNotes.toMap()))
+                                                    } else {
+                                                        studyErrors[currentStep] = "Offline: Unable to reconnect to Socratic Engine. Please verify your connection status and tap Retry."
+                                                    }
                                                 } catch (e: Exception) {
-                                                    studyErrors[currentStep] = "Failed to reconnect to Socratic Engine."
+                                                    studyErrors[currentStep] = "Offline: Unable to reconnect to Socratic Engine. Please verify your connection status and tap Retry."
                                                 } finally {
                                                     studyLoading[currentStep] = false
                                                 }
@@ -337,6 +407,30 @@ fun LearnScreen(
                                         text = currentContent ?: "",
                                         onLinkClicked = { link ->
                                             onNavigateToBrowser(link)
+                                        }
+                                    )
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "High-Yield Video & Web References",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    com.example.edu_ai.ui.components.VideoRecommendationCard(
+                                        title = "Video Lecture & Clinical Breakdown: ${subtopic.name}",
+                                        url = "https://www.youtube.com/results?search_query=" + java.net.URLEncoder.encode(subtopic.name + " clinical lecture osmosis ninja nerd", "UTF-8"),
+                                        onOpen = {
+                                            onNavigateToBrowser("https://www.youtube.com/results?search_query=" + java.net.URLEncoder.encode(subtopic.name + " clinical lecture osmosis ninja nerd", "UTF-8"))
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    com.example.edu_ai.ui.components.WebReferenceCard(
+                                        title = "PubMed Evidence & Research: ${subtopic.name}",
+                                        url = "https://pubmed.ncbi.nlm.nih.gov/?term=" + java.net.URLEncoder.encode(subtopic.name, "UTF-8"),
+                                        onOpen = {
+                                            onNavigateToBrowser("https://pubmed.ncbi.nlm.nih.gov/?term=" + java.net.URLEncoder.encode(subtopic.name, "UTF-8"))
                                         }
                                     )
                                 }
@@ -558,7 +652,7 @@ fun LearnScreen(
     }
 }
 
-data class SyllabusObjective(val title: String, val prompt: String)
+data class SyllabusObjective(val title: String, val description: String, val prompt: String)
 
 @Composable
 fun StudyChip(text: String, onClick: () -> Unit) {

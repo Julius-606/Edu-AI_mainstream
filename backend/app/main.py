@@ -37,14 +37,107 @@ try:
     Base.metadata.create_all(bind=engine)
     logger.info("Database schemas verified successfully.")
     with Session(bind=engine) as init_db:
-        # Smart automated migrations: Ensure 'type' column exists on 'bookmarks' table
+        # Smart automated migrations: Ensure columns exist on 'bookmarks' table
+        from sqlalchemy import text
+        is_postgres = "postgresql" in str(engine.url)
+        
+        # 1. 'type' column on bookmarks
         try:
-            from sqlalchemy import text
-            init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'general';"))
+            if is_postgres:
+                init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'general';"))
+            else:
+                init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN type VARCHAR(50) DEFAULT 'general';"))
             init_db.commit()
-            logger.info("Database migration: Verified type column exists on bookmarks table.")
-        except Exception as migration_err:
-            logger.warning(f"Database migration bookmarks.type column update skipped/handled: {migration_err}")
+        except Exception as err:
+            init_db.rollback()
+
+        # 2. 'title' column on bookmarks
+        try:
+            if is_postgres:
+                init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS title VARCHAR(200) DEFAULT 'Saved Item';"))
+            else:
+                init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN title VARCHAR(200) DEFAULT 'Saved Item';"))
+            init_db.commit()
+        except Exception as err:
+            init_db.rollback()
+
+        # 3. 'notes' column on bookmarks
+        try:
+            if is_postgres:
+                init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS notes TEXT;"))
+            else:
+                init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN notes TEXT;"))
+            init_db.commit()
+        except Exception as err:
+            init_db.rollback()
+
+        # 4. 'category' column on units
+        try:
+            if is_postgres:
+                init_db.execute(text("ALTER TABLE units ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'General';"))
+            else:
+                init_db.execute(text("ALTER TABLE units ADD COLUMN category VARCHAR(100) DEFAULT 'General';"))
+            init_db.commit()
+        except Exception as err:
+            init_db.rollback()
+
+        # 5. 'course' column on units
+        try:
+            if is_postgres:
+                init_db.execute(text("ALTER TABLE units ADD COLUMN IF NOT EXISTS course VARCHAR(100) DEFAULT 'General';"))
+            else:
+                init_db.execute(text("ALTER TABLE units ADD COLUMN course VARCHAR(100) DEFAULT 'General';"))
+            init_db.commit()
+        except Exception as err:
+            init_db.rollback()
+
+        # 6. 'unit_group' column on units
+        try:
+            if is_postgres:
+                init_db.execute(text("ALTER TABLE units ADD COLUMN IF NOT EXISTS unit_group VARCHAR(100);"))
+            else:
+                init_db.execute(text("ALTER TABLE units ADD COLUMN unit_group VARCHAR(100);"))
+            init_db.commit()
+        except Exception as err:
+            init_db.rollback()
+
+        # 7. 'system_releases' columns
+        try:
+            if is_postgres:
+                init_db.execute(text("ALTER TABLE system_releases ADD COLUMN IF NOT EXISTS version_code INTEGER DEFAULT 1;"))
+                init_db.execute(text("ALTER TABLE system_releases ADD COLUMN IF NOT EXISTS is_mandatory BOOLEAN DEFAULT FALSE;"))
+                init_db.execute(text("ALTER TABLE system_releases ADD COLUMN IF NOT EXISTS min_supported_version_code INTEGER DEFAULT 1;"))
+                init_db.execute(text("ALTER TABLE system_releases ADD COLUMN IF NOT EXISTS file_size VARCHAR(50) DEFAULT '14.8 MB';"))
+            else:
+                init_db.execute(text("ALTER TABLE system_releases ADD COLUMN version_code INTEGER DEFAULT 1;"))
+                init_db.execute(text("ALTER TABLE system_releases ADD COLUMN is_mandatory BOOLEAN DEFAULT 0;"))
+                init_db.execute(text("ALTER TABLE system_releases ADD COLUMN min_supported_version_code INTEGER DEFAULT 1;"))
+                init_db.execute(text("ALTER TABLE system_releases ADD COLUMN file_size VARCHAR(50) DEFAULT '14.8 MB';"))
+            init_db.commit()
+        except Exception as err:
+            init_db.rollback()
+
+        # Seed initial release if table is empty
+        try:
+            existing_releases_count = init_db.query(models.SystemRelease).count()
+            if existing_releases_count == 0:
+                init_db.add(models.SystemRelease(
+                    version="1.0.0",
+                    version_code=1,
+                    artifact_type="Trace Android APK",
+                    download_url="https://github.com/Agent606/Edu-AI/releases/tag/v1.0.0",
+                    release_notes="Initial production build of Trace Medical & Academic Engine.\n- Socratic clinical reasoning\n- Dynamic weekly study timetable\n- Active recall quiz interface",
+                    is_current=True,
+                    is_mandatory=False,
+                    min_supported_version_code=1,
+                    file_size="14.2 MB",
+                    timestamp=time.time() - 86400 * 7
+                ))
+                init_db.commit()
+        except Exception as err:
+            init_db.rollback()
+
+        logger.info("Database migrations: Self-healing schema validation complete.")
 
         admin_email = os.environ.get("ADMIN_EMAIL", "admin@trace.edu")
         existing_admin = init_db.query(models.User).filter(models.User.email == admin_email).first()
@@ -537,6 +630,7 @@ def sync_user_data(user_id: str, payload: schemas.SyncRequest, db: Session = Dep
             models.UserSyllabusProgress.node_id == p_item.node_id,
             models.UserSyllabusProgress.node_type == p_item.node_type
         ).first()
+        is_completed_status = (p_item.status == "Completed")
         if existing:
             existing.status = p_item.status
             existing.last_studied_at = p_item.last_studied_at
@@ -548,6 +642,12 @@ def sync_user_data(user_id: str, payload: schemas.SyncRequest, db: Session = Dep
                 status=p_item.status,
                 last_studied_at=p_item.last_studied_at
             ))
+        
+        # Keep Subtopic table in sync!
+        if p_item.node_type == "subtopic":
+            sub = db.query(models.Subtopic).filter(models.Subtopic.id == p_item.node_id).first()
+            if sub:
+                sub.is_completed = is_completed_status
     
     # 2. Sync Bookmarks
     for b_item in payload.bookmarks:

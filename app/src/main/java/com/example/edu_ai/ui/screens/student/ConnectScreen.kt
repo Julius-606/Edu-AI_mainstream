@@ -85,22 +85,42 @@ fun ConnectScreen(
     var inputText by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
     var showSearchResults by remember { mutableStateOf(false) }
+    var isPeerTyping by remember { mutableStateOf(false) }
     
-    // In-memory chat storage for peer connection
-    val chatHistory = remember { mutableStateMapOf<String, List<PeerMsg>>() }
+    val prefs = remember(user.id) { context.getSharedPreferences("edu_peer_chats_${user.id}", android.content.Context.MODE_PRIVATE) }
+    val gson = remember { com.google.gson.Gson() }
+
+    // Persistent chat storage for peer connection
+    val chatHistory = remember(user.id) { 
+        val map = mutableStateMapOf<String, List<PeerMsg>>()
+        prefs.all.forEach { (peerId, json) ->
+            if (json is String) {
+                try {
+                    val listType = object : com.google.gson.reflect.TypeToken<List<PeerMsg>>() {}.type
+                    val list = gson.fromJson<List<PeerMsg>>(json, listType)
+                    if (list != null) map[peerId] = list
+                } catch (e: Exception) {
+                    // Ignore JSON parsing errors
+                }
+            }
+        }
+        map
+    }
     
-    // Seed initial greetings
+    // Seed initial greetings if chat is completely empty for this peer
     LaunchedEffect(selectedPeer.id) {
-        if (!chatHistory.containsKey(selectedPeer.id)) {
-            chatHistory[selectedPeer.id] = listOf(
+        if (!chatHistory.containsKey(selectedPeer.id) || chatHistory[selectedPeer.id].isNullOrEmpty()) {
+            val initialList = listOf(
                 PeerMsg(
-                    id = "init-1",
+                    id = "init-${selectedPeer.id}",
                     senderId = selectedPeer.id,
                     senderName = selectedPeer.name,
-                    content = "Hello ${user.username}! Let me know if you want to collaborate on any medical topics or share bookmarks today.",
+                    content = "Hello ${user.username}! Let me know if you want to collaborate on any clinical topics, exchange questions, or share bookmarks today.",
                     timestamp = System.currentTimeMillis() - 600000
                 )
             )
+            chatHistory[selectedPeer.id] = initialList
+            prefs.edit().putString(selectedPeer.id, gson.toJson(initialList)).apply()
         }
     }
 
@@ -386,6 +406,34 @@ fun ConnectScreen(
                             }
                         }
                     }
+
+                    if (isPeerTyping) {
+                        item {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(12.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "${selectedPeer.name} is typing a response...",
+                                        fontSize = 11.sp,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Chat Input Controllers
@@ -422,17 +470,59 @@ fun ConnectScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         IconButton(
                             onClick = {
-                                if (inputText.isNotBlank()) {
+                                val messageText = inputText.trim()
+                                if (messageText.isNotBlank()) {
                                     TactileFeedback.triggerSubtleClick(context)
                                     val newMsg = PeerMsg(
                                         id = "msg-${System.currentTimeMillis()}",
                                         senderId = user.id,
                                         senderName = user.username,
-                                        content = inputText,
+                                        content = messageText,
                                         timestamp = System.currentTimeMillis()
                                     )
-                                    chatHistory[selectedPeer.id] = (chatHistory[selectedPeer.id] ?: emptyList()) + newMsg
+                                    val activePeer = selectedPeer
+                                    val updatedWithUserMsg = (chatHistory[activePeer.id] ?: emptyList()) + newMsg
+                                    chatHistory[activePeer.id] = updatedWithUserMsg
+                                    prefs.edit().putString(activePeer.id, gson.toJson(updatedWithUserMsg)).apply()
                                     inputText = ""
+                                    isPeerTyping = true
+
+                                    // Simulate actual receive: classmate/mentor peer typing and responding!
+                                    scope.launch {
+                                        kotlinx.coroutines.delay(1200) // typing simulation delay
+                                        try {
+                                            val promptMsg = "You are simulating a collaborative classmate peer named '${activePeer.name}' (role: ${activePeer.role}, status: ${activePeer.status}) on a study platform. A student classmate named '${user.username}' just texted you: '$messageText'. Respond naturally in 1 to 2 sentences as a friendly and focused colleague, mentioning clinical terminology or board tips if relevant."
+                                            val peerReply = viewModel.repositoryChat(user.id, promptMsg)
+                                            val cleanReply = if (peerReply.isNotBlank() && !peerReply.contains("consultation failed", ignoreCase = true) && !peerReply.contains("unable to contact", ignoreCase = true)) {
+                                                peerReply
+                                            } else {
+                                                "That's a solid study observation. Let's make sure to review those clinical features together!"
+                                            }
+                                            val replyMsg = PeerMsg(
+                                                id = "msg-${System.currentTimeMillis()}",
+                                                senderId = activePeer.id,
+                                                senderName = activePeer.name,
+                                                content = cleanReply,
+                                                timestamp = System.currentTimeMillis()
+                                            )
+                                            val updatedWithReply = (chatHistory[activePeer.id] ?: emptyList()) + replyMsg
+                                            chatHistory[activePeer.id] = updatedWithReply
+                                            prefs.edit().putString(activePeer.id, gson.toJson(updatedWithReply)).apply()
+                                        } catch (e: Exception) {
+                                            val replyMsg = PeerMsg(
+                                                id = "msg-${System.currentTimeMillis()}",
+                                                senderId = activePeer.id,
+                                                senderName = activePeer.name,
+                                                content = "That's a solid study point. Let's make sure to review those clinical features together!",
+                                                timestamp = System.currentTimeMillis()
+                                            )
+                                            val updatedWithReply = (chatHistory[activePeer.id] ?: emptyList()) + replyMsg
+                                            chatHistory[activePeer.id] = updatedWithReply
+                                            prefs.edit().putString(activePeer.id, gson.toJson(updatedWithReply)).apply()
+                                        } finally {
+                                            isPeerTyping = false
+                                        }
+                                    }
                                 }
                             },
                             colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)

@@ -31,8 +31,20 @@ interface EduAIApi {
     @GET("api/ai/recommendations/{user_id}")
     suspend fun getRecommendations(@Path("user_id") userId: String): RecommendationResponse
 
+    @POST("api/ai/recommendations/{user_id}")
+    suspend fun getRecommendationsWithContext(
+        @Path("user_id") userId: String,
+        @Body payload: ApiStudyContextPayload
+    ): RecommendationResponse
+
     @GET("api/users/{user_id}/timetable")
     suspend fun getTimetable(@Path("user_id") userId: String): ApiTimetableResponse
+
+    @POST("api/users/{user_id}/timetable")
+    suspend fun getTimetableWithContext(
+        @Path("user_id") userId: String,
+        @Body payload: ApiStudyContextPayload
+    ): ApiTimetableResponse
 
     @POST("api/auth/login")
     suspend fun login(@Body request: com.example.edu_ai.schemas.LoginRequest): com.example.edu_ai.schemas.TokenResponse
@@ -85,6 +97,24 @@ interface EduAIApi {
     suspend fun saveBookmark(
         @Path("user_id") userId: String,
         @Body bookmark: ApiBookmarkItem
+    ): Map<String, Any?>
+
+    // --- System Releases & Mandatory Upgrade Endpoints ---
+
+    @GET("api/system/releases")
+    suspend fun getSystemReleases(
+        @Query("client_version_code") clientVersionCode: Int
+    ): ApiReleasesResponse
+
+    @POST("admin/releases")
+    suspend fun createRelease(
+        @Body request: CreateReleaseRequest
+    ): Map<String, Any?>
+
+    @POST("admin/releases/{release_id}/toggle-mandatory")
+    suspend fun toggleMandatoryRelease(
+        @Path("release_id") releaseId: Long,
+        @Body body: Map<String, Boolean> = emptyMap()
     ): Map<String, Any?>
 }
 

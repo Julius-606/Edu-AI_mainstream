@@ -1,11 +1,8 @@
-
 package com.example.edu_ai.ui.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -28,10 +25,10 @@ data class RingProgress(
 @Composable
 fun ProgressRings(
     rings: List<RingProgress>,
-    learningObjectives: List<String>,
+    learntProgress: Float,
+    quizProgress: Float,
     modifier: Modifier = Modifier
 ) {
-    // Animation state for the rings
     var animationStarted by remember { mutableStateOf(false) }
     
     val animatedPercentages = rings.map { ring ->
@@ -47,13 +44,13 @@ fun ProgressRings(
     }
 
     Box(
-        modifier = modifier.size(240.dp),
+        modifier = modifier.size(140.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Draw the concentric rings
+        // Draw exactly two concentric rings
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokeWidth = 10.dp.toPx()
-            val spacing = 18.dp.toPx()
+            val strokeWidth = 8.dp.toPx()
+            val spacing = 16.dp.toPx()
             
             rings.forEachIndexed { index, ring ->
                 val radius = (size.minDimension / 2) - (index * spacing) - (strokeWidth / 2)
@@ -79,40 +76,51 @@ fun ProgressRings(
             }
         }
 
-        // Center Content: Scrollable Learning Objectives
+        // Center Content showing Learnt and Quiz percentage numbers side-by-side or stacked cleanly
         Column(
             modifier = Modifier
-                .size(110.dp)
+                .size(100.dp)
                 .padding(4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            // Learnt Progress
             Text(
-                text = "FOCUS",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.ExtraBold,
+                text = "${learntProgress.toInt()}%",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                lineHeight = 16.sp
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                items(learningObjectives) { objective ->
-                    Text(
-                        text = objective,
-                        fontSize = 9.sp,
-                        lineHeight = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(vertical = 1.dp)
-                    )
-                }
-            }
+            Text(
+                text = "Learnt",
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center,
+                lineHeight = 10.sp
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            // Quiz Progress
+            Text(
+                text = "${quizProgress.toInt()}%",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.secondary,
+                textAlign = TextAlign.Center,
+                lineHeight = 16.sp
+            )
+            Text(
+                text = "Quiz",
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center,
+                lineHeight = 10.sp
+            )
         }
     }
 }
-
-
- 

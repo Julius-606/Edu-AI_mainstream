@@ -38,6 +38,107 @@ def get_user(user_id: str, db: Session = Depends(get_db)):
 
     return user_response(user)
 
+def populate_default_syllabus(db: Session, user_id: int):
+    # Let's check if the user already has units to prevent double insertion
+    existing = db.query(models.Unit).filter(models.Unit.owner_id == user_id).first()
+    if existing:
+        return
+
+    # Define default medical courses structure
+    syllabus_data = {
+        "Biochemistry II": {
+            "Metabolic Pathways": {
+                "Enzyme Kinetics and Regulation": [
+                    {
+                        "name": "Allosteric Regulation",
+                        "objectives": [
+                            "Understand the mechanics of allosteric enzyme kinetics, sigmoidal velocity curves, and transition states (R-state vs T-state).",
+                            "Analyze feedback inhibition loops in carbohydrate glycolysis pathways, detailing PFK-1 regulation by ATP, AMP, and Fructose-2,6-bisphosphate.",
+                            "Identify clinical presentations of metabolic enzyme deficiency disorders like G6PD deficiency and glycogen storage diseases."
+                        ]
+                    },
+                    {
+                        "name": "Oxidative Phosphorylation",
+                        "objectives": [
+                            "Describe the electron transport chain (ETC) complexes I-IV, electron carriers (NADH, FADH2, CoQ, Cytochrome c), and the proton-motive force.",
+                            "Explain the mechanism of ATP synthase (Complex V) and the rotational catalysis model.",
+                            "Analyze the mechanism of ETC uncouplers (e.g., 2,4-dinitrophenol, thermogenin) and inhibitors (e.g., cyanide, carbon monoxide, oligomycin)."
+                        ]
+                    }
+                ]
+            }
+        },
+        "General Surgery": {
+            "Acute Abdomen": {
+                "Appendicitis Diagnosis and Surgical Management": [
+                    {
+                        "name": "Clinical Assessment and Signs",
+                        "objectives": [
+                            "Perform clinical evaluation for suspected acute appendicitis including McBurney's point tenderness, Rovsing's sign, Psoas sign, and Obturator sign.",
+                            "Interpret diagnostic laboratory markers (leukocytosis, CRP) and imaging studies (ultrasound showing appendix >6mm, CT scans).",
+                            "Outline preoperative preparations, fluid resuscitation protocols, antibiotic prophylaxis, and laparoscopic vs open appendectomy pathways."
+                        ]
+                    },
+                    {
+                        "name": "Postoperative Complications",
+                        "objectives": [
+                            "Identify early postoperative complications including surgical site infections, pelvic abscesses, and stump leakages.",
+                            "Manage postoperative ileus, bowel obstructions, and recognize indications for surgical re-exploration."
+                        ]
+                    }
+                ]
+            }
+        },
+        "Internal Medicine": {
+            "Cardiology": {
+                "Heart Failure Pathophysiology & Management": [
+                    {
+                        "name": "Systolic vs Diastolic Dysfunction",
+                        "objectives": [
+                            "Distinguish between Heart Failure with Reduced Ejection Fraction (HFrEF) and Heart Failure with Preserved Ejection Fraction (HFpEF) regarding ventricular remodeling and compliance.",
+                            "Formulate evidence-based guideline-directed medical therapy (GDMT) including ACE inhibitors/ARNIs, Beta-blockers, SGLT2 inhibitors, and Aldosterone antagonists.",
+                            "Identify key diagnostic features on transthoracic echocardiography, chest X-ray findings (Kerley B lines, cardiomegaly), and BNP/NT-proBNP assays."
+                        ]
+                    },
+                    {
+                        "name": "Acute Decompensated Heart Failure",
+                        "objectives": [
+                            "Classify patients using hemodynamic profiles (warm vs cold, wet vs dry) to guide acute therapy.",
+                            "Manage volume overload with intravenous loop diuretics and recognize signs of diuretic resistance."
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+
+    # Now insert into DB
+    for unit_name, modules in syllabus_data.items():
+        unit = models.Unit(name=unit_name, owner_id=user_id, is_active=True, category="Medical Study")
+        db.add(unit)
+        db.flush()
+
+        for module_name, topics in modules.items():
+            module = models.Module(name=module_name, unit_id=unit.id)
+            db.add(module)
+            db.flush()
+
+            for topic_name, subtopics in topics.items():
+                topic = models.Topic(name=topic_name, module_id=module.id)
+                db.add(topic)
+                db.flush()
+
+                for subtopic_item in subtopics:
+                    subtopic = models.Subtopic(name=subtopic_item["name"], topic_id=topic.id)
+                    db.add(subtopic)
+                    db.flush()
+
+                    for desc in subtopic_item["objectives"]:
+                        objective = models.LearningObjective(description=desc, subtopic_id=subtopic.id)
+                        db.add(objective)
+    
+    db.commit()
+
 @router.get("/{user_id}/dashboard", response_model=schemas.DashboardResponse)
 def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     user = find_user(user_id, db)
@@ -49,10 +150,7 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
 
     active_units = db.query(models.Unit).filter(models.Unit.owner_id == user.id, models.Unit.is_active == True).all()
     if not active_units:
-        defaults = ["Biochemistry II", "General Surgery", "Internal Medicine"]
-        for name in defaults:
-            db.add(models.Unit(name=name, owner_id=user.id))
-        db.commit()
+        populate_default_syllabus(db, user.id)
         active_units = db.query(models.Unit).filter(models.Unit.owner_id == user.id, models.Unit.is_active == True).all()
 
     unit_names = [u.name for u in active_units]
@@ -95,11 +193,46 @@ def get_ai_timetable(user_id: str, db: Session = Depends(get_db)):
     recent_sessions = db.query(models.ChatSession).filter(models.ChatSession.owner_id == user.id).order_by(models.ChatSession.id.desc()).limit(10).all()
     chat_titles = [s.title for s in recent_sessions]
 
+    weak = [q.unit_name for q in quiz_history if q.pnl < 70]
+    mastered = [q.unit_name for q in quiz_history if q.pnl >= 80]
+    db_context = schemas.StudyContextPayload(
+        mastered_topics=list(set(mastered)),
+        weak_topics=list(set(weak)),
+        total_quizzes_taken=len(quiz_history)
+    )
+
     user_info = {"username": user.username, "semester_status": user.semester_status}
-    new_timetable_data = ai_service.generate_timetable(user_info, quiz_history, active_units, chat_titles, previous_plan)
+    new_timetable_data = ai_service.generate_timetable(user_info, quiz_history, active_units, chat_titles, previous_plan, study_context=db_context)
 
     if not new_timetable_data:
         raise HTTPException(status_code=500, detail="The AI is still drafting your plan. Try again in a moment.")
+
+    new_db_timetable = models.Timetable(owner_id=user.id, weekly_plan_json=new_timetable_data["weekly_plan"], ai_brief=new_timetable_data["ai_brief"], timestamp=time.time())
+    db.add(new_db_timetable)
+    db.commit()
+
+    return schemas.TimetableResponse(weekly_plan=new_timetable_data["weekly_plan"], ai_brief=new_timetable_data["ai_brief"])
+
+@router.post("/{user_id}/timetable", response_model=schemas.TimetableResponse)
+def get_personalized_ai_timetable(
+    user_id: str,
+    payload: Optional[schemas.StudyContextPayload] = None,
+    db: Session = Depends(get_db)
+):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    quiz_history = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
+    active_units = [u.name for u in user.units if u.is_active]
+    recent_sessions = db.query(models.ChatSession).filter(models.ChatSession.owner_id == user.id).order_by(models.ChatSession.id.desc()).limit(10).all()
+    chat_titles = [s.title for s in recent_sessions]
+
+    user_info = {"username": user.username, "semester_status": user.semester_status}
+    new_timetable_data = ai_service.generate_timetable(user_info, quiz_history, active_units, chat_titles, None, study_context=payload)
+
+    if not new_timetable_data:
+        raise HTTPException(status_code=500, detail="The AI is still drafting your personalized plan. Try again in a moment.")
 
     new_db_timetable = models.Timetable(owner_id=user.id, weekly_plan_json=new_timetable_data["weekly_plan"], ai_brief=new_timetable_data["ai_brief"], timestamp=time.time())
     db.add(new_db_timetable)

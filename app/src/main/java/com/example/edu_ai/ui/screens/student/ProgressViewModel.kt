@@ -24,7 +24,8 @@ data class ProgressUiState(
 class ProgressViewModel(
     private val aiService: AiService,
     private val dao: EduAIDao,
-    private val user: UserEntity
+    private val user: UserEntity,
+    private val repository: com.example.edu_ai.repository.EduAIRepository? = null
 ) : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
@@ -48,7 +49,8 @@ class ProgressViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val rec = aiService.getRecommendations(user)
+                val studyContext = repository?.buildStudyContext(user.id)
+                val rec = aiService.getRecommendations(user, studyContext)
                 _recommendation.value = rec
             } catch (e: Exception) {
                 _recommendation.value = "Stay consistent! Your next breakthrough is just one study session away."
@@ -63,7 +65,7 @@ class ProgressViewModel(
             initializer {
                 val application = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as EduAIApplication)
                 val aiService = AiServiceFactory().createService(isProMode = false)
-                ProgressViewModel(aiService, application.database.dao(), user)
+                ProgressViewModel(aiService, application.database.dao(), user, application.repository)
             }
         }
     }

@@ -15,12 +15,7 @@ import com.example.edu_ai.data.remote.ai.AiService
 import com.example.edu_ai.data.remote.ai.AiServiceFactory
 import com.example.edu_ai.data.remote.ai.QuizQuestion
 import com.example.edu_ai.data.remote.ai.QuizResponse
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class QuizUiState(
@@ -33,6 +28,7 @@ data class QuizUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val selectedUnit: String? = null,
+    val selectedTopic: String? = null,
     val unitsWithModules: List<UnitWithModules> = emptyList(),
     val isReviewMode: Boolean = false,
     val quizHistory: List<QuizHistoryEntity> = emptyList()
@@ -85,9 +81,77 @@ class QuizViewModel(
                 isLoading = true,
                 error = null,
                 selectedUnit = unitName,
+                selectedTopic = topic,
                 isReviewMode = false
             ) }
-            val quiz = aiService.generateQuiz(unitName, user, topic)
+            
+            val gson = com.google.gson.Gson()
+            var quiz = aiService.generateQuiz(unitName, user, topic)
+            
+            if (quiz != null) {
+                // Cache the newly generated quiz online
+                if (topic != null) {
+                    val subtopicEntity = _uiState.value.unitsWithModules
+                        .flatMap { it.modules }
+                        .flatMap { it.topics }
+                        .flatMap { it.subtopics }
+                        .find { it.name.equals(topic, ignoreCase = true) }
+                    if (subtopicEntity != null) {
+                        try {
+                            val quizJson = gson.toJson(quiz)
+                            dao.updateSubtopicCachedQuiz(subtopicEntity.subtopicId, quizJson)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                } else {
+                    val unitEntity = _uiState.value.unitsWithModules
+                        .find { it.unit.unitName.equals(unitName, ignoreCase = true) }?.unit
+                    if (unitEntity != null) {
+                        try {
+                            val quizJson = gson.toJson(quiz)
+                            dao.updateUnitCachedQuiz(unitEntity.localId, quizJson)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            } else {
+                // If network/AI fails, attempt to load from SQLite Offline Cache!
+                if (topic != null) {
+                    val subtopicEntity = _uiState.value.unitsWithModules
+                        .flatMap { it.modules }
+                        .flatMap { it.topics }
+                        .flatMap { it.subtopics }
+                        .find { it.name.equals(topic, ignoreCase = true) }
+                    if (subtopicEntity != null) {
+                        val dbSubtopic = dao.getSubtopicById(subtopicEntity.subtopicId)
+                        val cachedJson = dbSubtopic?.cachedQuizJson
+                        if (!cachedJson.isNullOrBlank()) {
+                            try {
+                                quiz = gson.fromJson(cachedJson, QuizResponse::class.java)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                } else {
+                    val unitEntity = _uiState.value.unitsWithModules
+                        .find { it.unit.unitName.equals(unitName, ignoreCase = true) }?.unit
+                    if (unitEntity != null) {
+                        val dbUnit = dao.getAllUnits().firstOrNull()?.find { it.localId == unitEntity.localId }
+                        val cachedJson = dbUnit?.cachedQuizJson
+                        if (!cachedJson.isNullOrBlank()) {
+                            try {
+                                quiz = gson.fromJson(cachedJson, QuizResponse::class.java)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                }
+            }
+
             if (quiz != null) {
                 // Shuffle options for each question to break predictable patterns
                 val shuffledQuestions = quiz.questions.map { question ->
@@ -100,7 +164,7 @@ class QuizViewModel(
                 val shuffledQuiz = quiz.copy(questions = shuffledQuestions)
                 _uiState.update { it.copy(quiz = shuffledQuiz, isLoading = false) }
             } else {
-                _uiState.update { it.copy(isLoading = false, error = "Failed to ignite the Quiz Engine.") }
+                _uiState.update { it.copy(isLoading = false, error = "Failed to ignite the Quiz Engine. No offline cache found for this assessment.") }
             }
         }
     }
@@ -159,20 +223,21 @@ class QuizViewModel(
         val quiz = state.quiz ?: return
         
         val finalScorePercentage = (state.score.toDouble() / quiz.questions.size) * 100
+        val recordTitle = state.selectedTopic ?: quiz.title
         
         viewModelScope.launch {
             // Save locally with user isolation
             dao.insertQuizHistory(
                 QuizHistoryEntity(
                     userId = user.id,
-                    unitName = quiz.title,
+                    unitName = recordTitle,
                     pnlScore = finalScorePercentage,
                     timestamp = System.currentTimeMillis()
                 )
             )
             // Save to backend
             aiService.recordQuizResult(
-                unitName = quiz.title,
+                unitName = recordTitle,
                 score = state.score,
                 total = quiz.questions.size,
                 userContext = user

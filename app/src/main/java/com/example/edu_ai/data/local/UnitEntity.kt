@@ -13,7 +13,8 @@ import androidx.room.PrimaryKey
 data class UnitEntity(
     @PrimaryKey(autoGenerate = true) val localId: Long = 0,
     val unitName: String,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val cachedQuizJson: String? = null
 )
 
 

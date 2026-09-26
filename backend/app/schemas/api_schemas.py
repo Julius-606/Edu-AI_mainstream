@@ -214,6 +214,28 @@ class TokenResponse(BaseModel):
 class RecommendationResponse(BaseModel):
     recommendation: str
 
+class UnitProgressInfo(BaseModel):
+    unit_name: str
+    completed_subtopics: int = 0
+    total_subtopics: int = 0
+    progress_percentage: float = 0.0
+
+class QuizAttemptInfo(BaseModel):
+    unit_name: str
+    score: float
+    timestamp: Optional[Any] = None
+
+class StudyContextPayload(BaseModel):
+    overall_progress_percentage: Optional[float] = None
+    units_progress: List[UnitProgressInfo] = []
+    completed_subtopic_names: List[str] = []
+    pending_subtopic_names: List[str] = []
+    average_quiz_score: Optional[float] = None
+    total_quizzes_taken: Optional[int] = None
+    mastered_topics: List[str] = []
+    weak_topics: List[str] = []
+    recent_quizzes: List[QuizAttemptInfo] = []
+
 class BookmarkBase(BaseModel):
     type: str
     title: str

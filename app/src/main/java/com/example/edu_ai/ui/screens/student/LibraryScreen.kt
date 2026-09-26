@@ -1,35 +1,34 @@
 package com.example.edu_ai.ui.screens.student
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.LibraryBooks
-import androidx.compose.material.icons.filled.MedicalServices
-import androidx.compose.material.icons.filled.Computer
-import androidx.compose.material.icons.filled.Engineering
-import androidx.compose.material.icons.filled.BusinessCenter
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.edu_ai.EduAIApplication
-import androidx.compose.ui.platform.LocalContext
+import com.example.edu_ai.data.remote.LibraryUnit
 import com.example.edu_ai.ui.components.DynamicBackground
+import com.example.edu_ai.utils.TactileFeedback
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,44 +48,58 @@ fun LibraryScreen(
         viewModel.loadLibrary()
     }
 
-    // Drill-down Picker State
-    var currentStage by remember { mutableStateOf("field") } // "field", "course", "unit"
-    var selectedField by remember { mutableStateOf<String?>(null) }
-    var selectedCourse by remember { mutableStateOf<String?>(null) }
-
-    // Hardcoded structure for picks
-    val fields = remember {
+    // Curated fallback matching the 21 authentic units in the backend
+    val fallbackUnits = remember {
         listOf(
-            FieldItem("Medical & Health Sciences", Icons.Default.MedicalServices, Color(0xFF00E5FF)),
-            FieldItem("Computer Science & IT", Icons.Default.Computer, Color(0xFF6366F1)),
-            FieldItem("Engineering & Applied Sciences", Icons.Default.Engineering, Color(0xFFEC4899)),
-            FieldItem("Business & Administration", Icons.Default.BusinessCenter, Color(0xFF10B981))
+            LibraryUnit(8, "General Pharmacology", "Medicine"),
+            LibraryUnit(30, "INTRODUCTION TO PHILOSOPHY - EEN 114", "Global"),
+            LibraryUnit(18, "GENERAL SURGERY I - BCM 314 - Principles, Emergency, GI Tract and Hernias", "Medicine"),
+            LibraryUnit(21, "GENERAL SURGERY II - BCM 322 - Hepatobiliary, Urology, Breast, Vascular and Specialty Surgery", "Medicine"),
+            LibraryUnit(22, "Obstetrics and Gynaecology I - BCM 317", "Medicine"),
+            LibraryUnit(23, "Obstetrics and Gynaecology II - BCM 323 - Pathology and Management", "Medicine"),
+            LibraryUnit(31, "ENTREPRENEURSHIP - HSN 425", "Global"),
+            LibraryUnit(3, "Internal Medicine I: Cardiopulmonary and Haematology", "Medicine"),
+            LibraryUnit(1, "Internal Medicine I (Crash Course): Cardiopulmonary and Haematology", "Medicine"),
+            LibraryUnit(5, "Internal Medicine II: Neurology, Nephrology and Endocrinology", "Medicine"),
+            LibraryUnit(4, "Internal Medicine II (Crash Course): Neurology, Nephrology and Endocrinology", "Medicine"),
+            LibraryUnit(7, "Internal Medicine III: Gastroenterology, Infectious Diseases, Rheumatology and Oncology", "Medicine"),
+            LibraryUnit(6, "Internal Medicine III (Crash Course): Gastroenterology, Infectious Diseases, Rheumatology and Oncology", "Medicine"),
+            LibraryUnit(32, "BASIC COMPUTER SKILLS - BCM 111", "Global"),
+            LibraryUnit(9, "Clinical Pharmacology I: Autonomic, Cardiovascular, Respiratory, Gastrointestinal and Hematology", "Medicine"),
+            LibraryUnit(10, "Clinical Pharmacology II: Antimicrobials, CNS, Endocrine, Chemotherapy and Immunomodulators", "Medicine"),
+            LibraryUnit(29, "Clinical Pharmacology III - BCM 331 - Comprehensive and Applied Clinical Pharmacology", "Medicine"),
+            LibraryUnit(35, "Emergency Medicine and Life Support [ATLS & ACLS]", "Medicine"),
+            LibraryUnit(36, "Child Health - BCM 312", "Medicine"),
+            LibraryUnit(38, "RESEARCH METHODOLOGY", "Global"),
+            LibraryUnit(37, "Research Methodology - HRS 312", "Medicine")
         )
     }
 
-    val coursesMap = remember {
-        mapOf(
-            "Medical & Health Sciences" to listOf(
-                "Bachelor of Medicine & Bachelor of Surgery (MBChB)",
-                "Bachelor of Science in Nursing",
-                "Bachelor of Pharmacy"
-            ),
-            "Computer Science & IT" to listOf(
-                "BSc. Software Engineering",
-                "BSc. Artificial Intelligence & Data Science",
-                "BSc. Cybersecurity & IT Systems"
-            ),
-            "Engineering & Applied Sciences" to listOf(
-                "BSc. Electrical & Electronic Engineering",
-                "BSc. Civil & Structural Engineering",
-                "BSc. Mechanical & Robotics Engineering"
-            ),
-            "Business & Administration" to listOf(
-                "Bachelor of Business Administration (BBA)",
-                "BSc. Financial Engineering",
-                "BA. Economics & Statistics"
-            )
-        )
+    val displayUnits = if (uiState.availableUnits.isNotEmpty()) uiState.availableUnits else fallbackUnits
+
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategoryFilter by remember { mutableStateOf("All") } // "All", "Medicine", "Global", "Surgery", "Pharmacology", "Internal Medicine"
+    var addingUnitId by remember { mutableStateOf<Int?>(null) }
+
+    val filteredUnits = remember(displayUnits, searchQuery, selectedCategoryFilter) {
+        displayUnits.filter { unit ->
+            val matchesSearch = searchQuery.isBlank() ||
+                    unit.name.contains(searchQuery, ignoreCase = true) ||
+                    unit.category.contains(searchQuery, ignoreCase = true)
+
+            val matchesFilter = when (selectedCategoryFilter) {
+                "All" -> true
+                "Medicine" -> unit.category.equals("Medicine", ignoreCase = true)
+                "Global" -> unit.category.equals("Global", ignoreCase = true)
+                "Surgery" -> unit.name.contains("surgery", ignoreCase = true)
+                "Pharmacology" -> unit.name.contains("pharmacology", ignoreCase = true)
+                "Internal Medicine" -> unit.name.contains("internal medicine", ignoreCase = true)
+                "Crash Courses" -> unit.name.contains("crash", ignoreCase = true)
+                else -> true
+            }
+
+            matchesSearch && matchesFilter
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -98,34 +111,17 @@ fun LibraryScreen(
                 TopAppBar(
                     title = {
                         Column {
-                            Text("Syllabus Library", fontWeight = FontWeight.Black, fontSize = 20.sp)
-                            if (selectedField != null) {
-                                Text(
-                                    text = buildString {
-                                        append(selectedField)
-                                        if (selectedCourse != null) append(" > ").append(selectedCourse?.take(18)).append("...")
-                                    },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
+                            Text("Add Unit to Syllabus", fontWeight = FontWeight.Black, fontSize = 20.sp)
+                            Text(
+                                text = "Authentic curriculum courses offered on Trace Backend",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = {
-                            when (currentStage) {
-                                "unit" -> {
-                                    selectedCourse = null
-                                    currentStage = "course"
-                                }
-                                "course" -> {
-                                    selectedField = null
-                                    currentStage = "field"
-                                }
-                                else -> onBack()
-                            }
-                        }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -139,7 +135,7 @@ fun LibraryScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                if (uiState.isLoading) {
+                if (uiState.isLoading && addingUnitId == null) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primary)
                 }
 
@@ -147,251 +143,129 @@ fun LibraryScreen(
                     Text(
                         text = uiState.error!!,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(16.dp),
-                        fontSize = 13.sp
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        fontSize = 12.sp
                     )
                 }
 
                 if (uiState.successMessage != null) {
+                    Surface(
+                        color = Color(0xFF10B981).copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                    ) {
+                        Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = uiState.successMessage!!,
+                                color = Color(0xFF10B981),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+
+                // Search Bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    placeholder = { Text("Search 21+ backend units (e.g. Surgery, Pharmacology)...", fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear")
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                    )
+                )
+
+                // Category Filter Chips
+                val filterChips = listOf("All", "Medicine", "Global", "Internal Medicine", "Surgery", "Pharmacology", "Crash Courses")
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    items(filterChips) { chip ->
+                        val isSelected = selectedCategoryFilter == chip
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                TactileFeedback.triggerSubtleClick(context)
+                                selectedCategoryFilter = chip
+                            },
+                            label = { Text(chip, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        )
+                    }
+                }
+
+                // Summary Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = uiState.successMessage!!,
-                        color = Color(0xFF059669),
+                        "${filteredUnits.size} Units Available",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(16.dp),
-                        fontSize = 13.sp
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        "Synchronized with Trace Server",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.outline
                     )
                 }
 
-                androidx.compose.animation.Crossfade(
-                    targetState = currentStage,
-                    modifier = Modifier.fillMaxSize(),
-                    label = "LibraryStageCrossfade"
-                ) { stage ->
-                    when (stage) {
-                        "field" -> {
-                            // STAGE 1: Big Fields Grid
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    "Pick an Academic Field",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(bottom = 12.dp)
-                                )
-                                LazyVerticalGrid(
-                                    columns = GridCells.Fixed(2),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    items(fields) { field ->
-                                        Card(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(130.dp)
-                                                .clickable {
-                                                    com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                                    selectedField = field.name
-                                                    currentStage = "course"
-                                                },
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                                            ),
-                                            border = androidx.compose.foundation.BorderStroke(
-                                                1.5.dp,
-                                                field.themeColor.copy(alpha = 0.4f)
-                                            ),
-                                            shape = MaterialTheme.shapes.large
-                                        ) {
-                                            Column(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .padding(12.dp),
-                                                verticalArrangement = Arrangement.Center,
-                                                horizontalAlignment = Alignment.CenterHorizontally
-                                            ) {
-                                                Icon(
-                                                    imageVector = field.icon,
-                                                    contentDescription = null,
-                                                    tint = field.themeColor,
-                                                    modifier = Modifier.size(36.dp)
-                                                )
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Text(
-                                                    text = field.name,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                if (filteredUnits.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(48.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("No matching units found.", color = MaterialTheme.colorScheme.outline, fontSize = 13.sp)
                         }
-                        "course" -> {
-                            // STAGE 2: Courses List under Field
-                            val courses = coursesMap[selectedField] ?: emptyList()
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    "Pick a Course Path",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(bottom = 12.dp)
-                                )
-                                LazyColumn(
-                                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    items(courses) { course ->
-                                        Card(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                                    selectedCourse = course
-                                                    currentStage = "unit"
-                                                },
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                                            ),
-                                            shape = MaterialTheme.shapes.medium
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(16.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Text(
-                                                    text = course,
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                                Icon(
-                                                    imageVector = Icons.Default.Add,
-                                                    contentDescription = "Select",
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(filteredUnits) { unit ->
+                            UnitBackendCard(
+                                unit = unit,
+                                isAdding = addingUnitId == unit.id,
+                                onAdd = {
+                                    TactileFeedback.triggerSubtleClick(context)
+                                    addingUnitId = unit.id
+                                    viewModel.addUnit(unit.id, userId) {
+                                        addingUnitId = null
+                                        onUnitAdded()
                                     }
                                 }
-                            }
-                        }
-                        "unit" -> {
-                            // STAGE 3: Filtered Units Offered
-                            // Filter units from available units list
-                            val courseLower = selectedCourse?.lowercase() ?: ""
-                            val filteredUnits = uiState.availableUnits.filter { unit ->
-                                val category = unit.category.lowercase()
-                                val name = unit.name.lowercase()
-                                when {
-                                    courseLower.contains("medicine") || courseLower.contains("surgery") || courseLower.contains("mbchb") -> {
-                                        category.contains("medical") || category.contains("clinical") || category.contains("surgery") || category.contains("medicine") || category.contains("biochem") || name.contains("surgery") || name.contains("biochem") || name.contains("medicine")
-                                    }
-                                    courseLower.contains("nursing") -> {
-                                        category.contains("nursing") || name.contains("nursing") || name.contains("clinical")
-                                    }
-                                    courseLower.contains("pharmacy") -> {
-                                        category.contains("pharmacy") || name.contains("pharmacology") || name.contains("biochem")
-                                    }
-                                    courseLower.contains("software") || courseLower.contains("computer") -> {
-                                        category.contains("software") || category.contains("computer") || category.contains("it") || name.contains("software") || name.contains("database") || name.contains("programming")
-                                    }
-                                    courseLower.contains("intelligence") || courseLower.contains("data") -> {
-                                        category.contains("ai") || category.contains("data") || category.contains("intelligence") || name.contains("ai") || name.contains("intelligence") || name.contains("python")
-                                    }
-                                    courseLower.contains("electrical") -> {
-                                        category.contains("electrical") || name.contains("circuit") || name.contains("electrical")
-                                    }
-                                    courseLower.contains("civil") -> {
-                                        category.contains("civil") || name.contains("structural") || name.contains("survey")
-                                    }
-                                    courseLower.contains("business") || courseLower.contains("administration") -> {
-                                        category.contains("business") || category.contains("management") || name.contains("accounting") || name.contains("marketing")
-                                    }
-                                    courseLower.contains("finance") || courseLower.contains("financial") -> {
-                                        category.contains("finance") || name.contains("finance") || name.contains("quantitative")
-                                    }
-                                    else -> {
-                                        // General fallback: return true if not matched to anything, or filter generally
-                                        true
-                                    }
-                                }
-                            }.ifEmpty {
-                                // If course filter ends up empty, show all available units in the library as general electives
-                                uiState.availableUnits
-                            }
-
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = "Units Offered under $selectedCourse",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(bottom = 12.dp)
-                                )
-
-                                if (filteredUnits.isEmpty()) {
-                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Text("No specialized units found for this path.", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
-                                    }
-                                } else {
-                                    LazyColumn(
-                                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        items(filteredUnits) { unit ->
-                                            Card(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                colors = CardDefaults.cardColors(
-                                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                                                ),
-                                                shape = MaterialTheme.shapes.large
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(14.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.LibraryBooks,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(24.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(12.dp))
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Text(
-                                                            unit.name,
-                                                            fontWeight = FontWeight.Bold,
-                                                            fontSize = 14.sp
-                                                        )
-                                                        Text(
-                                                            unit.category,
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            fontSize = 10.sp,
-                                                            color = MaterialTheme.colorScheme.outline
-                                                        )
-                                                    }
-                                                    Button(
-                                                        onClick = {
-                                                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                                            viewModel.addUnit(unit.id, userId, onUnitAdded)
-                                                        },
-                                                        shape = MaterialTheme.shapes.medium,
-                                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
-                                                        modifier = Modifier.height(32.dp)
-                                                    ) {
-                                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text("ADD", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            )
                         }
                     }
                 }
@@ -400,4 +274,112 @@ fun LibraryScreen(
     }
 }
 
-data class FieldItem(val name: String, val icon: ImageVector, val themeColor: Color)
+@Composable
+fun UnitBackendCard(
+    unit: LibraryUnit,
+    isAdding: Boolean,
+    onAdd: () -> Unit
+) {
+    val isMedicine = unit.category.equals("Medicine", ignoreCase = true)
+    val categoryColor = if (isMedicine) Color(0xFF00E5FF) else Color(0xFF10B981)
+    val categoryIcon: ImageVector = if (isMedicine) Icons.Default.MedicalServices else Icons.Default.Public
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, categoryColor.copy(alpha = 0.25f))
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = categoryColor.copy(alpha = 0.15f),
+                modifier = Modifier.size(42.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = categoryIcon,
+                        contentDescription = null,
+                        tint = categoryColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = categoryColor.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = unit.category.uppercase(),
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black,
+                            color = categoryColor,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                    if (unit.name.contains("Crash Course", ignoreCase = true)) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Color(0xFFF59E0B).copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "CRASH COURSE",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFFF59E0B),
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = unit.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Button(
+                onClick = onAdd,
+                enabled = !isAdding,
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                modifier = Modifier.height(36.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = categoryColor.copy(alpha = 0.85f),
+                    contentColor = Color.Black
+                )
+            ) {
+                if (isAdding) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.Black
+                    )
+                } else {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("ADD", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                }
+            }
+        }
+    }
+}

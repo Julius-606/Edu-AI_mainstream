@@ -1,4 +1,3 @@
-
 package com.example.edu_ai.ui.screens.student
 
 import androidx.lifecycle.ViewModel
@@ -8,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.edu_ai.EduAIApplication
 import com.example.edu_ai.data.local.UserEntity
+import com.example.edu_ai.data.remote.ApiStudyContextPayload
 import com.example.edu_ai.data.remote.ApiTimetableResponse
 import com.example.edu_ai.data.remote.ApiTimetableSlot
 import com.example.edu_ai.repository.EduAIRepository
@@ -31,48 +31,76 @@ class TimetableViewModel(
     val uiState: StateFlow<TimetableUiState> = _uiState
 
     init {
-        loadTimetable()
+        loadTimetable(forceRefresh = false)
     }
 
-    fun loadTimetable() {
+    fun loadTimetable(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                val response = repository.getWeeklyTimetable(user.id)
-                val finalPlan = if (response.weeklyPlan.size < 5) {
-                    generateFallbackRichPlan()
+                // Share rich user performance context with AI (quiz scores, completed & pending subtopics, weak areas)
+                val studyContext = repository.buildStudyContext(user.id)
+                val response = repository.getWeeklyTimetable(user.id, studyContext, forceRefresh)
+                
+                val finalPlan = if (response.weeklyPlan.size < 14) {
+                    generateFallbackRichPlan(studyContext)
                 } else {
                     response.weeklyPlan
                 }
+                
+                val dynamicAiBrief = if (response.aiBrief.isNotBlank()) {
+                    response.aiBrief
+                } else {
+                    val weak = studyContext.weakTopics.firstOrNull()
+                    val score = studyContext.averageQuizScore?.toInt()
+                    val base = "Zenith AI has formulated 4 tactical daily study quadrants."
+                    if (weak != null && score != null) {
+                        "$base Prioritizing high-yield retention in $weak based on your current $score% average diagnostic score."
+                    } else {
+                        "$base Dynamically calibrated around your syllabus pace and active modules."
+                    }
+                }
+
                 _uiState.value = TimetableUiState(
                     weeklyPlan = finalPlan,
-                    aiBrief = response.aiBrief.ifBlank { "Zenith AI has assembled 4 high-yield study quadrants per day to optimize memory retention." },
+                    aiBrief = dynamicAiBrief,
                     isLoading = false
                 )
             } catch (e: Exception) {
-                // Return gorgeous rich multi-slot schedule on fallback so app remains fully functional
+                val studyContext = try { repository.buildStudyContext(user.id) } catch (ex: Exception) { null }
                 _uiState.value = TimetableUiState(
-                    weeklyPlan = generateFallbackRichPlan(),
-                    aiBrief = "Local Engine Fallback: Displaying 4 tactical clinical study intervals for maximum academic performance.",
+                    weeklyPlan = generateFallbackRichPlan(studyContext),
+                    aiBrief = "Local Zenith Adaptive Engine: Schedule calibrated to address diagnostic review and active curriculum milestones.",
                     isLoading = false
                 )
             }
         }
     }
 
-    private fun generateFallbackRichPlan(): List<ApiTimetableSlot> {
+    private fun generateFallbackRichPlan(studyContext: ApiStudyContextPayload?): List<ApiTimetableSlot> {
         val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-        val units = listOf("Biochemistry II", "General Surgery", "Internal Medicine")
+        
+        // Dynamically pull active units and weak topics from user's actual database
+        val availableUnits = studyContext?.unitsProgress?.map { it.unitName }?.filter { it.isNotBlank() } ?: emptyList()
+        val defaultUnits = if (availableUnits.isNotEmpty()) {
+            availableUnits
+        } else {
+            listOf("Internal Medicine I", "Clinical Pharmacology", "General Surgery I")
+        }
+
+        val weakTarget = studyContext?.weakTopics?.firstOrNull() ?: defaultUnits.first()
+        val pendingTarget = studyContext?.pendingSubtopicNames?.firstOrNull() ?: "Core Syllabus Module"
+
         val slots = mutableListOf<ApiTimetableSlot>()
         days.forEachIndexed { i, day ->
-            val u1 = units[i % units.size]
-            val u2 = units[(i + 1) % units.size]
-            val u3 = units[(i + 2) % units.size]
+            val u1 = defaultUnits[i % defaultUnits.size]
+            val u2 = defaultUnits[(i + 1) % defaultUnits.size]
+            val u3 = defaultUnits[(i + 2) % defaultUnits.size]
             
-            slots.add(ApiTimetableSlot(day, "08:30 - 10:30", "Deep Study: Core Pathophysiology", u1, "study"))
-            slots.add(ApiTimetableSlot(day, "11:00 - 12:00", "Zenith Diagnostic Assessment", u2, "assessment"))
+            slots.add(ApiTimetableSlot(day, "08:30 - 10:30", "Deep Study: $pendingTarget", u1, "study"))
+            slots.add(ApiTimetableSlot(day, "11:00 - 12:00", "Zenith Diagnostic: $weakTarget", u2, "assessment"))
             slots.add(ApiTimetableSlot(day, "12:00 - 13:00", "Mental Calibration & Hydration Break", null, "break"))
-            slots.add(ApiTimetableSlot(day, "14:30 - 16:30", "Peer Review & Differential Case Study", u3, "revision"))
+            slots.add(ApiTimetableSlot(day, "14:30 - 16:30", "Differential Case Study & Peer Review", u3, "revision"))
         }
         return slots
     }
@@ -86,6 +114,3 @@ class TimetableViewModel(
         }
     }
 }
-
-
- 

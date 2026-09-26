@@ -465,46 +465,92 @@
 
         <!-- SECTION: ARCHIVES / RELEASES -->
         {% elif section == 'archives' %}
-        <div class="mb-6">
-            <p class="text-xs uppercase tracking-widest text-indigo-400 font-bold">Release Management</p>
-            <h1 class="text-3xl font-extrabold text-white tracking-tight mt-1">Artifact &amp; Release Archives</h1>
-            <p class="text-sm text-slate-400 mt-1">Manage version numbers, binary APK download links, and release notes.</p>
+        <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <p class="text-xs uppercase tracking-widest text-indigo-400 font-bold">Release Management &amp; Archives</p>
+                <h1 class="text-3xl font-extrabold text-white tracking-tight mt-1">Artifact &amp; Release Archives</h1>
+                <p class="text-sm text-slate-400 mt-1">Manage version numbers, binary APK download links, and enforce mandatory upgrades for all users.</p>
+            </div>
+            {% if mandatory_active %}
+            <div class="flex items-center gap-2 bg-rose-500/20 border border-rose-500/40 px-4 py-2 rounded-xl text-rose-300 text-xs font-bold animate-pulse">
+                <span>🚨 MANDATORY UPGRADE ACTIVE</span>
+            </div>
+            {% endif %}
         </div>
 
         <div class="grid lg:grid-cols-2 gap-6">
             <form method="post" action="/admin/releases" class="rounded-2xl border border-slate-800 bg-slate-900/90 p-6 space-y-4 shadow-lg">
                 <h2 class="font-bold text-base text-white">Publish / Archive Release</h2>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Version string</label>
-                    <input name="version" required placeholder="e.g. 3.2.0" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Version string</label>
+                        <input name="version" required placeholder="e.g. 1.2.0" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Version Code</label>
+                        <input name="version_code" type="number" value="102" required class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Artifact Type</label>
-                    <input name="artifact_type" value="Trace Android App" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Artifact Type</label>
+                        <input name="artifact_type" value="Trace Android App" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">File Size</label>
+                        <input name="file_size" value="14.8 MB" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+                    </div>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-1">Download URL</label>
-                    <input name="download_url" type="url" placeholder="https://..." class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
+                    <input name="download_url" type="url" placeholder="https://github.com/.../app.apk" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Release Notes</label>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Release Notes / Changelog</label>
                     <textarea name="release_notes" rows="3" placeholder="What changed in this build?" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-indigo-500"></textarea>
                 </div>
+                <!-- Mandatory Upgrade Trigger Switch -->
+                <div class="p-3.5 rounded-xl border border-rose-500/30 bg-rose-500/10 space-y-2">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="is_mandatory" value="true" class="w-4 h-4 text-rose-600 rounded bg-slate-950 border-slate-700 focus:ring-rose-500">
+                        <span class="text-xs font-black text-rose-300">🚨 Enforce Mandatory Upgrade for All Users</span>
+                    </label>
+                    <p class="text-[11px] text-slate-400">When enabled, active users on older versions cannot access the app until they download and install this update.</p>
+                </div>
+
                 <button class="w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 py-3 font-bold text-sm text-white shadow-md shadow-indigo-600/30 transition">Archive Release</button>
             </form>
 
             <div class="space-y-3">
-                <h2 class="font-bold text-base text-white">Logged Releases</h2>
+                <h2 class="font-bold text-base text-white">Logged Releases in Archive</h2>
                 {% for release in releases %}
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-2 shadow">
+                <div class="rounded-2xl border {{ 'border-rose-500/40 bg-rose-950/20' if release.is_mandatory else 'border-slate-800 bg-slate-900/80' }} p-5 space-y-3 shadow">
                     <div class="flex items-center justify-between">
-                        <span class="font-bold text-indigo-300 text-base">v{{ release.version }}</span>
-                        <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400">{{ release.artifact_type }}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-indigo-300 text-base">v{{ release.version }}</span>
+                            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">Code: {{ release.version_code or 1 }}</span>
+                            {% if release.is_mandatory %}
+                            <span class="text-[10px] font-black px-2 py-0.5 rounded bg-rose-500 text-white">MANDATORY</span>
+                            {% else %}
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">OPTIONAL</span>
+                            {% endif %}
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400">{{ release.file_size or '14.8 MB' }}</span>
                     </div>
                     {% if release.download_url %}
                     <a href="{{ release.download_url }}" target="_blank" class="text-xs text-indigo-400 hover:underline block truncate">{{ release.download_url }}</a>
                     {% endif %}
                     <p class="text-xs text-slate-300 whitespace-pre-line">{{ release.release_notes or 'No release notes.' }}</p>
+                    
+                    <!-- Trigger toggle button -->
+                    <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                        <span class="text-[11px] text-slate-400">Status: <strong class="{{ 'text-rose-400' if release.is_mandatory else 'text-slate-400' }}">{{ 'Strict Lockdown Enforced' if release.is_mandatory else 'Normal' }}</strong></span>
+                        <form method="post" action="/admin/releases/{{ release.id }}/toggle-mandatory" style="display:inline;">
+                            <button class="text-xs px-3 py-1 rounded-lg font-bold transition {{ 'bg-slate-800 hover:bg-slate-700 text-slate-300' if release.is_mandatory else 'bg-rose-600 hover:bg-rose-500 text-white' }}">
+                                {{ 'Deactivate Mandatory Lock' if release.is_mandatory else 'Enforce as Mandatory' }}
+                            </button>
+                        </form>
+                    </div>
                 </div>
                 {% else %}
                 <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center text-slate-500 text-sm">No releases archived yet.</div>

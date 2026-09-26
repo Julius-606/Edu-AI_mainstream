@@ -59,12 +59,63 @@ interface EduAIDao {
     @Query("UPDATE subtopics SET isCompleted = :isCompleted WHERE subtopicId = :subtopicId")
     suspend fun updateSubtopicStatus(subtopicId: Long, isCompleted: Boolean)
 
+    @Query("UPDATE subtopics SET cachedContentJson = :cachedContentJson WHERE subtopicId = :subtopicId")
+    suspend fun updateSubtopicCachedContent(subtopicId: Long, cachedContentJson: String?)
+
+    @Query("UPDATE subtopics SET cachedQuizJson = :cachedQuizJson WHERE subtopicId = :subtopicId")
+    suspend fun updateSubtopicCachedQuiz(subtopicId: Long, cachedQuizJson: String?)
+
+    @Query("UPDATE units SET cachedQuizJson = :cachedQuizJson WHERE localId = :localId")
+    suspend fun updateUnitCachedQuiz(localId: Long, cachedQuizJson: String?)
+
+    @Query("SELECT * FROM subtopics WHERE subtopicId = :subtopicId LIMIT 1")
+    suspend fun getSubtopicById(subtopicId: Long): SubtopicEntity?
+
+    @Query("SELECT * FROM units WHERE unitName = :name LIMIT 1")
+    suspend fun getUnitByName(name: String): UnitEntity?
+
+    @Query("SELECT * FROM modules WHERE unitId = :unitId AND name = :name LIMIT 1")
+    suspend fun getModuleByName(unitId: Long, name: String): ModuleEntity?
+
+    @Query("SELECT * FROM topics WHERE moduleId = :moduleId AND name = :name LIMIT 1")
+    suspend fun getTopicByName(moduleId: Long, name: String): TopicEntity?
+
+    @Query("SELECT * FROM subtopics WHERE topicId = :topicId AND name = :name LIMIT 1")
+    suspend fun getSubtopicByName(topicId: Long, name: String): SubtopicEntity?
+
+    @Query("SELECT * FROM subtopics WHERE name = :name LIMIT 1")
+    suspend fun getSubtopicByTitle(name: String): SubtopicEntity?
+
+    @Query("UPDATE subtopics SET isCompleted = 1 WHERE name = :name")
+    suspend fun markSubtopicCompletedByName(name: String)
+
+    @Query("SELECT * FROM subtopics WHERE isCompleted = 1")
+    suspend fun getCompletedSubtopics(): List<SubtopicEntity>
+
+    @Query("DELETE FROM units WHERE localId NOT IN (SELECT MIN(localId) FROM units GROUP BY unitName)")
+    suspend fun deduplicateUnits()
+
+    @Query("DELETE FROM modules WHERE moduleId NOT IN (SELECT MIN(moduleId) FROM modules GROUP BY unitId, name)")
+    suspend fun deduplicateModules()
+
+    @Query("DELETE FROM topics WHERE topicId NOT IN (SELECT MIN(topicId) FROM topics GROUP BY moduleId, name)")
+    suspend fun deduplicateTopics()
+
+    @Query("DELETE FROM subtopics WHERE subtopicId NOT IN (SELECT MIN(subtopicId) FROM subtopics GROUP BY topicId, name)")
+    suspend fun deduplicateSubtopics()
+
+    @Query("UPDATE subtopics SET cachedContentJson = NULL WHERE cachedContentJson LIKE '%consultation failed%' OR cachedContentJson LIKE '%failed to reconnect%'")
+    suspend fun sanitizeCorruptedCachedContent()
+
     // Quiz History
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertQuizHistory(quiz: QuizHistoryEntity)
 
     @Query("SELECT * FROM quiz_history WHERE userId = :userId ORDER BY timestamp DESC")
     fun getQuizHistory(userId: String): Flow<List<QuizHistoryEntity>>
+
+    @Query("DELETE FROM quiz_history WHERE localId NOT IN (SELECT MIN(localId) FROM quiz_history GROUP BY userId, unitName, pnlScore)")
+    suspend fun deduplicateQuizHistory()
 
     @Query("DELETE FROM quiz_history")
     suspend fun clearAllQuizHistory()
@@ -151,6 +202,25 @@ interface EduAIDao {
 
     @Query("DELETE FROM bookmarks")
     suspend fun clearAllBookmarks()
+
+    // App Releases Archive
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRelease(release: AppReleaseEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReleases(releases: List<AppReleaseEntity>)
+
+    @Query("SELECT * FROM app_releases ORDER BY versionCode DESC, timestamp DESC")
+    fun getReleases(): Flow<List<AppReleaseEntity>>
+
+    @Query("SELECT * FROM app_releases WHERE isMandatory = 1 ORDER BY versionCode DESC LIMIT 1")
+    fun getLatestMandatoryRelease(): Flow<AppReleaseEntity?>
+
+    @Query("UPDATE app_releases SET isMandatory = :isMandatory WHERE id = :id")
+    suspend fun updateReleaseMandatoryStatus(id: Long, isMandatory: Boolean)
+
+    @Query("DELETE FROM app_releases WHERE id = :id")
+    suspend fun deleteRelease(id: Long)
 }
 
 

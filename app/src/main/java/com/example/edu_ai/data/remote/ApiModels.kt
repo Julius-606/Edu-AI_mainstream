@@ -158,6 +158,31 @@ data class RecommendationResponse(
     @SerializedName("recommendation") val recommendation: String
 )
 
+data class ApiUnitProgressInfo(
+    @SerializedName("unit_name") val unitName: String,
+    @SerializedName("completed_subtopics") val completedSubtopics: Int,
+    @SerializedName("total_subtopics") val totalSubtopics: Int,
+    @SerializedName("progress_percentage") val progressPercentage: Float
+)
+
+data class ApiQuizAttemptInfo(
+    @SerializedName("unit_name") val unitName: String,
+    @SerializedName("score") val score: Float,
+    @SerializedName("timestamp") val timestamp: Long? = null
+)
+
+data class ApiStudyContextPayload(
+    @SerializedName("overall_progress_percentage") val overallProgressPercentage: Float? = null,
+    @SerializedName("units_progress") val unitsProgress: List<ApiUnitProgressInfo> = emptyList(),
+    @SerializedName("completed_subtopic_names") val completedSubtopicNames: List<String> = emptyList(),
+    @SerializedName("pending_subtopic_names") val pendingSubtopicNames: List<String> = emptyList(),
+    @SerializedName("average_quiz_score") val averageQuizScore: Float? = null,
+    @SerializedName("total_quizzes_taken") val totalQuizzesTaken: Int? = null,
+    @SerializedName("mastered_topics") val masteredTopics: List<String> = emptyList(),
+    @SerializedName("weak_topics") val weakTopics: List<String> = emptyList(),
+    @SerializedName("recent_quizzes") val recentQuizzes: List<ApiQuizAttemptInfo> = emptyList()
+)
+
 data class LibraryUnit(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
@@ -189,6 +214,39 @@ data class ApiSyncResponse(
 data class ApiSyncRequest(
     @SerializedName("progress") val progress: List<ApiProgressItem> = emptyList(),
     @SerializedName("bookmarks") val bookmarks: List<ApiBookmarkItem> = emptyList()
+)
+
+data class ApiAppRelease(
+    @SerializedName("id") val id: Long,
+    @SerializedName("version") val version: String,
+    @SerializedName("version_code") val versionCode: Int = 1,
+    @SerializedName("artifact_type") val artifactType: String = "Trace Android APK",
+    @SerializedName("download_url") val downloadUrl: String,
+    @SerializedName("release_notes") val releaseNotes: String? = null,
+    @SerializedName("is_current") val isCurrent: Boolean = false,
+    @SerializedName("is_mandatory") val isMandatory: Boolean = false,
+    @SerializedName("min_supported_version_code") val minSupportedVersionCode: Int = 1,
+    @SerializedName("file_size") val fileSize: String = "14.8 MB",
+    @SerializedName("timestamp") val timestamp: Long = System.currentTimeMillis()
+)
+
+data class ApiReleasesResponse(
+    @SerializedName("latest_version") val latestVersion: String? = null,
+    @SerializedName("latest_version_code") val latestVersionCode: Int? = null,
+    @SerializedName("mandatory_update_active") val mandatoryUpdateActive: Boolean = false,
+    @SerializedName("min_supported_version_code") val minSupportedVersionCode: Int = 1,
+    @SerializedName("releases") val releases: List<ApiAppRelease> = emptyList()
+)
+
+data class CreateReleaseRequest(
+    @SerializedName("version") val version: String,
+    @SerializedName("version_code") val versionCode: Int,
+    @SerializedName("artifact_type") val artifactType: String = "Trace Android APK",
+    @SerializedName("download_url") val downloadUrl: String,
+    @SerializedName("release_notes") val releaseNotes: String,
+    @SerializedName("is_mandatory") val isMandatory: Boolean = false,
+    @SerializedName("file_size") val fileSize: String = "14.8 MB",
+    @SerializedName("is_current") val isCurrent: Boolean = true
 )
 
 

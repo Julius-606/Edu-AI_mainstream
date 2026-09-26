@@ -22,7 +22,10 @@ data class SubtopicEntity(
     @PrimaryKey(autoGenerate = true) val subtopicId: Long = 0,
     val topicId: Long,
     val name: String,
-    val isCompleted: Boolean = false
+    val isCompleted: Boolean = false,
+    val learningObjectivesJson: String? = null,
+    val cachedContentJson: String? = null,
+    val cachedQuizJson: String? = null
 )
 
 

@@ -1,45 +1,44 @@
 package com.example.edu_ai.ui.screens.student
 
+import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.edu_ai.data.local.ModuleEntity
-import com.example.edu_ai.data.local.ModuleWithTopics
-import com.example.edu_ai.data.local.SubtopicEntity
-import com.example.edu_ai.data.local.TopicEntity
-import com.example.edu_ai.data.local.TopicWithSubtopics
-import com.example.edu_ai.data.local.UnitEntity
 import com.example.edu_ai.data.local.UnitWithModules
 import com.example.edu_ai.data.local.UserEntity
 import com.example.edu_ai.data.remote.ApiTimetableSlot
 import com.example.edu_ai.ui.components.DynamicBackground
 import com.example.edu_ai.ui.components.ProgressRings
 import com.example.edu_ai.ui.components.RingProgress
-import com.example.edu_ai.ui.theme.TraceTheme
+import com.example.edu_ai.utils.TactileFeedback
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,23 +49,24 @@ fun StudentDashboard(
     onOpenLibrary: () -> Unit,
     onLaunchUnit: (Long) -> Unit,
     onOpenBookmarks: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     viewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
-    // Use the userId directly if user entity is not yet loaded in DAO
-    val user = uiState.user ?: UserEntity(id = userId, username = "Student", role = "student", sensoryMode = "Visual", semesterStatus = "Active", aiPersona = "Helper")
+    val user = uiState.user ?: UserEntity(id = userId, username = "Student", role = "student", sensoryMode = "Visual", semesterStatus = "Year 4 - Medical Candidate", aiPersona = "Socratic Mentor")
 
-    val progressViewModel: ProgressViewModel = viewModel(factory = ProgressViewModel.provideFactory(user))
+    val progressViewModel: ProgressViewModel = viewModel(key = "progress_$userId", factory = ProgressViewModel.provideFactory(user))
     val recommendation by progressViewModel.recommendation.collectAsState()
+    val progressUiState by progressViewModel.uiState.collectAsState()
     
-    val timetableViewModel: TimetableViewModel = viewModel(key = "timetable_${user.id}", factory = TimetableViewModel.provideFactory(user))
+    val timetableViewModel: TimetableViewModel = viewModel(key = "timetable_$userId", factory = TimetableViewModel.provideFactory(user))
     val timetableUiState by timetableViewModel.uiState.collectAsState()
 
-    val chatViewModel: ChatViewModel = viewModel(key = "chat_${user.id}", factory = ChatViewModel.provideFactory(user))
-    val quizViewModel: QuizViewModel = viewModel(key = "quiz_${user.id}", factory = QuizViewModel.provideFactory(user))
+    val chatViewModel: ChatViewModel = viewModel(key = "chat_$userId", factory = ChatViewModel.provideFactory(user))
+    val quizViewModel: QuizViewModel = viewModel(key = "quiz_$userId", factory = QuizViewModel.provideFactory(user))
 
     LaunchedEffect(userId) {
         viewModel.refreshDashboard(userId)
@@ -75,6 +75,7 @@ fun StudentDashboard(
 
     var currentTab by remember { mutableStateOf("dashboard") }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    var isRightDrawerOpen by remember { mutableStateOf(false) }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -83,7 +84,6 @@ fun StudentDashboard(
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
                 modifier = Modifier.width(300.dp)
             ) {
-                // Header block mirroring web app theme
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -130,13 +130,12 @@ fun StudentDashboard(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Unified Navigation Menu items mirroring web app sidebar
                 NavigationDrawerItem(
                     label = { Text("Home Dashboard", fontWeight = FontWeight.Bold) },
                     selected = currentTab == "dashboard",
                     onClick = {
                         scope.launch { drawerState.close() }
-                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                        TactileFeedback.triggerSubtleClick(context)
                         currentTab = "dashboard"
                     },
                     icon = { Icon(Icons.Default.Home, contentDescription = null) },
@@ -148,10 +147,10 @@ fun StudentDashboard(
                     selected = currentTab == "socratic",
                     onClick = {
                         scope.launch { drawerState.close() }
-                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                        TactileFeedback.triggerSubtleClick(context)
                         currentTab = "socratic"
                     },
-                    icon = { Icon(Icons.Default.MenuBook, contentDescription = null) },
+                    icon = { Icon(Icons.Default.Psychology, contentDescription = null) },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                 )
 
@@ -160,7 +159,7 @@ fun StudentDashboard(
                     selected = currentTab == "assessment",
                     onClick = {
                         scope.launch { drawerState.close() }
-                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                        TactileFeedback.triggerSubtleClick(context)
                         currentTab = "assessment"
                     },
                     icon = { Icon(Icons.Default.School, contentDescription = null) },
@@ -172,7 +171,7 @@ fun StudentDashboard(
                     selected = currentTab == "connect",
                     onClick = {
                         scope.launch { drawerState.close() }
-                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                        TactileFeedback.triggerSubtleClick(context)
                         currentTab = "connect"
                     },
                     icon = { Icon(Icons.Default.Group, contentDescription = null) },
@@ -184,7 +183,7 @@ fun StudentDashboard(
                     selected = currentTab == "timetable",
                     onClick = {
                         scope.launch { drawerState.close() }
-                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                        TactileFeedback.triggerSubtleClick(context)
                         currentTab = "timetable"
                     },
                     icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
@@ -196,10 +195,10 @@ fun StudentDashboard(
                     selected = false,
                     onClick = {
                         scope.launch { drawerState.close() }
-                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                        TactileFeedback.triggerSubtleClick(context)
                         onOpenLibrary()
                     },
-                    icon = { Icon(Icons.Default.MenuBook, contentDescription = null) },
+                    icon = { Icon(Icons.Default.LibraryAdd, contentDescription = null) },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                 )
 
@@ -208,10 +207,22 @@ fun StudentDashboard(
                     selected = false,
                     onClick = {
                         scope.launch { drawerState.close() }
-                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                        TactileFeedback.triggerSubtleClick(context)
                         onOpenBookmarks()
                     },
                     icon = { Icon(Icons.Default.Bookmark, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
+                )
+
+                NavigationDrawerItem(
+                    label = { Text("Settings & Version", fontWeight = FontWeight.Bold) },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        TactileFeedback.triggerSubtleClick(context)
+                        onOpenSettings()
+                    },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                 )
 
@@ -222,7 +233,7 @@ fun StudentDashboard(
                     selected = false,
                     onClick = {
                         scope.launch { drawerState.close() }
-                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                        TactileFeedback.triggerSubtleClick(context)
                         onLogout()
                     },
                     icon = { Icon(Icons.Default.ExitToApp, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
@@ -231,7 +242,20 @@ fun StudentDashboard(
             }
         }
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures { change, dragAmount ->
+                        change.consume()
+                        if (dragAmount < -18) { // Swiping Left -> Opens Loaded Units panel
+                            isRightDrawerOpen = true
+                        } else if (dragAmount > 18) { // Swiping Right -> Closes Loaded Units panel
+                            isRightDrawerOpen = false
+                        }
+                    }
+                }
+        ) {
             DynamicBackground()
 
             Scaffold(
@@ -243,11 +267,11 @@ fun StudentDashboard(
                                 Text("Trace Portal", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
                                 Text(
                                     text = when (currentTab) {
-                                        "socratic" -> "Socratic Consultation"
-                                        "assessment" -> "Knowledge Retrieval"
-                                        "connect" -> "Study Network"
-                                        "timetable" -> "Dynamic Study Schedule"
-                                        else -> "Student Dashboard"
+                                        "socratic" -> "Socratic Clinical Assistant"
+                                        "assessment" -> "Knowledge Retrieval Center"
+                                        "connect" -> "Peer Network & Chats"
+                                        "timetable" -> "Personalized Study Schedule"
+                                        else -> "Student Command Center"
                                     },
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary
@@ -264,9 +288,12 @@ fun StudentDashboard(
                                 IconButton(onClick = onOpenBookmarks) {
                                     Icon(Icons.Default.Bookmark, contentDescription = "Saved Bookmarks", tint = MaterialTheme.colorScheme.primary)
                                 }
-                                IconButton(onClick = onLogout) {
-                                    Icon(Icons.Default.ExitToApp, contentDescription = "Sign Out")
+                                IconButton(onClick = onOpenLibrary) {
+                                    Icon(Icons.Default.AddCircleOutline, contentDescription = "Add Unit", tint = MaterialTheme.colorScheme.primary)
                                 }
+                            }
+                            IconButton(onClick = onOpenSettings) {
+                                Icon(Icons.Default.Settings, contentDescription = "Settings & Updates", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -287,11 +314,14 @@ fun StudentDashboard(
                                 uiState = uiState,
                                 recommendation = recommendation,
                                 timetableUiState = timetableUiState,
-                                onLogout = onLogout,
-                                onLaunchModule = onLaunchModule,
+                                quizHistory = progressUiState.quizHistory,
+                                onNavigateToTab = { tabName ->
+                                    TactileFeedback.triggerSubtleClick(context)
+                                    currentTab = tabName
+                                },
                                 onOpenLibrary = onOpenLibrary,
                                 onLaunchUnit = onLaunchUnit,
-                                onOpenBookmarks = onOpenBookmarks
+                                onLaunchModule = onLaunchModule
                             )
                         }
                         "socratic" -> {
@@ -312,7 +342,8 @@ fun StudentDashboard(
                                 user = user,
                                 viewModel = viewModel,
                                 onNavigateToLearn = { subtopicId ->
-                                    onLaunchUnit(1L) // Redirect to unit outline
+                                    val firstUnitId = uiState.unitsWithModules.firstOrNull()?.unit?.localId ?: 1L
+                                    onLaunchUnit(firstUnitId)
                                 }
                             )
                         }
@@ -322,32 +353,257 @@ fun StudentDashboard(
                     }
                 }
             }
+
+            // Right Drawer Panel (Loaded Units overlay on Swipe Left)
+            if (isRightDrawerOpen) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .clickable { isRightDrawerOpen = false }
+                        .zIndex(9f)
+                )
+            }
+
+            AnimatedVisibility(
+                visible = isRightDrawerOpen,
+                enter = slideInHorizontally(initialOffsetX = { it }),
+                exit = slideOutHorizontally(targetOffsetX = { it }),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .width(300.dp)
+                    .zIndex(10f)
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                    tonalElevation = 8.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                ) {
+                    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Loaded Units",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            IconButton(onClick = { isRightDrawerOpen = false }) {
+                                Icon(Icons.Default.Close, contentDescription = "Close")
+                            }
+                        }
+                        Text(
+                            text = "Quickly switch syllabus outline context below:",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.padding(bottom = 14.dp)
+                        )
+                        
+                        if (uiState.unitsWithModules.isEmpty()) {
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Text("No units loaded yet.", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(uiState.unitsWithModules) { unitWithModules ->
+                                    val unit = unitWithModules.unit
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                isRightDrawerOpen = false
+                                                onLaunchUnit(unit.localId)
+                                            },
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Text(unit.unitName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                            Text(
+                                                text = "${unitWithModules.modules.size} Modules loaded",
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Button(
+                            onClick = {
+                                isRightDrawerOpen = false
+                                onOpenLibrary()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("ADD NEW UNIT")
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudentDashboardContent(
     user: UserEntity,
     uiState: StudentUiState,
     recommendation: String,
     timetableUiState: TimetableUiState,
-    onLogout: () -> Unit,
-    onLaunchModule: () -> Unit,
+    quizHistory: List<com.example.edu_ai.data.local.QuizHistoryEntity>,
+    onNavigateToTab: (String) -> Unit,
     onOpenLibrary: () -> Unit,
     onLaunchUnit: (Long) -> Unit,
-    onOpenBookmarks: () -> Unit
+    onLaunchModule: () -> Unit
 ) {
+    val context = LocalContext.current
+    val currentDay = remember {
+        SimpleDateFormat("EEEE", Locale.getDefault()).format(Date())
+    }
+    val currentDateStr = remember {
+        SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).format(Date())
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        item { Spacer(modifier = Modifier.height(8.dp)) }
+        item { Spacer(modifier = Modifier.height(4.dp)) }
 
-        // Welcome Section
+        // =================================================================
+        // 1. "HI, {USER}!" - AT THE VERY TOP
+        // =================================================================
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Hi, ${user.username}!",
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = (-1).sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = user.semesterStatus,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "• $currentDay",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+
+                FilledTonalButton(
+                    onClick = onOpenLibrary,
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("ADD UNIT", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // =================================================================
+        // 2. ZENITH INSIGHT RECOMMENDATION (AI Personalized Strategy)
+        // =================================================================
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+                ),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("ZENITH AI INSIGHT", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                        }
+                        Text("Live Guidance", fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        recommendation,
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineHeight = 20.sp,
+                        fontSize = 13.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(
+                            onClick = { onNavigateToTab("socratic") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Icon(Icons.Default.Psychology, contentDescription = null, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Ask Socratic Assistant", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        // =================================================================
+        // 3. TODAY'S INTERACTIVE ACTIVITY HUB (Revamped with Direct Links)
+        // =================================================================
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -355,61 +611,86 @@ fun StudentDashboardContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(
-                        text = "Hi, ${user.username}!",
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = (-1).sp
-                    )
-                    Text(
-                        text = user.semesterStatus,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-                
-                FilledTonalButton(
-                    onClick = onOpenLibrary,
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("ADD UNIT")
-                }
-            }
-        }
-
-        // Zenith Insight (Prominent)
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                ),
-                shape = MaterialTheme.shapes.extraLarge
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.AutoAwesome, 
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text("ZENITH INSIGHT", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Today's Tactical Hub", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        recommendation,
-                        style = MaterialTheme.typography.bodyLarge,
-                        lineHeight = 22.sp
-                    )
+                    Text(currentDateStr, fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+                }
+
+                TextButton(onClick = { onNavigateToTab("timetable") }) {
+                    Text("Full Plan", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(12.dp))
                 }
             }
         }
 
+        val todaysSlots = timetableUiState.weeklyPlan.filter { it.day.equals(currentDay, ignoreCase = true) }
+
+        if (todaysSlots.isEmpty()) {
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(32.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "No active sessions remaining for today. Rest & recharge for tomorrow!", 
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            fontSize = 12.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(onClick = { onNavigateToTab("assessment") }, shape = RoundedCornerShape(8.dp)) {
+                            Text("Take Bonus Quiz", fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        } else {
+            items(todaysSlots) { slot ->
+                InteractiveTodaySlotCard(
+                    slot = slot,
+                    onLaunch = { targetTab, targetUnit ->
+                        TactileFeedback.triggerSubtleClick(context)
+                        if (targetTab == "learn" && targetUnit != null) {
+                            val matchedUnit = uiState.unitsWithModules.find { it.unit.unitName.contains(targetUnit, ignoreCase = true) }
+                            if (matchedUnit != null) {
+                                onLaunchUnit(matchedUnit.unit.localId)
+                            } else {
+                                onNavigateToTab("assessment")
+                            }
+                        } else {
+                            onNavigateToTab(targetTab)
+                        }
+                    }
+                )
+            }
+        }
+
+        // =================================================================
+        // 4. LEARNING "PROGRESS" - CONCENTRIC RINGS & ACTIVE UNITS
+        // =================================================================
         item {
-            Text("Current Progress", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Curriculum Progress", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+                }
+                Text("${uiState.unitsWithModules.size} Active Units", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
+            }
         }
 
         if (uiState.unitsWithModules.isEmpty() && !uiState.isLoading) {
@@ -417,28 +698,29 @@ fun StudentDashboardContent(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    shape = MaterialTheme.shapes.medium
+                    shape = RoundedCornerShape(14.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            "No course data available yet.", 
+                            "No curriculum units active on your profile yet.", 
                             style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            fontSize = 12.sp
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = onLaunchModule) {
-                            Text("EXPLORE COURSES")
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(onClick = onOpenLibrary, shape = RoundedCornerShape(10.dp)) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("ADD FROM 21+ BACKEND UNITS", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
         }
 
-        // Hierarchical Progress Cards
+        // Concentric Rings Unit Cards
         items(uiState.unitsWithModules) { unitWithModules ->
             val unit = unitWithModules.unit
-            
-            // Calculate hierarchical progress
             val allTopics = unitWithModules.modules.flatMap { it.topics }
             val allSubtopics = allTopics.flatMap { it.subtopics }
             
@@ -446,114 +728,183 @@ fun StudentDashboardContent(
                 (allSubtopics.count { it.isCompleted }.toFloat() / allSubtopics.size) * 100f
             } else 0f
 
-            // Example: Current Module (First one)
-            val currentModule = unitWithModules.modules.firstOrNull()
-            val currentModuleSubtopics = currentModule?.topics?.flatMap { it.subtopics } ?: emptyList()
-            
-            val moduleProgress = if (currentModuleSubtopics.isNotEmpty()) {
-                (currentModuleSubtopics.count { it.isCompleted }.toFloat() / currentModuleSubtopics.size) * 100f
+            val completedQuizSubtopicsCount = allSubtopics.count { sub ->
+                quizHistory.any { q -> q.unitName.equals(sub.name, ignoreCase = true) }
+            }
+            val quizProgress = if (allSubtopics.isNotEmpty()) {
+                (completedQuizSubtopicsCount.toFloat() / allSubtopics.size) * 100f
             } else 0f
 
-            // Objectives for the center
-            val objectives = if (currentModuleSubtopics.isNotEmpty()) {
-                currentModuleSubtopics.map { it.name }
-            } else listOf("Explore Unit")
+            val currentModule = unitWithModules.modules.firstOrNull()
 
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onLaunchUnit(unit.localId) },
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)),
-                shape = MaterialTheme.shapes.large
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val rings = listOf(
-                        RingProgress(unitProgress, MaterialTheme.colorScheme.primary, "Unit"),
-                        RingProgress(moduleProgress, MaterialTheme.colorScheme.secondary, "Module"),
-                        RingProgress(30f, MaterialTheme.colorScheme.tertiary, "Subtopic") // Mock sub-module progress
+                        RingProgress(unitProgress, MaterialTheme.colorScheme.primary, "Learnt"),
+                        RingProgress(quizProgress, MaterialTheme.colorScheme.secondary, "Quiz")
                     )
                     
                     ProgressRings(
                         rings = rings,
-                        learningObjectives = objectives,
-                        modifier = Modifier.size(140.dp)
+                        learntProgress = unitProgress,
+                        quizProgress = quizProgress,
+                        modifier = Modifier.size(125.dp)
                     )
                     
-                    Spacer(modifier = Modifier.width(20.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
                     
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             unit.unitName, 
                             fontWeight = FontWeight.ExtraBold, 
-                            fontSize = 22.sp,
-                            lineHeight = 26.sp
+                            fontSize = 17.sp,
+                            lineHeight = 21.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            currentModule?.module?.name ?: "No Active Module", 
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            currentModule?.module?.name ?: "Active Syllabus Module", 
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.outline,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Button(
                             onClick = { onLaunchUnit(unit.localId) },
-                            shape = MaterialTheme.shapes.medium,
-                            modifier = Modifier.fillMaxWidth()
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().height(36.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                         ) {
-                            Text("CONTINUE")
+                            Text("CONTINUE SYLLABUS", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
-                    }
-                }
-            }
-        }
-
-        // Timetable Preview
-        item {
-            Text("Today's Schedule", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        }
-
-        val today = java.text.SimpleDateFormat("EEEE", java.util.Locale.getDefault()).format(java.util.Date())
-        val todaysSlots = timetableUiState.weeklyPlan.filter { it.day.equals(today, ignoreCase = true) }
-
-        if (todaysSlots.isEmpty()) {
-            item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Text(
-                        "No sessions scheduled for today. Rest up!", 
-                        modifier = Modifier.padding(16.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        } else {
-            items(todaysSlots) { slot ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp), 
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(slot.time, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                            Text(slot.activity, style = MaterialTheme.typography.bodyLarge)
-                        }
-                        SuggestionChip(
-                            onClick = {},
-                            label = { Text(slot.type) }
-                        )
                     }
                 }
             }
         }
         
-        item { Spacer(modifier = Modifier.height(40.dp)) }
+        item { Spacer(modifier = Modifier.height(32.dp)) }
     }
 }
+
+/**
+ * Appealing, interactive Today Activity Card that acts as a direct link to features around the app!
+ */
+@Composable
+fun InteractiveTodaySlotCard(
+    slot: ApiTimetableSlot,
+    onLaunch: (tabName: String, unitName: String?) -> Unit
+) {
+    val activityLower = slot.activity.lowercase()
+    val typeLower = slot.type.lowercase()
+
+    val (actionLabel, targetTab, accentColor, icon) = when {
+        activityLower.contains("quiz") || activityLower.contains("assessment") || typeLower.contains("assessment") -> {
+            Quadruple("TAKE QUIZ", "assessment", Color(0xFF10B981), Icons.Default.School)
+        }
+        activityLower.contains("socratic") || activityLower.contains("assistant") || activityLower.contains("consultation") -> {
+            Quadruple("START CHAT", "socratic", Color(0xFF00E5FF), Icons.Default.Psychology)
+        }
+        activityLower.contains("peer") || activityLower.contains("connect") || activityLower.contains("review") -> {
+            Quadruple("CONNECT", "connect", Color(0xFF6366F1), Icons.Default.Group)
+        }
+        activityLower.contains("break") || typeLower.contains("break") -> {
+            Quadruple("REST", "timetable", Color(0xFFF59E0B), Icons.Default.Coffee)
+        }
+        else -> {
+            Quadruple("STUDY UNIT", "learn", MaterialTheme.colorScheme.primary, Icons.Default.MenuBook)
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onLaunch(targetTab, slot.unit) },
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+        ),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f))
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = accentColor.copy(alpha = 0.15f),
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = slot.time,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = accentColor,
+                        fontSize = 11.sp
+                    )
+                    slot.unit?.let { unitName ->
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "• $unitName",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.outline,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = slot.activity,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            FilledTonalButton(
+                onClick = { onLaunch(targetTab, slot.unit) },
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                modifier = Modifier.height(32.dp),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = accentColor.copy(alpha = 0.15f),
+                    contentColor = accentColor
+                )
+            ) {
+                Text(actionLabel, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(12.dp))
+            }
+        }
+    }
+}
+
+data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)

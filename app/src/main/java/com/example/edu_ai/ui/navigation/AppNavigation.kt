@@ -25,6 +25,11 @@ import com.example.edu_ai.ui.screens.teacher.TeacherViewModel
 import com.example.edu_ai.ui.screens.teacher.TeacherViewModelFactory
 import com.example.edu_ai.ui.screens.parent.ParentDashboard
 import com.example.edu_ai.ui.screens.admin.AdminDashboardScreen
+import com.example.edu_ai.ui.screens.settings.MandatoryUpdateLockdownScreen
+import com.example.edu_ai.ui.screens.settings.SettingsScreen
+import com.example.edu_ai.utils.UpdateManager
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
@@ -37,7 +42,10 @@ fun AppNavigation() {
     val dao = app.database.dao()
     val scope = rememberCoroutineScope()
 
+    val mandatoryRequired by UpdateManager.mandatoryUpdateRequired.collectAsState()
+
     LaunchedEffect(Unit) {
+        UpdateManager.startPeriodicCheck(scope, repository)
         val user = dao.getUser().firstOrNull()
         if (user != null) {
             val destination = when (user.role) {
@@ -52,9 +60,12 @@ fun AppNavigation() {
         }
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = "login",
+    if (mandatoryRequired) {
+        MandatoryUpdateLockdownScreen(repository = repository)
+    } else {
+        NavHost(
+            navController = navController,
+            startDestination = "login",
         enterTransition = {
             slideIntoContainer(
                 AnimatedContentTransitionScope.SlideDirection.Left,
@@ -123,6 +134,9 @@ fun AppNavigation() {
                 },
                 onOpenBookmarks = {
                     navController.navigate("bookmarks_screen/$userId")
+                },
+                onOpenSettings = {
+                    navController.navigate("settings_screen/$userId")
                 }
             )
         }
@@ -263,6 +277,7 @@ fun AppNavigation() {
 
         composable("admin_dashboard") {
             AdminDashboardScreen(
+                repository = repository,
                 onLogout = {
                     scope.launch {
                         repository.logout(context)
@@ -273,7 +288,20 @@ fun AppNavigation() {
                 }
             )
         }
+
+        composable(
+            route = "settings_screen/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            SettingsScreen(
+                userId = userId,
+                repository = repository,
+                onBack = { navController.popBackStack() }
+            )
+        }
     }
+}
 }
 
 

@@ -77,8 +77,45 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db)):
         "semester_status": user.semester_status
     }
 
-    rec_text = ai_service.get_recommendations(user_info, quiz_history, active_units)
+    # Extract database syllabus progress
+    progress_records = db.query(models.UserSyllabusProgress).filter(models.UserSyllabusProgress.user_id == user.id).all()
+    completed_nodes = [p.node_id for p in progress_records if p.status == "Completed"]
+    
+    # Calculate weak and mastered topics from quiz history
+    weak = [q.unit_name for q in quiz_history if q.pnl < 70]
+    mastered = [q.unit_name for q in quiz_history if q.pnl >= 80]
+    
+    db_context = schemas.StudyContextPayload(
+        mastered_topics=list(set(mastered)),
+        weak_topics=list(set(weak)),
+        total_quizzes_taken=len(quiz_history),
+        average_quiz_score=round(sum([q.pnl for q in quiz_history]) / len(quiz_history), 1) if quiz_history else None
+    )
+
+    rec_text = ai_service.get_recommendations(user_info, quiz_history, active_units, study_context=db_context)
     return schemas.RecommendationResponse(recommendation=rec_text or "Keep going!")
+
+@router.post("/recommendations/{user_id}", response_model=schemas.RecommendationResponse)
+def get_personalized_recommendations(
+    user_id: str,
+    payload: Optional[schemas.StudyContextPayload] = None,
+    db: Session = Depends(get_db)
+):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    quiz_history = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
+    active_units = [u.name for u in user.units if u.is_active]
+
+    user_info = {
+        "username": user.username,
+        "ai_persona": user.ai_persona,
+        "semester_status": user.semester_status
+    }
+
+    rec_text = ai_service.get_recommendations(user_info, quiz_history, active_units, study_context=payload)
+    return schemas.RecommendationResponse(recommendation=rec_text or "Keep pushing your boundaries!")
 
 
  

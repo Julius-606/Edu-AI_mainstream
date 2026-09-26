@@ -1,6 +1,8 @@
 package com.example.edu_ai.ui.screens.admin
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,14 +19,23 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.edu_ai.EduAIApplication
+import com.example.edu_ai.data.remote.ApiAppRelease
+import com.example.edu_ai.data.remote.CreateReleaseRequest
+import com.example.edu_ai.repository.EduAIRepository
 import com.example.edu_ai.utils.PreferenceManager
+import com.example.edu_ai.utils.UpdateManager
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminDashboardScreen(
+    repository: EduAIRepository? = null,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
+    val effectiveRepo = repository ?: (context.applicationContext as EduAIApplication).repository
+    val scope = rememberCoroutineScope()
     var activeBackendMode by remember { mutableStateOf(PreferenceManager.getBackendMode(context)) }
     var aiPersona by remember { mutableStateOf("Socratic Tutor") }
     var temperature by remember { mutableStateOf(0.7f) }
@@ -289,6 +300,299 @@ fun AdminDashboardScreen(
                                                         }
                                                     }
                                                 }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // System Releases Archive & Mandatory Upgrade Trigger Administration
+            item {
+                val releases by UpdateManager.releases.collectAsState()
+                val isCheckingReleases by UpdateManager.isChecking.collectAsState()
+                var isArchiveExpanded by remember { mutableStateOf(true) }
+                var showNewReleaseDialog by remember { mutableStateOf(false) }
+
+                var newVersion by remember { mutableStateOf("1.1.0") }
+                var newVersionCode by remember { mutableStateOf("2") }
+                var newDownloadUrl by remember { mutableStateOf("https://github.com/Agent606/Edu-AI/releases/tag/v1.1.0") }
+                var newReleaseNotes by remember { mutableStateOf("Critical security update and updated Socratic Clinical reasoning models.") }
+                var newIsMandatory by remember { mutableStateOf(false) }
+                var newFileSize by remember { mutableStateOf("14.8 MB") }
+                var isSubmittingRelease by remember { mutableStateOf(false) }
+
+                val isAnyMandatoryActive = releases.any { it.isMandatory }
+
+                LaunchedEffect(Unit) {
+                    UpdateManager.checkForUpdates(effectiveRepo)
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isAnyMandatoryActive) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isArchiveExpanded = !isArchiveExpanded },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isAnyMandatoryActive) Icons.Default.SecurityUpdateWarning else Icons.Default.Inventory2,
+                                    contentDescription = null,
+                                    tint = if (isAnyMandatoryActive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text("App Releases & Archive Authority", fontWeight = FontWeight.Bold)
+                                    Text(
+                                        if (isAnyMandatoryActive) "🚨 MANDATORY LOCKDOWN ENFORCED" else "Normal Distribution (${releases.size} releases)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isAnyMandatoryActive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                            }
+                            Icon(
+                                imageVector = if (isArchiveExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = "Toggle"
+                            )
+                        }
+
+                        AnimatedVisibility(visible = isArchiveExpanded) {
+                            Column(modifier = Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(
+                                    "When the admin marks a release as MANDATORY, active users on older versions are immediately blocked from the app until they download the new version.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                // Action Row: Refresh + Archive New Release Button
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            scope.launch {
+                                                UpdateManager.checkForUpdates(effectiveRepo)
+                                                statusMessage = "Archive synchronized with cloud server."
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        enabled = !isCheckingReleases
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Sync Archive", fontSize = 12.sp)
+                                    }
+
+                                    Button(
+                                        onClick = { showNewReleaseDialog = !showNewReleaseDialog },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(if (showNewReleaseDialog) "Cancel" else "+ New Release", fontSize = 12.sp)
+                                    }
+                                }
+
+                                // New Release Form
+                                if (showNewReleaseDialog) {
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Text("Archive New Application Release", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                OutlinedTextField(
+                                                    value = newVersion,
+                                                    onValueChange = { newVersion = it },
+                                                    label = { Text("Version (e.g. 1.1.0)", fontSize = 11.sp) },
+                                                    modifier = Modifier.weight(1f),
+                                                    singleLine = true
+                                                )
+                                                OutlinedTextField(
+                                                    value = newVersionCode,
+                                                    onValueChange = { newVersionCode = it },
+                                                    label = { Text("Version Code", fontSize = 11.sp) },
+                                                    modifier = Modifier.weight(1f),
+                                                    singleLine = true
+                                                )
+                                            }
+
+                                            OutlinedTextField(
+                                                value = newDownloadUrl,
+                                                onValueChange = { newDownloadUrl = it },
+                                                label = { Text("Download URL (APK Link)", fontSize = 11.sp) },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                singleLine = true
+                                            )
+
+                                            OutlinedTextField(
+                                                value = newReleaseNotes,
+                                                onValueChange = { newReleaseNotes = it },
+                                                label = { Text("Release Notes & Changelog", fontSize = 11.sp) },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                minLines = 2
+                                            )
+
+                                            // Mandatory Trigger Checkbox
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = if (newIsMandatory) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.background,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable { newIsMandatory = !newIsMandatory }
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(10.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Checkbox(
+                                                        checked = newIsMandatory,
+                                                        onCheckedChange = { newIsMandatory = it }
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Column {
+                                                        Text(
+                                                            "🚨 Enforce as Mandatory Upgrade",
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 12.sp,
+                                                            color = if (newIsMandatory) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                        Text(
+                                                            "Active users must update to this release before they can access the app.",
+                                                            fontSize = 10.sp,
+                                                            color = MaterialTheme.colorScheme.outline
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            Button(
+                                                onClick = {
+                                                    scope.launch {
+                                                        isSubmittingRelease = true
+                                                        try {
+                                                            val vCode = newVersionCode.toIntOrNull() ?: 2
+                                                            effectiveRepo.createRelease(
+                                                                CreateReleaseRequest(
+                                                                    version = newVersion.trim(),
+                                                                    versionCode = vCode,
+                                                                    downloadUrl = newDownloadUrl.trim(),
+                                                                    releaseNotes = newReleaseNotes.trim(),
+                                                                    isMandatory = newIsMandatory,
+                                                                    fileSize = newFileSize.trim(),
+                                                                    isCurrent = true
+                                                                )
+                                                            )
+                                                            statusMessage = "Published v$newVersion to archive! Mandatory trigger: $newIsMandatory"
+                                                            showNewReleaseDialog = false
+                                                            UpdateManager.checkForUpdates(effectiveRepo)
+                                                        } catch (e: Exception) {
+                                                            statusMessage = "Archive publish failed: ${e.message}"
+                                                        } finally {
+                                                            isSubmittingRelease = false
+                                                        }
+                                                    }
+                                                },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                enabled = !isSubmittingRelease && newVersion.isNotBlank() && newDownloadUrl.isNotBlank()
+                                            ) {
+                                                if (isSubmittingRelease) {
+                                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                                } else {
+                                                    Text("Publish to Admin Archive")
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // List of logged releases
+                                releases.forEach { release ->
+                                    Card(
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (release.isMandatory) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text("v${release.version}", fontWeight = FontWeight.Black, fontSize = 14.sp)
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text("(Code: ${release.versionCode})", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
+                                                }
+
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = if (release.isMandatory) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondaryContainer
+                                                ) {
+                                                    Text(
+                                                        text = if (release.isMandatory) "MANDATORY LOCK" else "OPTIONAL",
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Black,
+                                                        color = if (release.isMandatory) Color.White else MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            if (!release.releaseNotes.isNullOrBlank()) {
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = release.releaseNotes,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            // Toggle Mandatory Lock Trigger Button
+                                            Button(
+                                                onClick = {
+                                                    scope.launch {
+                                                        try {
+                                                            effectiveRepo.toggleMandatoryRelease(release.id)
+                                                            UpdateManager.checkForUpdates(effectiveRepo)
+                                                            statusMessage = "Toggled mandatory upgrade trigger for v${release.version}"
+                                                        } catch (e: Exception) {
+                                                            statusMessage = "Toggle failed: ${e.message}"
+                                                        }
+                                                    }
+                                                },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                colors = if (release.isMandatory) {
+                                                    ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                } else {
+                                                    ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                                },
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (release.isMandatory) "Deactivate Mandatory Lock" else "🚨 Enforce Mandatory Upgrade",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
                                             }
                                         }
                                     }

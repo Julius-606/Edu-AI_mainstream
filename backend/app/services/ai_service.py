@@ -175,10 +175,12 @@ class AiService:
                     continue
         return None
 
-    def generate_timetable(self, user_info, quiz_history, active_units, recent_chat_titles, previous_timetable=None):
+    def generate_timetable(self, user_info, quiz_history, active_units, recent_chat_titles, previous_timetable=None, study_context=None):
         performance_summary = ""
         for q in quiz_history:
-            performance_summary += f"- {q.unit_name}: {q.pnl}% score\n"
+            score_val = getattr(q, 'pnl', None) or getattr(q, 'score', 0)
+            unit_name = getattr(q, 'unit_name', 'General')
+            performance_summary += f"- {unit_name}: {score_val}% score\n"
 
         chat_context = ", ".join(recent_chat_titles)
 
@@ -186,12 +188,34 @@ class AiService:
         if previous_timetable:
             timetable_continuity = f"Previous Timetable Context:\n{json.dumps(previous_timetable)}\n"
 
+        detailed_context = ""
+        if study_context:
+            sc_dict = study_context if isinstance(study_context, dict) else study_context.dict()
+            weak = sc_dict.get("weak_topics", [])
+            mastered = sc_dict.get("mastered_topics", [])
+            pending = sc_dict.get("pending_subtopic_names", [])
+            completed = sc_dict.get("completed_subtopic_names", [])
+            avg_score = sc_dict.get("average_quiz_score")
+            overall_progress = sc_dict.get("overall_progress_percentage")
+
+            detailed_context = f"""
+            REAL-TIME STUDENT LEARNING & PERFORMANCE METRICS:
+            - Overall Syllabus Completion: {overall_progress if overall_progress is not None else 'N/A'}%
+            - Average Assessment Score: {avg_score if avg_score is not None else 'N/A'}%
+            - Critical Weak Areas (Assessment accuracy < 70%): {', '.join(weak) if weak else 'None detected yet'}
+            - Mastered High-Yield Concepts (Assessment accuracy >= 80%): {', '.join(mastered) if mastered else 'Building mastery'}
+            - High-Priority Pending Subtopics: {', '.join(pending[:6]) if pending else 'Follow core syllabus'}
+            - Recently Completed Subtopics: {', '.join(completed[:4]) if completed else 'None'}
+            """
+
         prompt = f"""
-        Generate a dynamic weekly study timetable for {user_info['username']}.
+        Generate a dynamic, hyper-personalized weekly study timetable for {user_info['username']}.
         Current Level: {user_info['semester_status']}
         Active Units: {', '.join(active_units)}
 
-        Performance Context:
+        {detailed_context}
+
+        Performance History:
         {performance_summary if performance_summary else "No assessments taken yet."}
 
         Recent Consultation Topics:
@@ -199,13 +223,24 @@ class AiService:
 
         {timetable_continuity}
 
+        CRITICAL REQUIREMENT:
+        You MUST generate exactly 3 to 4 sequential study slots/activities per day for EACH day of the week (Monday through Sunday).
+        Directly align the slots with the student's real-time metrics:
+        1. Schedule morning 'Deep Study' sessions targeting their pending subtopics or foundational concepts.
+        2. Schedule afternoon 'Diagnostic Assessment' and 'Targeted Revision' sessions specifically addressing their WEAK topics to convert weaknesses into exam-ready strengths.
+        3. Include scheduled mental calibration and synthesis breaks.
+        Do NOT just output one task per day. Fill the schedule of each day with 3-4 items.
+
         Format:
         {{
           "weekly_plan": [
-            {{ "day": "Monday", "time": "09:00 - 10:30", "activity": "Intensive Study: [Unit]", "unit": "[Unit]", "type": "Study" }},
+            {{ "day": "Monday", "time": "08:30 - 10:30", "activity": "Deep Study: Core Pathophysiology", "unit": "Biochemistry II", "type": "Study" }},
+            {{ "day": "Monday", "time": "11:00 - 12:00", "activity": "Targeted Assessment: Diagnostic Traps", "unit": "General Surgery", "type": "Assessment" }},
+            {{ "day": "Monday", "time": "12:00 - 13:00", "activity": "Socratic Mental Calibration Break", "unit": null, "type": "Break" }},
+            {{ "day": "Monday", "time": "14:30 - 16:30", "activity": "Differential Case Study & Revision", "unit": "Internal Medicine", "type": "Revision" }},
             ...
           ],
-          "ai_brief": "Rationale..."
+          "ai_brief": "A customized clinical rationale explaining how this week's plan tackles their specific weak topics and advances their pending subtopics..."
         }}
         """
 
@@ -220,20 +255,49 @@ class AiService:
                 logger.error("Failed to parse timetable JSON")
         return None
 
-    def get_recommendations(self, user_info, quiz_history, active_units):
+    def get_recommendations(self, user_info, quiz_history, active_units, study_context=None):
         history_summary = ""
         for q in quiz_history:
-            history_summary += f"- {q.unit_name}: {q.pnl}% score\n"
+            score_val = getattr(q, 'pnl', None) or getattr(q, 'score', 0)
+            unit_name = getattr(q, 'unit_name', 'General')
+            history_summary += f"- {unit_name}: {score_val}% score\n"
+
+        detailed_context = ""
+        if study_context:
+            sc_dict = study_context if isinstance(study_context, dict) else study_context.dict()
+            weak = sc_dict.get("weak_topics", [])
+            mastered = sc_dict.get("mastered_topics", [])
+            pending = sc_dict.get("pending_subtopic_names", [])
+            completed = sc_dict.get("completed_subtopic_names", [])
+            avg_score = sc_dict.get("average_quiz_score")
+            overall_progress = sc_dict.get("overall_progress_percentage")
+
+            detailed_context = f"""
+            REAL-TIME LEARNING & QUIZ PERFORMANCE METRICS:
+            - Syllabus Progress: {overall_progress if overall_progress is not None else 'N/A'}%
+            - Mean Assessment Score: {avg_score if avg_score is not None else 'N/A'}%
+            - Verified Mastered Topics: {', '.join(mastered) if mastered else 'Consolidating knowledge'}
+            - Critical Weak Areas (Quiz Score < 70%): {', '.join(weak) if weak else 'No acute deficiencies'}
+            - Next Pending Subtopics to Unlock: {', '.join(pending[:4]) if pending else 'Syllabus on track'}
+            """
 
         prompt = f"""
-        Student: {user_info['username']}
-        Persona: {user_info['ai_persona']}
+        You are Zenith AI, the elite Socratic academic mentor for {user_info['username']}.
+        Persona: {user_info.get('ai_persona', 'Socratic Mentor')}
         Level: {user_info['semester_status']}
         Active Units: {', '.join(active_units)}
-        Recent Performance:
+
+        {detailed_context}
+
+        Assessment History:
         {history_summary if history_summary else "No assessments taken yet."}
 
-        Provide a concise study recommendation (max 3 sentences).
+        INSTRUCTIONS:
+        Formulate a punchy, highly motivating, and academically precise 3-sentence Zenith Insight for the student's dashboard.
+        1. Sentence 1: Acknowledge their actual learning progress or a topic they demonstrated mastery in.
+        2. Sentence 2: Directly call out their weakest area or a critical diagnostic pitfall/mechanism they must review immediately based on their quiz data.
+        3. Sentence 3: Prescribe the exact next actionable subtopic they should conquer today.
+        Avoid vague platitudes. Speak directly to their real academic data!
         """
 
         return self.ask(prompt)

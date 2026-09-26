@@ -199,10 +199,14 @@ class SystemRelease(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     version = Column(String(50))
+    version_code = Column(Integer, default=1)
     artifact_type = Column(String(100), default="Trace Mobile App")
     download_url = Column(String(500), nullable=True)
     release_notes = Column(Text, nullable=True)
     is_current = Column(Boolean, default=False)
+    is_mandatory = Column(Boolean, default=False)
+    min_supported_version_code = Column(Integer, default=1)
+    file_size = Column(String(50), default="14.8 MB")
     timestamp = Column(Float)
 
 

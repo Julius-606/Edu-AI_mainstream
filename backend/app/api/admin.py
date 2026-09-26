@@ -640,6 +640,7 @@ async def admin_releases_view(request: Request, db: Session = Depends(get_db)):
 
     releases = db.query(models.SystemRelease).order_by(desc(models.SystemRelease.id)).all()
     unread_count = db.query(models.AdminNotification).filter(models.AdminNotification.is_read == False).count()
+    mandatory_active = any(r.is_mandatory for r in releases)
 
     return templates.TemplateResponse(
         "admin/dashboard.html",
@@ -648,6 +649,7 @@ async def admin_releases_view(request: Request, db: Session = Depends(get_db)):
             "section": "archives",
             "version": BACKEND_VERSION,
             "releases": releases,
+            "mandatory_active": mandatory_active,
             "archive_files": [],
             "unread_count": unread_count
         }
@@ -656,31 +658,173 @@ async def admin_releases_view(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/admin/releases")
 async def admin_create_release(
-    version: str = Form(...),
+    request: Request,
+    version: Optional[str] = Form(None),
+    version_code: Optional[int] = Form(None),
     artifact_type: str = Form("Trace Mobile App"),
     download_url: Optional[str] = Form(None),
     release_notes: Optional[str] = Form(None),
     is_current: bool = Form(False),
+    is_mandatory: bool = Form(False),
+    file_size: str = Form("14.8 MB"),
+    min_supported_version_code: int = Form(1),
     db: Session = Depends(get_db)
 ):
+    # Support both JSON payload from Android app and Form data from Web Admin
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+            version = body.get("version", version or "1.0.0")
+            version_code = body.get("version_code", version_code or 1)
+            artifact_type = body.get("artifact_type", artifact_type)
+            download_url = body.get("download_url", download_url)
+            release_notes = body.get("release_notes", release_notes)
+            is_current = body.get("is_current", is_current)
+            is_mandatory = body.get("is_mandatory", is_mandatory)
+            file_size = body.get("file_size", file_size)
+            min_supported_version_code = body.get("min_supported_version_code", min_supported_version_code)
+        except Exception:
+            pass
+
+    if not version:
+        version = f"1.{int(time.time()) % 100}.0"
+    if not version_code:
+        version_code = int(time.time() % 10000)
+
+    # If is_current is true, set others to false
+    if is_current:
+        db.query(models.SystemRelease).update({"is_current": False})
+
     release = models.SystemRelease(
         version=version,
+        version_code=version_code,
         artifact_type=artifact_type,
         download_url=download_url,
         release_notes=release_notes,
         is_current=is_current,
+        is_mandatory=is_mandatory,
+        min_supported_version_code=min_supported_version_code if is_mandatory else 1,
+        file_size=file_size,
         timestamp=time.time()
     )
     db.add(release)
     db.commit()
+    db.refresh(release)
+
+    alert_title = f"🚨 MANDATORY UPGRADE ENFORCED: v{version}" if is_mandatory else f"New Release Archived: v{version}"
+    alert_level = "critical" if is_mandatory else "info"
     notify_admin(
         db,
         category="SYSTEM_ALERT",
-        title=f"New Release Archived: v{version}",
-        message=f"Archived {artifact_type} release v{version}.",
-        level="info"
+        title=alert_title,
+        message=f"Archived release v{version} (code {version_code}). Mandatory upgrade trigger: {'ACTIVE' if is_mandatory else 'Inactive'}.",
+        level=alert_level
     )
+
+    if "application/json" in content_type:
+        return JSONResponse({
+            "status": "success",
+            "message": "Release published to archive",
+            "release": {
+                "id": release.id,
+                "version": release.version,
+                "version_code": release.version_code,
+                "is_mandatory": release.is_mandatory,
+                "download_url": release.download_url
+            }
+        })
+
     return RedirectResponse(url="/admin/releases", status_code=303)
+
+
+@router.post("/admin/releases/{release_id}/toggle-mandatory")
+async def admin_toggle_mandatory_release(
+    release_id: int,
+    is_mandatory: Optional[bool] = None,
+    db: Session = Depends(get_db)
+):
+    release = db.query(models.SystemRelease).filter(models.SystemRelease.id == release_id).first()
+    if not release:
+        raise HTTPException(status_code=404, detail="Release not found")
+
+    if is_mandatory is not None:
+        release.is_mandatory = is_mandatory
+    else:
+        release.is_mandatory = not release.is_mandatory
+
+    if release.is_mandatory:
+        release.min_supported_version_code = release.version_code
+
+    db.commit()
+
+    notify_admin(
+        db,
+        category="SYSTEM_ALERT",
+        title=f"{'🚨 MANDATORY UPGRADE TRIGGERED' if release.is_mandatory else 'Mandatory Trigger Deactivated'}: v{release.version}",
+        message=f"Admin updated mandatory trigger for v{release.version} to {release.is_mandatory}. All active users must upgrade: {release.is_mandatory}.",
+        level="critical" if release.is_mandatory else "info"
+    )
+
+    return JSONResponse({
+        "status": "success",
+        "release_id": release.id,
+        "version": release.version,
+        "is_mandatory": release.is_mandatory,
+        "message": f"Mandatory status updated to {release.is_mandatory}"
+    })
+
+
+# --- PUBLIC & APP CLIENT RELEASES APIS ---
+
+@router.get("/api/system/releases")
+async def get_system_releases(client_version_code: int = 1, db: Session = Depends(get_db)):
+    """Returns all system releases from the admin archive, and checks mandatory upgrade status."""
+    releases = db.query(models.SystemRelease).order_by(desc(models.SystemRelease.id)).all()
+
+    # Find highest mandatory version requirement
+    mandatory_release = next((r for r in releases if r.is_mandatory), None)
+    latest_release = releases[0] if releases else None
+
+    # Mandatory update is active if there is a mandatory release with version_code > client_version_code
+    mandatory_update_active = False
+    min_supported_code = 1
+
+    if mandatory_release:
+        min_supported_code = mandatory_release.min_supported_version_code or mandatory_release.version_code or 1
+        if client_version_code < min_supported_code:
+            mandatory_update_active = True
+
+    releases_data = []
+    for r in releases:
+        releases_data.append({
+            "id": r.id,
+            "version": r.version or "1.0.0",
+            "version_code": r.version_code or 1,
+            "artifact_type": r.artifact_type or "Trace Android APK",
+            "download_url": r.download_url or "https://github.com/Agent606/Edu-AI/releases/latest",
+            "release_notes": r.release_notes or "Stability and performance updates.",
+            "is_current": r.is_current or False,
+            "is_mandatory": r.is_mandatory or False,
+            "min_supported_version_code": r.min_supported_version_code or 1,
+            "file_size": r.file_size or "14.8 MB",
+            "timestamp": int(r.timestamp * 1000) if r.timestamp else int(time.time() * 1000)
+        })
+
+    return {
+        "latest_version": latest_release.version if latest_release else "1.0.0",
+        "latest_version_code": latest_release.version_code if latest_release else 1,
+        "mandatory_update_active": mandatory_update_active,
+        "mandatory_release": {
+            "id": mandatory_release.id,
+            "version": mandatory_release.version,
+            "version_code": mandatory_release.version_code,
+            "download_url": mandatory_release.download_url,
+            "release_notes": mandatory_release.release_notes
+        } if mandatory_release else None,
+        "min_supported_version_code": min_supported_code,
+        "releases": releases_data
+    }
 
 
 # --- SUPERUSER API & NOTIFICATION SYSTEM ---

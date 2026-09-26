@@ -2,22 +2,21 @@ package com.example.edu_ai.ui.screens.student
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,10 +24,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import com.example.edu_ai.data.local.ModuleWithTopics
 import com.example.edu_ai.data.local.QuizHistoryEntity
 import com.example.edu_ai.data.local.UnitEntity
@@ -59,8 +57,9 @@ fun QuizTabWrapper(
         QuizResultScreen(
             score = uiState.score,
             total = uiState.quiz?.questions?.size ?: 0,
+            unitName = uiState.selectedTopic ?: uiState.quiz?.title ?: "Assessment",
             onReview = { viewModel.enterReviewMode() },
-            onRetake = { viewModel.startQuiz(uiState.quiz?.title ?: "") },
+            onRetake = { viewModel.startQuiz(uiState.selectedUnit ?: "", uiState.selectedTopic) },
             onTakeNew = { viewModel.resetQuizSelection() },
             onGoBack = { viewModel.resetQuizSelection() }
         )
@@ -88,22 +87,28 @@ fun UnitSelectionScreen(
         modifier = Modifier.fillMaxSize().padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Knowledge Retrieval", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-        Text("Select a unit from your syllabus to start a personalized quiz.", fontSize = 11.sp, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Knowledge Retrieval Center", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+        Text("Select a syllabus unit or subtopic. Take new assessments or review retake performance.", fontSize = 11.sp, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("AI is drafting your assessment...", style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
+                    Text("AI is synthesizing your clinical assessment...", style = MaterialTheme.typography.bodySmall, fontSize = 12.sp)
                 }
             }
         } else {
             error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, modifier = Modifier.padding(bottom = 12.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                ) {
+                    Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, modifier = Modifier.padding(10.dp))
+                }
             }
             
             LazyColumn(
@@ -114,7 +119,7 @@ fun UnitSelectionScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.School, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Active Contracts (Units)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Active Syllabus Units", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
 
@@ -126,82 +131,170 @@ fun UnitSelectionScreen(
                         onClick = { onUnitClicked(unit.unitName) },
                         colors = CardDefaults.cardColors(
                             containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                        )
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(unit.unitName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text(unit.unitName, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                Icon(
+                                    imageVector = if (isSelected) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                             
                             AnimatedVisibility(visible = isSelected) {
                                 Column {
-                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Spacer(modifier = Modifier.height(10.dp))
                                     unitWithModules.modules.forEach { moduleWithTopics ->
                                         ModuleAccordion(
+                                            unitName = unit.unitName,
                                             moduleWithTopics = moduleWithTopics,
+                                            history = history,
                                             onSubtopicClicked = { onStartQuiz(unit.unitName, it) }
                                         )
                                     }
                                     
-                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Spacer(modifier = Modifier.height(12.dp))
                                     OutlinedTextField(
                                         value = focusArea,
                                         onValueChange = { focusArea = it },
-                                        placeholder = { Text("Area of focus (Optional)", fontSize = 11.sp) },
+                                        placeholder = { Text("Specific area of focus (e.g. ECG Analysis, Pharmacology)", fontSize = 11.sp) },
                                         modifier = Modifier.fillMaxWidth(),
                                         textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
-                                        shape = MaterialTheme.shapes.medium
+                                        shape = RoundedCornerShape(10.dp)
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Button(
                                         onClick = { onStartQuiz(unit.unitName, focusArea.ifBlank { null }) },
-                                        modifier = Modifier.fillMaxWidth().height(40.dp)
+                                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                                        shape = RoundedCornerShape(10.dp)
                                     ) {
-                                        Text("GENERATE FULL UNIT QUIZ 🧠", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Icon(Icons.Default.Psychology, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("GENERATE UNIT ASSESSMENT", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
 
-                if (history.isNotEmpty()) {
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Recent Trades (Performance)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                    }
+                                    // Distinguish Assessment History & Retakes inside dropdown
+                                    val unitSubtopics = unitWithModules.modules.flatMap { it.topics }.flatMap { it.subtopics }.map { it.name }
+                                    val unitHistory = history.filter { record ->
+                                        record.unitName.equals(unit.unitName, ignoreCase = true) ||
+                                        unitSubtopics.any { subName -> subName.equals(record.unitName, ignoreCase = true) }
+                                    }
 
-                    items(history) { record ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(record.unitName, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                    Text(
-                                        SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(record.timestamp)),
-                                        fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                
-                                val pnlColor = if (record.pnlScore >= 70) Color(0xFF4CAF50) else Color(0xFFF44336)
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        "${record.pnlScore.toInt()}%",
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 14.sp,
-                                        color = pnlColor
-                                    )
-                                    Text("PnL", fontSize = 8.sp, color = pnlColor)
+                                    if (unitHistory.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Assessment Records & Retakes", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Group by target name to distinguish initial attempts from retakes
+                                        val groupedHistory = unitHistory.groupBy { it.unitName }
+
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            groupedHistory.forEach { (topicName, attempts) ->
+                                                // Sort chronologically ascending to assign Attempt #1, #2, etc.
+                                                val sortedAttempts = attempts.sortedBy { it.timestamp }
+                                                
+                                                Card(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)),
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                                                ) {
+                                                    Column(modifier = Modifier.padding(12.dp)) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(topicName, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                                                            
+                                                            // Quick Retake Button
+                                                            FilledTonalButton(
+                                                                onClick = { onStartQuiz(unit.unitName, topicName) },
+                                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                                modifier = Modifier.height(28.dp),
+                                                                shape = RoundedCornerShape(6.dp)
+                                                            ) {
+                                                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(12.dp))
+                                                                Spacer(modifier = Modifier.width(3.dp))
+                                                                Text("RETAKE", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+
+                                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                                        // List of attempts with clear badges and delta improvement
+                                                        sortedAttempts.forEachIndexed { attemptIndex, attempt ->
+                                                            val isInitial = attemptIndex == 0
+                                                            val attemptLabel = if (isInitial) "Attempt #1 (Initial)" else "Attempt #${attemptIndex + 1} (Retake)"
+                                                            val scoreColor = if (attempt.pnlScore >= 70) Color(0xFF10B981) else Color(0xFFEF4444)
+                                                            
+                                                            val prevScore = if (attemptIndex > 0) sortedAttempts[attemptIndex - 1].pnlScore else null
+                                                            val delta = if (prevScore != null) attempt.pnlScore - prevScore else null
+
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .padding(vertical = 3.dp),
+                                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                    Surface(
+                                                                        shape = RoundedCornerShape(4.dp),
+                                                                        color = if (isInitial) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color(0xFFF59E0B).copy(alpha = 0.15f)
+                                                                    ) {
+                                                                        Text(
+                                                                            text = attemptLabel,
+                                                                            fontSize = 9.sp,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            color = if (isInitial) MaterialTheme.colorScheme.primary else Color(0xFFF59E0B),
+                                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                                        )
+                                                                    }
+                                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                                    Text(
+                                                                        SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(attempt.timestamp)),
+                                                                        fontSize = 9.sp,
+                                                                        color = MaterialTheme.colorScheme.outline
+                                                                    )
+                                                                }
+
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                    if (delta != null) {
+                                                                        val isGain = delta >= 0
+                                                                        Text(
+                                                                            text = if (isGain) "+${delta.toInt()}% ↗" else "${delta.toInt()}% ↘",
+                                                                            fontSize = 9.sp,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            color = if (isGain) Color(0xFF10B981) else Color(0xFFEF4444),
+                                                                            modifier = Modifier.padding(end = 6.dp)
+                                                                        )
+                                                                    }
+                                                                    Text(
+                                                                        "${attempt.pnlScore.toInt()}%",
+                                                                        fontWeight = FontWeight.ExtraBold,
+                                                                        fontSize = 12.sp,
+                                                                        color = scoreColor
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -214,16 +307,18 @@ fun UnitSelectionScreen(
 
 @Composable
 fun ModuleAccordion(
+    unitName: String,
     moduleWithTopics: ModuleWithTopics,
+    history: List<QuizHistoryEntity>,
     onSubtopicClicked: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.padding(vertical = 2.dp)) {
+    Column(modifier = Modifier.padding(vertical = 3.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { expanded = !expanded }
-                .padding(vertical = 3.dp),
+                .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -242,26 +337,62 @@ fun ModuleAccordion(
         }
         if (expanded) {
             moduleWithTopics.topics.flatMap { it.subtopics }.forEach { subtopic ->
+                val subtopicHistory = history.filter { it.unitName.equals(subtopic.name, ignoreCase = true) }
+                    .sortedBy { it.timestamp }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onSubtopicClicked(subtopic.name) }
-                        .padding(start = 24.dp, top = 3.dp, bottom = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(start = 20.dp, top = 5.dp, bottom = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(
-                        imageVector = if (subtopic.isCompleted) Icons.Default.CheckCircle else Icons.Default.School,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp),
-                        tint = if (subtopic.isCompleted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        subtopic.name,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f).clickable { onSubtopicClicked(subtopic.name) }
+                    ) {
+                        Icon(
+                            imageVector = if (subtopic.isCompleted) Icons.Default.CheckCircle else Icons.Default.School,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = if (subtopic.isCompleted) Color(0xFF10B981) else MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            subtopic.name,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    
+                    // Distinguish initial attempts vs retakes on subtopic bubbles
+                    if (subtopicHistory.isNotEmpty()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(start = 6.dp)
+                        ) {
+                            subtopicHistory.forEachIndexed { idx, attempt ->
+                                val isInitial = idx == 0
+                                val bubbleColor = if (attempt.pnlScore >= 70) Color(0xFF10B981) else Color(0xFFEF4444)
+                                val label = if (isInitial) "1st: ${attempt.pnlScore.toInt()}%" else "Retake #${idx}: ${attempt.pnlScore.toInt()}%"
+                                
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = bubbleColor.copy(alpha = 0.15f),
+                                    border = BorderStroke(1.dp, bubbleColor.copy(alpha = 0.5f))
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = bubbleColor,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -275,109 +406,179 @@ fun QuizQuestionScreen(
 ) {
     val quiz = uiState.quiz ?: return
     val currentIdx = uiState.currentQuestionIndex
-    val currentQuestion = quiz.questions[currentIdx]
-    val selectedIdx = uiState.selectedOptions[currentIdx]
-    val isSubmitted = uiState.submittedQuestions.contains(currentIdx) || uiState.isReviewMode
-    val scrollState = rememberScrollState()
+    val currentQuestion = quiz.questions.getOrNull(currentIdx) ?: return
+    val selectedOption = uiState.selectedOptions[currentIdx]
+    val isSubmitted = uiState.submittedQuestions.contains(currentIdx)
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(12.dp)
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        Column {
+            // Header Progress Bar
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = uiState.selectedTopic ?: quiz.title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "Q ${currentIdx + 1}/${quiz.questions.size}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
             LinearProgressIndicator(
                 progress = { (currentIdx + 1).toFloat() / quiz.questions.size },
-                modifier = Modifier.fillMaxWidth().height(4.dp),
+                modifier = Modifier.fillMaxWidth().height(6.dp),
                 color = MaterialTheme.colorScheme.primary
             )
-            Text("Question ${currentIdx + 1} of ${quiz.questions.size}", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp)
 
-            FormattedText(
-                text = currentQuestion.text, 
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
-            )
+            Spacer(modifier = Modifier.height(20.dp))
 
-            currentQuestion.options.forEachIndexed { index, option ->
-                val isThisOptionSelected = selectedIdx == index
-                val isCorrect = index == currentQuestion.correctIndex
-                
-                val borderColor = when {
-                    isSubmitted && isCorrect -> Color.Green
-                    isSubmitted && isThisOptionSelected && !isCorrect -> Color.Red
-                    isThisOptionSelected -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+            // Question Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = currentQuestion.text,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 22.sp,
+                        fontSize = 14.sp
+                    )
                 }
+            }
 
-                val cardBg = if (isThisOptionSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent
+            Spacer(modifier = Modifier.height(16.dp))
 
-                OutlinedCard(
-                    onClick = { if (!isSubmitted) viewModel.selectOption(index) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = cardBg),
-                    border = BorderStroke(1.5.dp, borderColor)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            // Options List
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                currentQuestion.options.forEachIndexed { optIndex, optionText ->
+                    val isOptionSelected = selectedOption == optIndex
+                    val isCorrectOption = optIndex == currentQuestion.correctIndex
+
+                    val borderColor = when {
+                        isSubmitted && isCorrectOption -> Color(0xFF10B981)
+                        isSubmitted && isOptionSelected && !isCorrectOption -> Color(0xFFEF4444)
+                        isOptionSelected -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                    }
+
+                    val containerColor = when {
+                        isSubmitted && isCorrectOption -> Color(0xFF10B981).copy(alpha = 0.15f)
+                        isSubmitted && isOptionSelected && !isCorrectOption -> Color(0xFFEF4444).copy(alpha = 0.15f)
+                        isOptionSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        else -> MaterialTheme.colorScheme.surface
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isSubmitted && !uiState.isReviewMode) {
+                                viewModel.selectOption(optIndex)
+                            },
+                        colors = CardDefaults.cardColors(containerColor = containerColor),
+                        border = BorderStroke(1.5.dp, borderColor),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text(
-                            text = option, 
-                            style = MaterialTheme.typography.bodyMedium, 
-                            fontSize = 12.sp, 
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (isSubmitted) {
-                            if (isCorrect) Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.Green, modifier = Modifier.size(16.dp))
-                            else if (isThisOptionSelected) Icon(Icons.Default.Error, contentDescription = null, tint = Color.Red, modifier = Modifier.size(16.dp))
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = if (isOptionSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = "${('A'.code + optIndex).toChar()}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isOptionSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = optionText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontSize = 13.sp,
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                 }
             }
 
-            if (isSubmitted) {
+            // Explanation Section
+            if (isSubmitted || uiState.isReviewMode) {
+                Spacer(modifier = Modifier.height(16.dp))
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)),
                     modifier = Modifier.fillMaxWidth(),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f))
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Text("Explanation", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "Differential Explanation",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                         Spacer(modifier = Modifier.height(4.dp))
-                        FormattedText(
-                            text = currentQuestion.explanation, 
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp, lineHeight = 15.sp)
+                        Text(
+                            text = currentQuestion.explanation,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp
                         )
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
         }
 
+        // Bottom Navigation Buttons
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            OutlinedButton(
-                onClick = { viewModel.previousQuestion() },
-                enabled = currentIdx > 0,
-                modifier = Modifier.weight(1f).height(44.dp)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("PREV", fontSize = 11.sp)
-            }
-
-            if (!isSubmitted) {
-                Button(
-                    onClick = { viewModel.submitAnswer() },
-                    enabled = selectedIdx != null,
+            if (currentIdx > 0) {
+                OutlinedButton(
+                    onClick = { viewModel.previousQuestion() },
                     modifier = Modifier.weight(1f).height(44.dp)
                 ) {
-                    Text("SUBMIT", fontSize = 11.sp)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("PREV", fontSize = 11.sp)
+                }
+            }
+
+            if (!isSubmitted && !uiState.isReviewMode) {
+                Button(
+                    onClick = { viewModel.submitAnswer() },
+                    enabled = selectedOption != null,
+                    modifier = Modifier.weight(1f).height(44.dp)
+                ) {
+                    Text("SUBMIT", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             } else {
                 Button(
@@ -386,7 +587,8 @@ fun QuizQuestionScreen(
                 ) {
                     Text(
                         text = if (currentIdx + 1 < quiz.questions.size) "NEXT" else if (uiState.isReviewMode) "BACK TO RESULT" else "FINISH",
-                        fontSize = 11.sp
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -400,58 +602,92 @@ fun QuizQuestionScreen(
 fun QuizResultScreen(
     score: Int, 
     total: Int, 
+    unitName: String,
     onReview: () -> Unit,
     onRetake: () -> Unit,
     onTakeNew: () -> Unit,
     onGoBack: () -> Unit
 ) {
-    val percentage = (score.toDouble() / total * 100).toInt()
+    val percentage = if (total > 0) (score.toDouble() / total * 100).toInt() else 0
     
     val congratulationMessage = when {
         percentage == 100 -> "UNSTOPPABLE! 🏆 Perfect score."
-        percentage >= 80 -> "EXCELLENT! 🌟 High-tier performance."
-        else -> "Assessment Complete!"
+        percentage >= 80 -> "EXCELLENT! 🌟 High-yield retention."
+        percentage >= 60 -> "SOLID PROGRESS! 📈 Ready for review."
+        else -> "DIAGNOSTIC COMPLETE! 🎯 Target weak spots."
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        Surface(
+            shape = CircleShape,
+            color = if (percentage >= 70) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFF59E0B).copy(alpha = 0.15f),
+            modifier = Modifier.size(72.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = if (percentage >= 70) Icons.Default.EmojiEvents else Icons.Default.Psychology,
+                    contentDescription = null,
+                    tint = if (percentage >= 70) Color(0xFF10B981) else Color(0xFFF59E0B),
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = congratulationMessage, 
             fontSize = 18.sp, 
-            fontWeight = FontWeight.Bold, 
+            fontWeight = FontWeight.Black, 
             textAlign = TextAlign.Center,
             color = if (percentage >= 80) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         )
         
-        Spacer(modifier = Modifier.height(12.dp))
-        Text("Your PnL Accuracy", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
-        Text("$percentage%", fontSize = 44.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-        Text("Score: $score / $total", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(unitName, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("$percentage%", fontSize = 48.sp, fontWeight = FontWeight.Black, color = if (percentage >= 70) Color(0xFF10B981) else Color(0xFFEF4444))
+        Text("Correct: $score of $total Questions", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.outline)
+        
+        Spacer(modifier = Modifier.height(30.dp))
         
         // Options Grid
         Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = onReview, modifier = Modifier.weight(1f).height(44.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
+                Button(
+                    onClick = onReview, 
+                    modifier = Modifier.weight(1f).height(44.dp), 
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
                     Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("REVIEW", fontSize = 11.sp)
+                    Text("REVIEW MISTAKES", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
-                Button(onClick = onRetake, modifier = Modifier.weight(1f).height(44.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                Button(
+                    onClick = onRetake, 
+                    modifier = Modifier.weight(1f).height(44.dp), 
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("RETAKE", fontSize = 11.sp)
+                    Text("RETAKE QUIZ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                 }
             }
-            Button(onClick = onTakeNew, modifier = Modifier.fillMaxWidth().height(44.dp)) {
-                Text("TAKE NEW ASSESSMENT", fontSize = 11.sp)
+            Button(
+                onClick = onTakeNew, 
+                modifier = Modifier.fillMaxWidth().height(44.dp),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("START DIFFERENT TOPIC QUIZ", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
             TextButton(onClick = onGoBack) {
-                Text("Go Back to Units", fontSize = 12.sp)
+                Text("Return to Syllabus Selection", fontSize = 12.sp)
             }
         }
     }

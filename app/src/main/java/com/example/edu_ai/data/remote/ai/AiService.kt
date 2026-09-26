@@ -19,19 +19,15 @@ class GeminiAiService : AiService {
         userContext: UserEntity,
         history: List<ChatMessage>
     ): String {
-        return try {
-            val apiHistory = history.map { ApiChatMessage(role = it.role, content = it.content) }
-            val response = RetrofitClient.instance.aiChat(
-                ChatRequest(
-                    prompt = prompt,
-                    user_id = userContext.id,
-                    history = apiHistory
-                )
+        val apiHistory = history.map { ApiChatMessage(role = it.role, content = it.content) }
+        val response = RetrofitClient.instance.aiChat(
+            ChatRequest(
+                prompt = prompt,
+                user_id = userContext.id,
+                history = apiHistory
             )
-            response.response
-        } catch (e: Exception) {
-            "Consultation failed: ${e.localizedMessage}. Ensure the Python Backend is running."
-        }
+        )
+        return response.response
     }
 
     override suspend fun generateQuiz(
@@ -80,13 +76,30 @@ class GeminiAiService : AiService {
     }
 
     override suspend fun getRecommendations(
-        userContext: UserEntity
+        userContext: UserEntity,
+        studyContext: com.example.edu_ai.data.remote.ApiStudyContextPayload?
     ): String {
         return try {
-            val response = RetrofitClient.instance.getRecommendations(userContext.id)
-            response.recommendation
+            if (studyContext != null) {
+                RetrofitClient.instance.getRecommendationsWithContext(userContext.id, studyContext).recommendation
+            } else {
+                RetrofitClient.instance.getRecommendations(userContext.id).recommendation
+            }
         } catch (e: Exception) {
-            "Keep focusing on your active units! Your personalized strategy is being updated."
+            // Intelligent fallback referencing student's real metrics even if offline!
+            val weak = studyContext?.weakTopics?.firstOrNull()
+            val mastered = studyContext?.masteredTopics?.firstOrNull()
+            val pending = studyContext?.pendingSubtopicNames?.firstOrNull() ?: "core syllabus nodes"
+            
+            if (weak != null && mastered != null) {
+                "Superb retention in $mastered! Direct your immediate focus to $weak to resolve clinical distractor traps, then advance to $pending."
+            } else if (weak != null) {
+                "High-priority diagnostic review recommended in $weak where recent assessment accuracy flagged key pathophysiology gaps."
+            } else if (mastered != null) {
+                "Consistent mastery demonstrated across $mastered! Maintain this high-yield trajectory by conquering $pending today."
+            } else {
+                "Keep focusing on your active units! Your personalized strategy is continuously adapting to your progress."
+            }
         }
     }
 }
@@ -95,7 +108,7 @@ interface AiService {
     suspend fun getChatResponse(prompt: String, userContext: UserEntity, history: List<ChatMessage> = emptyList()): String
     suspend fun generateQuiz(unitName: String, userContext: UserEntity, topic: String? = null): QuizResponse?
     suspend fun recordQuizResult(unitName: String, score: Int, total: Int, userContext: UserEntity)
-    suspend fun getRecommendations(userContext: UserEntity): String
+    suspend fun getRecommendations(userContext: UserEntity, studyContext: com.example.edu_ai.data.remote.ApiStudyContextPayload? = null): String
 }
 
 data class ChatMessage(val role: String, val content: String)

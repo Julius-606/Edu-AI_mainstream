@@ -66,25 +66,45 @@ class StudentViewModel(val repository: EduAIRepository, private val dao: com.exa
         repository.updateSubtopicStatusAndSync(userId, subtopicId, isCompleted)
     }
 
+    suspend fun updateSubtopicCachedContent(subtopicId: Long, cachedContentJson: String?) {
+        dao.updateSubtopicCachedContent(subtopicId, cachedContentJson)
+    }
+
+    suspend fun getSubtopicById(subtopicId: Long): com.example.edu_ai.data.local.SubtopicEntity? {
+        return dao.getSubtopicById(subtopicId)
+    }
+
     fun triggerCloudSync(userId: String) {
         viewModelScope.launch {
             repository.triggerSync(userId)
         }
     }
 
-    suspend fun repositoryChat(userId: String, currentTopic: String): String {
-        val prompt = "Provide a very concise, structured medical/biochemical high-yield study review for: $currentTopic. Limit to 3 sentences emphasizing diagnostic tips or common exam traps."
+    suspend fun repositoryChat(userId: String, promptOrTopic: String): String {
+        val finalPrompt = if (promptOrTopic.length < 100 && !promptOrTopic.contains("You are simulating") && !promptOrTopic.contains("Teach me") && !promptOrTopic.contains("Explain")) {
+            "Provide a very concise, structured medical/biochemical high-yield study review for: $promptOrTopic. Limit to 3 sentences emphasizing diagnostic tips or common exam traps."
+        } else {
+            promptOrTopic
+        }
         val userContext = dao.getUserById(userId) ?: UserEntity(id = userId, username = "Student", role = "student", sensoryMode = "Visual", semesterStatus = "Active", aiPersona = "Helper")
         val aiService = com.example.edu_ai.data.remote.ai.AiServiceFactory().createService(isProMode = false)
-        return aiService.getChatResponse(prompt, userContext, emptyList())
+        return aiService.getChatResponse(finalPrompt, userContext, emptyList())
+    }
+
+    init {
+        viewModelScope.launch {
+            dao.sanitizeCorruptedCachedContent()
+        }
     }
 
     fun refreshDashboard(userId: String) {
         viewModelScope.launch {
-            _isLoading.value = true
+            if (uiState.value.unitsWithModules.isEmpty()) {
+                _isLoading.value = true
+            }
             _error.value = null
             try {
-                // repository.getDashboardData(userId) already updates the DAO
+                // repository.getDashboardData(userId) updates the DAO seamlessly in the background
                 repository.getDashboardData(userId).collect()
                 // Auto trigger sync on refresh to make sure we are synchronized!
                 repository.triggerSync(userId)
