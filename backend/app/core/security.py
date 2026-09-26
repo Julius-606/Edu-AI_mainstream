@@ -18,7 +18,7 @@ def _password_digest(password: str) -> bytes:
     return hashlib.sha256(password.encode("utf-8")).digest()
 
 
-def _normalize_passlib_bcrypt_sha256(hash_value: str) -> str | None:
+def _normalize_passlib_bcrypt_sha256(hash_value: str) -> Optional[str]:
     try:
         _, scheme, params, salt, checksum = hash_value.split("$", 4)
     except ValueError:

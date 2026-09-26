@@ -91,9 +91,14 @@ def generate_class_report(db: Session = Depends(get_db)):
     return schemas.ClassReportResponse(report=report or "Class report is temporarily unavailable.")
 
 @router.post("/send-report/{student_id}")
-def send_student_report(student_id: int, db: Session = Depends(get_db)):
-    student = db.query(models.User).filter(models.User.id == student_id).first()
-    if not student: raise HTTPException(status_code=404, detail="Student not found")
+def send_student_report(student_id: str, db: Session = Depends(get_db)):
+    student = None
+    if str(student_id).isdigit():
+        student = db.query(models.User).filter(models.User.id == int(student_id)).first()
+    if not student:
+        student = db.query(models.User).filter(models.User.username == str(student_id)).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
 
     quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == student.id).all()
     context = f"Student: {student.username}\nStatus: {student.semester_status}\nUnits: {', '.join(student.active_units_list)}\n"

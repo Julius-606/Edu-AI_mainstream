@@ -23,7 +23,59 @@ async def login(request: schemas.LoginRequest, db: Session = Depends(get_db)):
         "role": user.role
     }
 
-@router.post("/signup-form") # Renamed from /signup to avoid conflict with HTML signup if any
+@router.post("/signup", response_model=schemas.TokenResponse)
+@router.post("/register", response_model=schemas.TokenResponse)
+async def api_json_signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
+    existing_user = db.query(models.User).filter(
+        (models.User.email == user_in.email) | (models.User.username == user_in.username)
+    ).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email or Username already exists")
+
+    new_user = models.User(
+        username=user_in.username,
+        email=user_in.email,
+        hashed_password=security.get_password_hash(user_in.password),
+        role=user_in.role,
+        sensory_mode=user_in.sensory_mode,
+        difficulty=user_in.difficulty,
+        ai_persona=user_in.ai_persona,
+        semester_status=user_in.semester_status,
+        interests=user_in.interests
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    # Populate active units if provided
+    for unit_name in user_in.active_units:
+        db.add(models.Unit(name=unit_name, owner_id=new_user.id, is_active=True))
+    if user_in.active_units:
+        db.commit()
+
+    try:
+        from app.api import admin
+        admin.notify_admin(
+            db=db,
+            category="NEW_USER",
+            title="New User Registration",
+            message=f"User '{user_in.username}' registered as {user_in.role} ({user_in.email}) via JSON API.",
+            level="info",
+            details=f"Username: {user_in.username}\nRole: {user_in.role}\nEmail: {user_in.email}\nSource: /api/auth/signup"
+        )
+    except Exception:
+        pass
+
+    access_token = security.create_access_token(data={"sub": str(new_user.id)})
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_id": str(new_user.id),
+        "username": new_user.username,
+        "role": new_user.role
+    }
+
+@router.post("/signup-form") # Form submission for HTML web pages
 async def handle_signup(
     username: str = Form(...),
     email: str = Form(...),

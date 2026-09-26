@@ -5,7 +5,10 @@ from typing import List
 from app.db.session import get_db
 from app.models import database_models as models
 from app.schemas import api_schemas as schemas
-from ingestion_engine import parse_syllabus_markdown
+try:
+    from ingestion_engine import parse_syllabus_markdown
+except ImportError:
+    from app.ingestion_engine import parse_syllabus_markdown
 
 router = APIRouter(tags=["Structured Learning"])
 

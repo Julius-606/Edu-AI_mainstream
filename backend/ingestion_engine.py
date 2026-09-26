@@ -98,7 +98,7 @@ def save_syllabus_to_db(db: Session, syllabus_data: dict, owner_id=None):
     db.commit()
 
 def get_global_units(db: Session):
-    return db.query(models.Unit).filter(models.Unit.owner_id == None).all()
+    return db.query(models.Unit).filter(models.Unit.owner_id.is_(None)).all()
 
 def delete_unit(db: Session, unit_id: int):
     unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()

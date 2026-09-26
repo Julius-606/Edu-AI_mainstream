@@ -7,12 +7,15 @@ from sqlalchemy import text
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 try:
-    from database import engine, Base
-    import models
+    from app.db.session import engine, Base
+    from app.models import database_models as models
 except ImportError:
-    # Fallback for different execution contexts
-    from .database import engine, Base
-    from . import models
+    try:
+        from database import engine, Base
+        import models
+    except ImportError:
+        from .database import engine, Base
+        from . import models
 
 import argparse
 

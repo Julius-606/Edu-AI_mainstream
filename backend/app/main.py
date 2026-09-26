@@ -27,7 +27,10 @@ from app.core import security
 from app.models import database_models as models
 from app.schemas import api_schemas as schemas
 from typing import List
-import ingestion_engine
+try:
+    import ingestion_engine
+except ImportError:
+    from app import ingestion_engine
 
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
 WEBAPP_DIST_DIR = Path(__file__).resolve().parents[1] / "webapp_dist"

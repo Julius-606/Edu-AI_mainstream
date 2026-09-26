@@ -13,7 +13,10 @@ from sqlalchemy import desc, func
 from app.db.session import get_db, engine
 from app.models import database_models as models
 from app.core import security
-import ingestion_engine
+try:
+    import ingestion_engine
+except ImportError:
+    from app import ingestion_engine
 
 logger = logging.getLogger("trace_admin")
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[2] / "templates"))
@@ -741,15 +744,25 @@ async def admin_create_release(
 @router.post("/admin/releases/{release_id}/toggle-mandatory")
 async def admin_toggle_mandatory_release(
     release_id: int,
+    request: Request,
     is_mandatory: Optional[bool] = None,
     db: Session = Depends(get_db)
 ):
+    # Check if is_mandatory was passed in JSON body or form
+    if is_mandatory is None:
+        try:
+            body = await request.json()
+            if isinstance(body, dict) and "is_mandatory" in body:
+                is_mandatory = body.get("is_mandatory")
+        except Exception:
+            pass
+
     release = db.query(models.SystemRelease).filter(models.SystemRelease.id == release_id).first()
     if not release:
         raise HTTPException(status_code=404, detail="Release not found")
 
     if is_mandatory is not None:
-        release.is_mandatory = is_mandatory
+        release.is_mandatory = bool(is_mandatory)
     else:
         release.is_mandatory = not release.is_mandatory
 
