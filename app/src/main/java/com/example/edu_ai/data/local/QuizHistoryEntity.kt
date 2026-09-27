@@ -14,7 +14,9 @@ data class QuizHistoryEntity(
     val userId: String, // Added to support multi-user isolation
     val unitName: String,
     val pnlScore: Double,
-    val timestamp: Long
+    val timestamp: Long,
+    val status: String = "Completed",
+    val timeElapsed: Int = 0
 )
 
 

@@ -91,15 +91,17 @@ export const ArchivesModal: React.FC<ArchivesModalProps> = ({
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
-                          item.pnlScore >= 80
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[10px] shrink-0 ${
+                          item.status === 'Unfinished'
+                            ? 'bg-slate-800/50 text-slate-400 border border-slate-700/60'
+                            : item.pnlScore >= 80
                             ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                             : item.pnlScore >= 60
                             ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
                             : 'bg-red-500/10 text-red-400 border border-red-500/30'
                         }`}
                       >
-                        {Math.round(item.pnlScore)}%
+                        {item.status === 'Unfinished' ? 'Unf' : `${Math.round(item.pnlScore)}%`}
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-white">{item.unitName}</p>
@@ -107,7 +109,10 @@ export const ArchivesModal: React.FC<ArchivesModalProps> = ({
                       </div>
                     </div>
                     <div className="text-right text-[11px] text-slate-500">
-                      <span>{item.score} / {item.total} correct</span>
+                      <span>
+                        {item.score} / {item.total} correct
+                        {item.timeElapsed ? ` (${Math.floor(item.timeElapsed / 60)}:${(item.timeElapsed % 60 < 10 ? '0' : '') + (item.timeElapsed % 60)})` : ''}
+                      </span>
                       <p>{new Date(item.timestamp).toLocaleDateString()}</p>
                     </div>
                   </div>

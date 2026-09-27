@@ -1,6 +1,7 @@
 
 package com.example.edu_ai.ui.screens.student
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material3.*
@@ -26,6 +28,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -264,6 +267,7 @@ fun ZenithTab(
     progressViewModel: ProgressViewModel,
     timetableViewModel: TimetableViewModel
 ) {
+    val context = LocalContext.current
     val recommendation by progressViewModel.recommendation.collectAsState()
     val progressUiState by progressViewModel.uiState.collectAsState()
     val timetableUiState by timetableViewModel.uiState.collectAsState()
@@ -282,20 +286,32 @@ fun ZenithTab(
         
         item {
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("Strategic Guidance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                        Column {
+                            Text("Strategic Guidance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                            val timeText = if (progressUiState.lastUpdatedTimestamp > 0L) {
+                                val sdf = java.text.SimpleDateFormat("MMM dd, HH:mm", java.util.Locale.getDefault())
+                                "Synchronized today • Last calculated: " + sdf.format(java.util.Date(progressUiState.lastUpdatedTimestamp))
+                            } else {
+                                "Calculated once daily for synchrony"
+                            }
+                            Text(timeText, fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+                        }
                     }
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     if (progressUiState.isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        }
                     } else {
                         FormattedText(
                             text = recommendation,
@@ -306,10 +322,15 @@ fun ZenithTab(
                     Spacer(modifier = Modifier.height(20.dp))
                     
                     Button(
-                        onClick = { progressViewModel.refreshRecommendations() },
+                        onClick = {
+                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                            progressViewModel.refreshRecommendations(forceRefresh = true)
+                        },
                         modifier = Modifier.align(Alignment.End)
                     ) {
-                        Text("REFRESH STRATEGY")
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("RECALIBRATE")
                     }
                 }
             }

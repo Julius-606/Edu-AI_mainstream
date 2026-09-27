@@ -61,7 +61,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
       <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">
-            Faculty Academic Portal
+            Faculty Academic Dashboard
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-white mt-0.5">Clinical Educator Console</h1>
           <p className="text-xs text-slate-400">Class trajectory monitoring, at-risk triage, and AI report generation</p>

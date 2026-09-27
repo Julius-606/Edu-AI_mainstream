@@ -119,7 +119,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-400 mb-4 shadow-lg shadow-indigo-600/20">
             <span className="text-2xl font-black tracking-tight">T</span>
           </div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">Trace Portal</h1>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">Trace Learning</h1>
           <p className="text-xs text-slate-400 mt-1">Adaptive Clinical & Academic Learning System</p>
         </div>
 

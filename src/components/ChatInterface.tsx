@@ -11,7 +11,10 @@ import {
   Bot,
   User as UserIcon,
   MessageSquare,
-  ChevronDown
+  ChevronDown,
+  PanelLeftClose,
+  PanelLeft,
+  Maximize2
 } from 'lucide-react';
 import { ChatSession, ChatMessage, User } from '../types';
 import { TraceStore } from '../lib/store';
@@ -26,6 +29,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ user, onOpenBrowse
   const [sessions, setSessions] = useState<ChatSession[]>(TraceStore.getChatSessions(user.id));
   const [activeSessionId, setActiveSessionId] = useState<string>(sessions[0]?.id || '');
   const [activePersona, setActivePersona] = useState<string>(user.aiPersona || 'Socratic Tutor');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
 
   // Input & message state
   const [inputMessage, setInputMessage] = useState('');
@@ -167,111 +171,131 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ user, onOpenBrowse
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col sm:flex-row gap-4 pb-4 animate-in fade-in duration-200">
       {/* Sessions & Focus Timer Sidebar */}
-      <div className="w-full sm:w-72 bg-slate-900/80 border border-slate-800 rounded-3xl p-4 flex flex-col justify-between shadow-xl">
-        <div>
-          {/* Top New Consultation Button */}
-          <button
-            onClick={handleCreateNewSession}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-colors mb-4"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Consultation</span>
-          </button>
+      {!isSidebarCollapsed && (
+        <div className="w-full sm:w-72 bg-slate-900/80 border border-slate-800 rounded-3xl p-4 flex flex-col justify-between shadow-xl animate-in slide-in-from-left-4 duration-200">
+          <div>
+            {/* Top New Consultation Button & Collapse */}
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={handleCreateNewSession}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Consultation</span>
+              </button>
+              <button
+                onClick={() => setIsSidebarCollapsed(true)}
+                className="p-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                title="Collapse sidebar to maximize chat width"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
+            </div>
 
-          {/* Persona Dropdown */}
-          <div className="mb-4">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-              Consultant Persona
-            </label>
-            <select
-              value={activePersona}
-              onChange={(e) => setActivePersona(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-indigo-300 font-medium outline-none focus:border-indigo-500"
-            >
-              <option value="Socratic Tutor">Socratic Tutor (Guides through questions)</option>
-              <option value="Clinical Attending">Clinical Attending (Rounds rigor)</option>
-              <option value="Exam Drillmaster">Exam Drillmaster (High-yield pearls)</option>
-              <option value="Feynman Explainer">Feynman Explainer (Radical intuition)</option>
-            </select>
+            {/* Persona Dropdown */}
+            <div className="mb-4">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Consultant Persona
+              </label>
+              <select
+                value={activePersona}
+                onChange={(e) => setActivePersona(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-indigo-300 font-medium outline-none focus:border-indigo-500"
+              >
+                <option value="Socratic Tutor">Socratic Tutor (Guides through questions)</option>
+                <option value="Clinical Attending">Clinical Attending (Rounds rigor)</option>
+                <option value="Exam Drillmaster">Exam Drillmaster (High-yield pearls)</option>
+                <option value="Feynman Explainer">Feynman Explainer (Radical intuition)</option>
+              </select>
+            </div>
+
+            {/* Session List */}
+            <div className="space-y-1 max-h-[35vh] overflow-y-auto pr-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block px-2 mb-1">
+                Recent Consultations
+              </span>
+              {sessions.map((s) => (
+                <div
+                  key={s.id}
+                  onClick={() => setActiveSessionId(s.id)}
+                  className={`p-2.5 rounded-xl text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                    activeSessionId === s.id
+                      ? 'bg-indigo-600/20 text-indigo-200 border border-indigo-500/30'
+                      : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="truncate flex-1 pr-2">
+                    <p className="font-semibold truncate">{s.title || 'Consultation'}</p>
+                    <p className="text-[10px] text-slate-500">
+                      {new Date(s.timestamp).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {sessions.length > 1 && (
+                    <button
+                      onClick={(e) => handleDeleteSession(s.id, e)}
+                      className="p-1 text-slate-500 hover:text-red-400 opacity-0 hover:opacity-100 group-hover:opacity-100 transition-opacity"
+                      title="Delete session"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Session List */}
-          <div className="space-y-1 max-h-[35vh] overflow-y-auto pr-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block px-2 mb-1">
-              Recent Consultations
-            </span>
-            {sessions.map((s) => (
-              <div
-                key={s.id}
-                onClick={() => setActiveSessionId(s.id)}
-                className={`p-2.5 rounded-xl text-xs flex items-center justify-between cursor-pointer transition-colors ${
-                  activeSessionId === s.id
-                    ? 'bg-indigo-600/20 text-indigo-200 border border-indigo-500/30'
-                    : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+          {/* Integrated Study Focus Timer (Pomodoro) */}
+          <div className="pt-3 border-t border-slate-800/80 bg-slate-950/60 -mx-4 -mb-4 p-4 rounded-b-3xl">
+            <div className="flex items-center justify-between text-xs mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Focus Timer</span>
+              </span>
+              <span className="font-mono font-bold text-white text-sm">{formatTimer(timerSeconds)}</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsTimerRunning(!isTimerRunning)}
+                className={`flex-1 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                  isTimerRunning
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    : 'bg-indigo-600 hover:bg-indigo-500 text-white'
                 }`}
               >
-                <div className="truncate flex-1 pr-2">
-                  <p className="font-semibold truncate">{s.title || 'Consultation'}</p>
-                  <p className="text-[10px] text-slate-500">
-                    {new Date(s.timestamp).toLocaleDateString()}
-                  </p>
-                </div>
-                {sessions.length > 1 && (
-                  <button
-                    onClick={(e) => handleDeleteSession(s.id, e)}
-                    className="p-1 text-slate-500 hover:text-red-400 opacity-0 hover:opacity-100 group-hover:opacity-100 transition-opacity"
-                    title="Delete session"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            ))}
+                {isTimerRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                <span>{isTimerRunning ? 'Pause' : 'Start Focus'}</span>
+              </button>
+              <button
+                onClick={() => {
+                  setIsTimerRunning(false);
+                  setTimerSeconds(25 * 60);
+                }}
+                className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                title="Reset timer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Integrated Study Focus Timer (Pomodoro) */}
-        <div className="pt-3 border-t border-slate-800/80 bg-slate-950/60 -mx-4 -mb-4 p-4 rounded-b-3xl">
-          <div className="flex items-center justify-between text-xs mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Focus Timer</span>
-            </span>
-            <span className="font-mono font-bold text-white text-sm">{formatTimer(timerSeconds)}</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsTimerRunning(!isTimerRunning)}
-              className={`flex-1 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
-                isTimerRunning
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                  : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-              }`}
-            >
-              {isTimerRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-              <span>{isTimerRunning ? 'Pause' : 'Start Focus'}</span>
-            </button>
-            <button
-              onClick={() => {
-                setIsTimerRunning(false);
-                setTimerSeconds(25 * 60);
-              }}
-              className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
-              title="Reset timer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Conversation Stream */}
-      <div className="flex-1 bg-slate-900/80 border border-slate-800 rounded-3xl flex flex-col shadow-xl overflow-hidden backdrop-blur-md">
+      {/* Main Conversation Stream - Maximized to full width */}
+      <div className="flex-1 w-full bg-slate-900/80 border border-slate-800 rounded-3xl flex flex-col shadow-xl overflow-hidden backdrop-blur-md">
         {/* Active Session Header */}
-        <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
+        <div className="px-5 py-3.5 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+            {isSidebarCollapsed && (
+              <button
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 transition-colors mr-1"
+                title="Show consultations sidebar"
+              >
+                <PanelLeft className="w-4 h-4" />
+              </button>
+            )}
+            <div className="w-9 h-9 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
               <Bot className="w-5 h-5" />
             </div>
             <div>
@@ -280,19 +304,29 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ user, onOpenBrowse
             </div>
           </div>
 
-          <div className="text-right text-[11px] text-slate-500 hidden sm:block">
-            Socratic Diagnostic Gateway
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className="px-2.5 py-1 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              title={isSidebarCollapsed ? "Show side panel" : "Maximize chat width"}
+            >
+              <Maximize2 className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden sm:inline">{isSidebarCollapsed ? "Show Sessions" : "Maximize Width"}</span>
+            </button>
+            <span className="text-[11px] text-slate-500 hidden md:block">
+              Socratic Diagnostic Gateway
+            </span>
           </div>
         </div>
 
         {/* Message Log */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 w-full overflow-y-auto p-4 sm:p-6 space-y-4">
           {activeSession?.messages.map((m) => {
             const isUser = m.sender === 'user';
             return (
               <div
                 key={m.id}
-                className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}
+                className={`flex gap-3 w-full ${isUser ? 'justify-end' : 'justify-start'}`}
               >
                 {!isUser && (
                   <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5">
@@ -301,16 +335,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ user, onOpenBrowse
                 )}
 
                 <div
-                  className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 text-xs leading-relaxed ${
+                  className={`rounded-2xl text-xs sm:text-sm leading-relaxed ${
                     isUser
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                      : 'bg-slate-950/90 border border-slate-800 text-slate-200'
+                      ? 'max-w-[85%] sm:max-w-[70%] bg-indigo-600 text-white shadow-md shadow-indigo-600/20 p-4'
+                      : 'w-full flex-1 text-slate-200 py-1 px-1'
                   }`}
                 >
                   {isUser ? (
                     <p className="whitespace-pre-wrap">{m.text}</p>
                   ) : (
-                    <FormattedText text={m.text} onLinkClick={onOpenBrowser} />
+                    <div className="w-full max-w-none">
+                      <FormattedText text={m.text} onLinkClick={onOpenBrowser} />
+                    </div>
                   )}
                   <span className="text-[9px] text-slate-400 block text-right mt-1.5 opacity-70">
                     {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -327,7 +363,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ user, onOpenBrowse
           })}
 
           {isLoading && (
-            <div className="flex items-center gap-3 text-xs text-indigo-400 p-3 bg-slate-950/60 rounded-2xl border border-slate-800 max-w-sm">
+            <div className="flex items-center gap-3 text-xs text-indigo-400 py-1 px-1">
               <Sparkles className="w-4 h-4 animate-spin text-indigo-400" />
               <span>Consultant analyzing clinical pathophysiological matrix...</span>
             </div>

@@ -25,6 +25,7 @@ class User(Base):
     performance_logs = relationship("PerformanceLog", back_populates="owner", cascade="all, delete-orphan")
     timetables = relationship("Timetable", back_populates="owner", cascade="all, delete-orphan")
     bookmarks = relationship("Bookmark", back_populates="owner", cascade="all, delete-orphan")
+    recommendations = relationship("Recommendation", back_populates="owner", cascade="all, delete-orphan")
 
     @property
     def active_units_list(self):
@@ -39,6 +40,7 @@ class Unit(Base):
     category = Column(String(100), default="General")
     course = Column(String(100), default="General")
     unit_group = Column(String(100), nullable=True)
+    learning_outcomes = Column(Text, nullable=True)
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="units")
@@ -166,6 +168,16 @@ class Timetable(Base):
 
     owner_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="timetables")
+
+class Recommendation(Base):
+    __tablename__ = "recommendations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    recommendation = Column(Text)
+    timestamp = Column(Float) # Time of generation
+
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="recommendations")
 
 class Bookmark(Base):
     __tablename__ = "bookmarks"

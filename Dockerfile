@@ -1,11 +1,11 @@
 # ==============================================================================
-# Edu-AI Trace Web & API Runtime Dockerfile
+# Trace Web & API Runtime Dockerfile
 #
 # BACKEND ENTRYPOINT INSTRUCTION:
 # The backend administrative interface opens at:
 #   -> backend/templates/admin/login.html (served at / and /admin/login)
 # The public user onboarding interface opens at:
-#   -> backend/templates/public/signup.html (served at /signup, /Edu_AI/signup.html)
+#   -> backend/templates/public/signup.html (served at /signup, /Trace/signup.html)
 # ==============================================================================
 
 # Stage 1: Build the frontend static assets

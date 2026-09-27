@@ -36,6 +36,7 @@ import com.example.edu_ai.ui.components.DynamicBackground
 import com.example.edu_ai.ui.components.ProgressRings
 import com.example.edu_ai.ui.components.RingProgress
 import com.example.edu_ai.utils.TactileFeedback
+import com.example.edu_ai.utils.PreferenceManager
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -50,6 +51,9 @@ fun StudentDashboard(
     onLaunchUnit: (Long) -> Unit,
     onOpenBookmarks: () -> Unit,
     onOpenSettings: () -> Unit = {},
+    initialTab: String = "dashboard",
+    initialUnit: String? = null,
+    initialTopic: String? = null,
     viewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -68,12 +72,22 @@ fun StudentDashboard(
     val chatViewModel: ChatViewModel = viewModel(key = "chat_$userId", factory = ChatViewModel.provideFactory(user))
     val quizViewModel: QuizViewModel = viewModel(key = "quiz_$userId", factory = QuizViewModel.provideFactory(user))
 
+    var currentTab by remember { mutableStateOf(if (initialTab.isNotEmpty()) initialTab else "dashboard") }
+
     LaunchedEffect(userId) {
+        viewModel.setUserId(userId)
         viewModel.refreshDashboard(userId)
         progressViewModel.refreshRecommendations()
     }
 
-    var currentTab by remember { mutableStateOf("dashboard") }
+    LaunchedEffect(initialTab, initialUnit, initialTopic) {
+        if (initialTab.isNotEmpty()) {
+            currentTab = initialTab
+        }
+        if (initialTab == "assessment" && !initialUnit.isNullOrBlank()) {
+            quizViewModel.startQuiz(initialUnit, initialTopic?.ifBlank { null })
+        }
+    }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     var isRightDrawerOpen by remember { mutableStateOf(false) }
 
@@ -102,7 +116,7 @@ fun StudentDashboard(
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = "Trace Portal",
+                                text = "Trace Learning",
                                 fontWeight = FontWeight.Black,
                                 fontSize = 22.sp,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -264,7 +278,7 @@ fun StudentDashboard(
                     TopAppBar(
                         title = {
                             Column {
-                                Text("Trace Portal", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                                Text("Trace Learning", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
                                 Text(
                                     text = when (currentTab) {
                                         "socratic" -> "Socratic Clinical Assistant"
@@ -287,9 +301,6 @@ fun StudentDashboard(
                             if (currentTab == "dashboard") {
                                 IconButton(onClick = onOpenBookmarks) {
                                     Icon(Icons.Default.Bookmark, contentDescription = "Saved Bookmarks", tint = MaterialTheme.colorScheme.primary)
-                                }
-                                IconButton(onClick = onOpenLibrary) {
-                                    Icon(Icons.Default.AddCircleOutline, contentDescription = "Add Unit", tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                             IconButton(onClick = onOpenSettings) {
@@ -492,10 +503,9 @@ fun StudentDashboardContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column {
                     Text(
                         text = "Hi, ${user.username}!",
                         fontSize = 30.sp,
@@ -516,6 +526,21 @@ fun StudentDashboardContent(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
+                        if (PreferenceManager.getToken(context) == "cached_offline_token") {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
+                            ) {
+                                Text(
+                                    text = "Offline Mode",
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "• $currentDay",
@@ -523,16 +548,6 @@ fun StudentDashboardContent(
                             color = MaterialTheme.colorScheme.outline
                         )
                     }
-                }
-
-                FilledTonalButton(
-                    onClick = onOpenLibrary,
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("ADD UNIT", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

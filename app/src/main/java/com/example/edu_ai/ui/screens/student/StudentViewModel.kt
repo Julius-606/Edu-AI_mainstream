@@ -26,15 +26,27 @@ class StudentViewModel(val repository: EduAIRepository, private val dao: com.exa
 
     private val _isLoading = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
+    private val _userId = MutableStateFlow("")
 
-    val uiState: StateFlow<StudentUiState> = combine(
-        dao.getUser(),
-        dao.getAllUnits(),
-        dao.getAllUnitsWithModules(),
-        _isLoading,
-        _error
-    ) { user, units, unitsWithModules, isLoading, error ->
-        StudentUiState(user, units, unitsWithModules, isLoading, error)
+    fun setUserId(userId: String) {
+        _userId.value = userId
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val uiState: StateFlow<StudentUiState> = _userId.flatMapLatest { userId ->
+        if (userId.isEmpty()) {
+            flowOf(StudentUiState(isLoading = true))
+        } else {
+            combine(
+                dao.getUserFlow(userId),
+                dao.getAllUnits(),
+                dao.getAllUnitsWithModules(),
+                _isLoading,
+                _error
+            ) { user, units, unitsWithModules, isLoading, error ->
+                StudentUiState(user, units, unitsWithModules, isLoading, error)
+            }
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -72,6 +84,16 @@ class StudentViewModel(val repository: EduAIRepository, private val dao: com.exa
 
     suspend fun getSubtopicById(subtopicId: Long): com.example.edu_ai.data.local.SubtopicEntity? {
         return dao.getSubtopicById(subtopicId)
+    }
+
+    suspend fun getUnitNameBySubtopicId(subtopicId: Long): String? {
+        return dao.getUnitNameBySubtopicId(subtopicId)
+    }
+
+    fun deleteUnit(unitId: Long) {
+        viewModelScope.launch {
+            dao.deleteUnitById(unitId)
+        }
     }
 
     fun triggerCloudSync(userId: String) {

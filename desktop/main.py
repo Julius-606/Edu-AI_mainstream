@@ -18,7 +18,7 @@ import webbrowser
 import argparse
 
 VERSION = "3.1.0"
-DEFAULT_HF_URL = "https://huggingface.co/spaces/Agent606/Edu-AI"
+DEFAULT_HF_URL = "https://huggingface.co/spaces/Agent606/Trace"
 LOCAL_WEB_PORT = 3000
 LOCAL_API_PORT = 7860
 

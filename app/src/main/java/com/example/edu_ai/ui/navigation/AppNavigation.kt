@@ -28,6 +28,7 @@ import com.example.edu_ai.ui.screens.admin.AdminDashboardScreen
 import com.example.edu_ai.ui.screens.settings.MandatoryUpdateLockdownScreen
 import com.example.edu_ai.ui.screens.settings.SettingsScreen
 import com.example.edu_ai.utils.UpdateManager
+import com.example.edu_ai.utils.PreferenceManager
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import kotlinx.coroutines.flow.firstOrNull
@@ -46,16 +47,20 @@ fun AppNavigation() {
 
     LaunchedEffect(Unit) {
         UpdateManager.startPeriodicCheck(scope, repository)
-        val user = dao.getUser().firstOrNull()
-        if (user != null) {
-            val destination = when (user.role) {
-                "Teacher" -> "teacher_dashboard"
-                "Parent" -> "parent_dashboard/${user.id}"
-                "Admin" -> "admin_dashboard"
-                else -> "student_dashboard/${user.id}"
-            }
-            navController.navigate(destination) {
-                popUpTo("login") { inclusive = true }
+        val activeUserId = PreferenceManager.getActiveUserId(context)
+        val token = PreferenceManager.getToken(context)
+        if (!activeUserId.isNullOrBlank() && !token.isNullOrBlank()) {
+            val user = dao.getUserById(activeUserId)
+            if (user != null) {
+                val destination = when (user.role) {
+                    "Teacher" -> "teacher_dashboard"
+                    "Parent" -> "parent_dashboard/${user.id}"
+                    "Admin" -> "admin_dashboard"
+                    else -> "student_dashboard/${user.id}"
+                }
+                navController.navigate(destination) {
+                    popUpTo("login") { inclusive = true }
+                }
             }
         }
     }
@@ -109,12 +114,30 @@ fun AppNavigation() {
         }
 
         composable(
-            route = "student_dashboard/{userId}",
-            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+            route = "student_dashboard/{userId}?tab={tab}&unit={unit}&topic={topic}",
+            arguments = listOf(
+                navArgument("userId") { type = NavType.StringType },
+                navArgument("tab") { type = NavType.StringType; defaultValue = "dashboard" },
+                navArgument("unit") { type = NavType.StringType; defaultValue = "" },
+                navArgument("topic") { type = NavType.StringType; defaultValue = "" }
+            )
         ) { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            val tab = backStackEntry.arguments?.getString("tab") ?: "dashboard"
+            val rawUnit = backStackEntry.arguments?.getString("unit") ?: ""
+            val rawTopic = backStackEntry.arguments?.getString("topic") ?: ""
+            val initialUnit = if (rawUnit.isNotEmpty()) {
+                try { java.net.URLDecoder.decode(rawUnit, "UTF-8") } catch (e: Exception) { rawUnit }
+            } else null
+            val initialTopic = if (rawTopic.isNotEmpty()) {
+                try { java.net.URLDecoder.decode(rawTopic, "UTF-8") } catch (e: Exception) { rawTopic }
+            } else null
+
             StudentDashboard(
                 userId = userId,
+                initialTab = tab,
+                initialUnit = initialUnit,
+                initialTopic = initialTopic,
                 onLogout = {
                     scope.launch {
                         repository.logout(context)
@@ -175,6 +198,13 @@ fun AppNavigation() {
                 onBack = { navController.popBackStack() },
                 onNavigateToBrowser = { url ->
                     navController.navigate("browser_screen/$userId?url=$url")
+                },
+                onNavigateToQuiz = { unitName, subtopicName ->
+                    val encodedUnit = try { java.net.URLEncoder.encode(unitName, "UTF-8") } catch (e: Exception) { unitName }
+                    val encodedTopic = try { java.net.URLEncoder.encode(subtopicName, "UTF-8") } catch (e: Exception) { subtopicName }
+                    navController.navigate("student_dashboard/$userId?tab=assessment&unit=$encodedUnit&topic=$encodedTopic") {
+                        popUpTo("student_dashboard/$userId") { inclusive = true }
+                    }
                 }
             )
         }

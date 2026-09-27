@@ -66,7 +66,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
                 T
               </div>
               <div>
-                <h2 className="text-base font-bold text-white leading-tight">Trace Portal</h2>
+                <h2 className="text-base font-bold text-white leading-tight">Trace Learning</h2>
                 <p className="text-xs text-indigo-400 font-medium">{user.role} Workspace</p>
               </div>
             </div>

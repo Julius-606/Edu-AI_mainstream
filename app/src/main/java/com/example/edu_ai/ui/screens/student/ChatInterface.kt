@@ -29,8 +29,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.edu_ai.data.local.ChatSessionEntity
+import com.example.edu_ai.data.model.HighlightColor
+import com.example.edu_ai.data.model.TextHighlight
 import com.example.edu_ai.data.remote.ai.ChatMessage
 import com.example.edu_ai.ui.components.FormattedText
+import com.example.edu_ai.ui.components.HighlighterBar
+import com.example.edu_ai.ui.components.QuickAddHighlightDialog
+import com.example.edu_ai.ui.components.ManageHighlightsBottomSheet
+import com.example.edu_ai.utils.HighlightManager
 import com.example.edu_ai.utils.TactileFeedback
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -262,9 +268,9 @@ fun ChatInterface(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
+                contentPadding = PaddingValues(vertical = 12.dp)
             ) {
                 items(uiState.messages) { message ->
                     ModernChatBubble(message = message, context = context)
@@ -512,7 +518,11 @@ fun ModernChatBubble(message: ChatMessage, context: Context) {
     ) {
         Row(
             verticalAlignment = Alignment.Top,
-            modifier = Modifier.widthIn(max = 320.dp)
+            modifier = if (isUser) {
+                Modifier.fillMaxWidth(0.85f).widthIn(max = 380.dp)
+            } else {
+                Modifier.fillMaxWidth()
+            }
         ) {
             if (!isUser) {
                 Surface(
@@ -532,21 +542,63 @@ fun ModernChatBubble(message: ChatMessage, context: Context) {
                 Spacer(modifier = Modifier.width(8.dp))
             }
 
-            Surface(
-                color = containerColor,
-                contentColor = contentColor,
-                shape = RoundedCornerShape(
-                    topStart = 16.dp,
-                    topEnd = 16.dp,
-                    bottomStart = if (isUser) 16.dp else 4.dp,
-                    bottomEnd = if (isUser) 4.dp else 16.dp
-                ),
-                border = if (!isUser) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null,
-                modifier = Modifier.weight(1f, fill = false)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+            if (isUser) {
+                Surface(
+                    color = containerColor,
+                    contentColor = contentColor,
+                    shape = RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 16.dp,
+                        bottomStart = 16.dp,
+                        bottomEnd = 4.dp
+                    ),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        FormattedText(
+                            text = message.content,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                lineHeight = 20.sp,
+                                fontSize = 13.sp,
+                                color = contentColor
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val clip = ClipData.newPlainText("Consultation Message", message.content)
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.size(18.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.ContentCopy,
+                                    contentDescription = "Copy",
+                                    tint = Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .weight(1f, fill = true)
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp, horizontal = 2.dp)
+                ) {
                     FormattedText(
                         text = message.content,
+                        modifier = Modifier.fillMaxWidth(),
                         style = MaterialTheme.typography.bodyMedium.copy(
                             lineHeight = 20.sp,
                             fontSize = 13.sp,
@@ -572,7 +624,7 @@ fun ModernChatBubble(message: ChatMessage, context: Context) {
                             Icon(
                                 Icons.Default.ContentCopy,
                                 contentDescription = "Copy",
-                                tint = if (isUser) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline,
+                                tint = MaterialTheme.colorScheme.outline,
                                 modifier = Modifier.size(12.dp)
                             )
                         }

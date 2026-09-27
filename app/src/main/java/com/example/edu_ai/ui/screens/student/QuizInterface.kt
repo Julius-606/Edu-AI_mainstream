@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.edu_ai.data.local.ModuleWithTopics
+import com.example.edu_ai.data.local.TopicWithSubtopics
 import com.example.edu_ai.data.local.QuizHistoryEntity
 import com.example.edu_ai.data.local.UnitEntity
 import com.example.edu_ai.data.local.UnitWithModules
@@ -332,63 +333,141 @@ fun ModuleAccordion(
                 moduleWithTopics.module.name,
                 style = MaterialTheme.typography.bodyMedium,
                 fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                "${moduleWithTopics.topics.size} topics",
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.outline
             )
         }
         if (expanded) {
-            moduleWithTopics.topics.flatMap { it.subtopics }.forEach { subtopic ->
-                val subtopicHistory = history.filter { it.unitName.equals(subtopic.name, ignoreCase = true) }
-                    .sortedBy { it.timestamp }
+            Column(modifier = Modifier.padding(start = 14.dp, top = 2.dp, bottom = 4.dp)) {
+                moduleWithTopics.topics.forEach { topicWithSubtopics ->
+                    TopicAccordion(
+                        unitName = unitName,
+                        topicWithSubtopics = topicWithSubtopics,
+                        history = history,
+                        onSubtopicClicked = onSubtopicClicked
+                    )
+                }
+            }
+        }
+    }
+}
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 20.dp, top = 5.dp, bottom = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+@Composable
+fun TopicAccordion(
+    unitName: String,
+    topicWithSubtopics: TopicWithSubtopics,
+    history: List<QuizHistoryEntity>,
+    onSubtopicClicked: (String) -> Unit
+) {
+    var topicExpanded by remember { mutableStateOf(true) }
+    Column(modifier = Modifier.padding(vertical = 2.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { topicExpanded = !topicExpanded }
+                .padding(vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (topicExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(14.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Icon(
+                imageVector = Icons.Default.Folder,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.85f),
+                modifier = Modifier.size(14.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                topicWithSubtopics.topic.name,
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                "${topicWithSubtopics.subtopics.size} subtopics",
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.outline
+            )
+        }
+        if (topicExpanded) {
+            Column(modifier = Modifier.padding(start = 18.dp, top = 2.dp, bottom = 4.dp)) {
+                topicWithSubtopics.subtopics.forEach { subtopic ->
+                    val subtopicHistory = history.filter { it.unitName.equals(subtopic.name, ignoreCase = true) }
+                        .sortedBy { it.timestamp }
+
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f).clickable { onSubtopicClicked(subtopic.name) }
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Icon(
-                            imageVector = if (subtopic.isCompleted) Icons.Default.CheckCircle else Icons.Default.School,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = if (subtopic.isCompleted) Color(0xFF10B981) else MaterialTheme.colorScheme.outline
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            subtopic.name,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    
-                    // Distinguish initial attempts vs retakes on subtopic bubbles
-                    if (subtopicHistory.isNotEmpty()) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(start = 6.dp)
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f).clickable { onSubtopicClicked(subtopic.name) }
                         ) {
-                            subtopicHistory.forEachIndexed { idx, attempt ->
-                                val isInitial = idx == 0
-                                val bubbleColor = if (attempt.pnlScore >= 70) Color(0xFF10B981) else Color(0xFFEF4444)
-                                val label = if (isInitial) "1st: ${attempt.pnlScore.toInt()}%" else "Retake #${idx}: ${attempt.pnlScore.toInt()}%"
-                                
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = bubbleColor.copy(alpha = 0.15f),
-                                    border = BorderStroke(1.dp, bubbleColor.copy(alpha = 0.5f))
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = bubbleColor,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                    )
+                            Icon(
+                                imageVector = if (subtopic.isCompleted) Icons.Default.CheckCircle else Icons.Default.School,
+                                contentDescription = null,
+                                modifier = Modifier.size(13.dp),
+                                tint = if (subtopic.isCompleted) Color(0xFF10B981) else MaterialTheme.colorScheme.outline
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                subtopic.name,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // Distinguish initial attempts vs retakes on subtopic bubbles
+                        if (subtopicHistory.isNotEmpty()) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(start = 6.dp)
+                            ) {
+                                subtopicHistory.forEachIndexed { idx, attempt ->
+                                    val isInitial = idx == 0
+                                    val isUnfinished = attempt.status == "Unfinished"
+                                    val bubbleColor = if (isUnfinished) Color(0xFFF59E0B) else if (attempt.pnlScore >= 70) Color(0xFF10B981) else Color(0xFFEF4444)
+                                    val formattedTime = if (attempt.timeElapsed > 0) {
+                                        val m = attempt.timeElapsed / 60
+                                        val s = attempt.timeElapsed % 60
+                                        String.format(" (%02d:%02d)", m, s)
+                                    } else ""
+                                    val label = if (isUnfinished) {
+                                        if (isInitial) "1st: Unfinished$formattedTime" else "Retake #${idx}: Unfinished$formattedTime"
+                                    } else {
+                                        if (isInitial) "1st: ${attempt.pnlScore.toInt()}%$formattedTime" else "Retake #${idx}: ${attempt.pnlScore.toInt()}%$formattedTime"
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = bubbleColor.copy(alpha = 0.15f),
+                                        border = BorderStroke(1.dp, bubbleColor.copy(alpha = 0.5f))
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = bubbleColor,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -409,6 +488,9 @@ fun QuizQuestionScreen(
     val currentQuestion = quiz.questions.getOrNull(currentIdx) ?: return
     val selectedOption = uiState.selectedOptions[currentIdx]
     val isSubmitted = uiState.submittedQuestions.contains(currentIdx)
+
+    val localBookmarks by viewModel.bookmarks.collectAsState(initial = emptyList())
+    val isBookmarked = localBookmarks.any { it.type == "quiz" && it.target == currentQuestion.text }
 
     Column(
         modifier = Modifier
@@ -448,6 +530,42 @@ fun QuizQuestionScreen(
                 color = MaterialTheme.colorScheme.primary
             )
 
+            if (uiState.timerActive) {
+                val mins = uiState.timerSecondsElapsed / 60
+                val secs = uiState.timerSecondsElapsed % 60
+                val timerString = String.format("%02d:%02d", mins, secs)
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = "Timer",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Time Elapsed:",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                    Text(
+                        text = timerString,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(20.dp))
 
             // Question Card
@@ -457,13 +575,61 @@ fun QuizQuestionScreen(
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = currentQuestion.text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        lineHeight = 22.sp,
-                        fontSize = 14.sp
-                    )
+                    if (!currentQuestion.learningOutcome.isNullOrBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                            modifier = Modifier.padding(bottom = 10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.TrackChanges,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Target Outcome: ${currentQuestion.learningOutcome}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = currentQuestion.text,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 22.sp,
+                            fontSize = 14.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = {
+                                viewModel.toggleQuestionBookmark(currentQuestion.text)
+                            },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = "Bookmark Question",
+                                tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -551,6 +717,26 @@ fun QuizQuestionScreen(
                             fontSize = 11.sp,
                             lineHeight = 16.sp
                         )
+                        if (!currentQuestion.learningOutcome.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Color(0xFF10B981),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    text = "Outcome Tested: ${currentQuestion.learningOutcome}",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -594,6 +780,18 @@ fun QuizQuestionScreen(
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = { viewModel.exitAndSaveUnfinished() },
+            modifier = Modifier.fillMaxWidth().height(42.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+        ) {
+            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("EXIT & SAVE AS UNFINISHED", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

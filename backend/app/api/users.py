@@ -223,6 +223,22 @@ def get_personalized_ai_timetable(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    is_force = False
+    if payload and getattr(payload, 'force_refresh', False):
+        is_force = True
+
+    if not is_force:
+        one_week_ago = time.time() - (7 * 24 * 60 * 60)
+        existing_timetable = db.query(models.Timetable).filter(
+            models.Timetable.owner_id == user.id,
+            models.Timetable.timestamp > one_week_ago
+        ).order_by(models.Timetable.timestamp.desc()).first()
+        if existing_timetable:
+            return schemas.TimetableResponse(
+                weekly_plan=existing_timetable.weekly_plan_json,
+                ai_brief=existing_timetable.ai_brief
+            )
+
     quiz_history = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
     active_units = [u.name for u in user.units if u.is_active]
     recent_sessions = db.query(models.ChatSession).filter(models.ChatSession.owner_id == user.id).order_by(models.ChatSession.id.desc()).limit(10).all()

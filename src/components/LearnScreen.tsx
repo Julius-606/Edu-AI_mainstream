@@ -54,6 +54,7 @@ export const LearnScreen: React.FC<LearnScreenProps> = ({
   const currentObjective: SubtopicObjective | undefined = objectives[currentObjIndex] || objectives[0];
 
   const [isCompleted, setIsCompleted] = useState(activeSubtopic?.isCompleted ?? false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarkNote, setBookmarkNote] = useState('');
   const [showBookmarkInput, setShowBookmarkInput] = useState(false);
@@ -296,16 +297,21 @@ export const LearnScreen: React.FC<LearnScreenProps> = ({
             onClick={() => {
               if (currentObjIndex < objectives.length - 1) {
                 setCurrentObjIndex(currentObjIndex + 1);
-              } else if (currentIndex < allSubtopics.length - 1) {
-                setCurrentIndex(currentIndex + 1);
-                setCurrentObjIndex(0);
+              } else {
+                if (!isCompleted) {
+                  handleToggleComplete();
+                }
+                setShowCompletionModal(true);
               }
             }}
-            disabled={currentIndex === allSubtopics.length - 1 && currentObjIndex === objectives.length - 1}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors shadow-md"
           >
-            <span>Next Part</span>
-            <ChevronRight className="w-4 h-4" />
+            <span>{currentObjIndex < objectives.length - 1 ? 'Next Part' : 'Complete Subtopic'}</span>
+            {currentObjIndex < objectives.length - 1 ? (
+              <ChevronRight className="w-4 h-4" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+            )}
           </button>
         </div>
       </div>
@@ -390,17 +396,65 @@ export const LearnScreen: React.FC<LearnScreenProps> = ({
         <div>
           <h3 className="text-base font-bold text-white">Consolidate with Knowledge Retrieval</h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Test retention and calculate your PnL score on {activeItem?.topicName}.
+            Test retention and calculate your PnL score on {activeSubtopic?.name}.
           </p>
         </div>
         <button
-          onClick={() => onLaunchQuiz(unit.unitName, activeItem?.topicName)}
+          onClick={() => onLaunchQuiz(unit.unitName, activeSubtopic?.name)}
           className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs tracking-wider uppercase transition-all shadow-lg shadow-indigo-600/30"
         >
           <span>Launch Quiz</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Subtopic Completion Modal */}
+      {showCompletionModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center mx-auto">
+              <Sparkles className="w-7 h-7" />
+            </div>
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Milestone Completed</span>
+              <h3 className="text-xl font-black text-white mt-1">Subtopic Completed!</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                You've successfully mastered all objectives for{' '}
+                <span className="text-indigo-300 font-semibold">{activeSubtopic?.name}</span>.
+              </p>
+            </div>
+            <p className="text-xs text-slate-300 bg-slate-950 border border-slate-800/80 rounded-2xl p-4 leading-relaxed">
+              Would you like to take a knowledge retrieval quiz on this subtopic now to calculate your PnL retention score, or skip for now?
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                onClick={() => {
+                  setShowCompletionModal(false);
+                  onLaunchQuiz(unit.unitName, activeSubtopic?.name);
+                }}
+                className="flex-1 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2"
+              >
+                <span>Take Quiz Now</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => {
+                  setShowCompletionModal(false);
+                  if (currentIndex < allSubtopics.length - 1) {
+                    setCurrentIndex(currentIndex + 1);
+                    setCurrentObjIndex(0);
+                  } else {
+                    onBack();
+                  }
+                }}
+                className="flex-1 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors"
+              >
+                Skip for Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -183,8 +183,35 @@ fun ConnectScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 if (filteredCatalog.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        Text("No matching peers found.", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                TactileFeedback.triggerSubtleClick(context)
+                                val newPeer = Peer(
+                                    id = (110 + (0..100).random()).toString(),
+                                    name = searchQuery.trim(),
+                                    role = "Academic Peer",
+                                    status = "Available",
+                                    isOnline = true
+                                )
+                                if (peers.none { it.name.equals(newPeer.name, ignoreCase = true) }) {
+                                    peers.add(newPeer)
+                                }
+                                selectedPeer = newPeer
+                                searchQuery = ""
+                                showSearchResults = false
+                            }
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "No exact peer found. Tap to add and start chatting with '${searchQuery}'!",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 } else {
                     LazyColumn {

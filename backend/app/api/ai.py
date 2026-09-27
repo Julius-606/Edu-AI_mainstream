@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.models import database_models as models
 from app.schemas import api_schemas as schemas
 from app.services.ai_service import ai_service
+from app.services.curriculum_service import get_unit_learning_outcomes
 
 router = APIRouter(prefix="/ai", tags=["AI Intelligence"])
 
@@ -47,19 +48,37 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
 def generate_quiz(
     request: schemas.QuizRequest,
     topic: Optional[str] = Query(None),
+    subtopic: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     user = find_user(str(request.user_id), db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    chosen_subtopic = request.subtopic or request.topic or subtopic or topic
+
+    # Refer directly to that particular unit's learning outcomes from the curriculum database
+    learning_outcomes = get_unit_learning_outcomes(
+        unit_name=request.unit_name,
+        db=db,
+        user=user,
+        subtopic_name=chosen_subtopic,
+        client_outcomes=request.learning_outcomes
+    )
+
     quiz_data = ai_service.generate_quiz(
         unit_name=request.unit_name,
         student_level=user.semester_status,
-        topic=topic
+        topic=chosen_subtopic,
+        learning_outcomes=learning_outcomes
     )
     if not quiz_data:
         raise HTTPException(status_code=500, detail="Failed to ignite the Quiz Engine.")
+
+    if isinstance(quiz_data, dict):
+        if "learning_outcomes" not in quiz_data or not quiz_data["learning_outcomes"]:
+            quiz_data["learning_outcomes"] = learning_outcomes
+
     return quiz_data
 
 @router.get("/recommendations/{user_id}", response_model=schemas.RecommendationResponse)
@@ -67,6 +86,16 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db)):
     user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    import time
+    one_day_ago = time.time() - 86400
+    existing_rec = db.query(models.Recommendation).filter(
+        models.Recommendation.owner_id == user.id,
+        models.Recommendation.timestamp > one_day_ago
+    ).order_by(models.Recommendation.timestamp.desc()).first()
+
+    if existing_rec:
+        return schemas.RecommendationResponse(recommendation=existing_rec.recommendation)
 
     quiz_history = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
     active_units = [u.name for u in user.units if u.is_active]
@@ -93,6 +122,16 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db)):
     )
 
     rec_text = ai_service.get_recommendations(user_info, quiz_history, active_units, study_context=db_context)
+    
+    if rec_text:
+        new_db_rec = models.Recommendation(
+            owner_id=user.id,
+            recommendation=rec_text,
+            timestamp=time.time()
+        )
+        db.add(new_db_rec)
+        db.commit()
+
     return schemas.RecommendationResponse(recommendation=rec_text or "Keep going!")
 
 @router.post("/recommendations/{user_id}", response_model=schemas.RecommendationResponse)
@@ -105,6 +144,21 @@ def get_personalized_recommendations(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    import time
+    is_force = False
+    if payload and getattr(payload, 'force_refresh', False):
+        is_force = True
+
+    if not is_force:
+        one_day_ago = time.time() - 86400
+        existing_rec = db.query(models.Recommendation).filter(
+            models.Recommendation.owner_id == user.id,
+            models.Recommendation.timestamp > one_day_ago
+        ).order_by(models.Recommendation.timestamp.desc()).first()
+
+        if existing_rec:
+            return schemas.RecommendationResponse(recommendation=existing_rec.recommendation)
+
     quiz_history = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
     active_units = [u.name for u in user.units if u.is_active]
 
@@ -115,6 +169,16 @@ def get_personalized_recommendations(
     }
 
     rec_text = ai_service.get_recommendations(user_info, quiz_history, active_units, study_context=payload)
+    
+    if rec_text:
+        new_db_rec = models.Recommendation(
+            owner_id=user.id,
+            recommendation=rec_text,
+            timestamp=time.time()
+        )
+        db.add(new_db_rec)
+        db.commit()
+
     return schemas.RecommendationResponse(recommendation=rec_text or "Keep pushing your boundaries!")
 
 

@@ -105,7 +105,7 @@ def is_authenticated_admin(request: Request, db: Session) -> bool:
 def build_curriculum_catalog(db: Session) -> List[Dict[str, Any]]:
     """Builds hierarchical catalog grouped by Field -> Course -> Unit Group -> Units."""
     units = db.query(models.Unit).filter(models.Unit.owner_id == None).all()
-    fields_map: Dict[str, Dict[str, Dict[str, List[models.Unit]]]] = {}
+    fields_map: Dict[str, Dict[str, Dict[str, List[Dict[str, Any]]]]] = {}
 
     for u in units:
         field_name = u.category or "General"
@@ -119,7 +119,15 @@ def build_curriculum_catalog(db: Session) -> List[Dict[str, Any]]:
         if group_name not in fields_map[field_name][course_name]:
             fields_map[field_name][course_name][group_name] = []
 
-        fields_map[field_name][course_name][group_name].append(u)
+        unit_dict = {
+            "id": u.id,
+            "name": u.name,
+            "category": u.category,
+            "course": getattr(u, "course", "General") or "General",
+            "unit_group": getattr(u, "unit_group", None),
+            "modules": [{"id": m.id, "name": m.name} for m in u.modules]
+        }
+        fields_map[field_name][course_name][group_name].append(unit_dict)
 
     catalog = []
     for field_name, courses_dict in fields_map.items():
@@ -417,9 +425,16 @@ async def admin_user_update(
 
 
 @router.post("/admin/users/{user_id}/delete")
-async def admin_user_delete(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
+@router.delete("/api/admin/users/{user_id}")
+async def admin_user_delete(user_id: str, request: Request, db: Session = Depends(get_db)):
+    user = None
+    if str(user_id).isdigit():
+        user = db.query(models.User).filter(models.User.id == int(user_id)).first()
+    if not user:
+        user = db.query(models.User).filter(models.User.username == str(user_id)).first()
+    
     if user:
+        uid = user.id
         uname = user.username
         db.delete(user)
         db.commit()
@@ -427,9 +442,13 @@ async def admin_user_delete(user_id: int, db: Session = Depends(get_db)):
             db,
             category="SYSTEM_ALERT",
             title="User Account Deleted",
-            message=f"Admin deleted user #{user_id} ({uname}) and associated records.",
+            message=f"Admin deleted user #{uid} ({uname}) and associated records.",
             level="warning"
         )
+        if "application/json" in request.headers.get("accept", "") or request.url.path.startswith("/api/"):
+            return JSONResponse(content={"status": "success", "message": f"User #{uid} deleted"})
+    elif "application/json" in request.headers.get("accept", "") or request.url.path.startswith("/api/"):
+        return JSONResponse(status_code=404, content={"status": "error", "message": f"User {user_id} not found"})
     return RedirectResponse(url="/admin/users", status_code=303)
 
 
@@ -561,8 +580,11 @@ async def admin_update_node(
 
 
 @router.post("/admin/nodes/{node_type}/{node_id}/delete")
+@router.delete("/api/admin/nodes/{node_type}/{node_id}")
 async def admin_delete_node(node_type: str, node_id: int, request: Request, db: Session = Depends(get_db)):
-    if node_type == "module":
+    if node_type == "unit":
+        item = db.query(models.Unit).filter(models.Unit.id == node_id).first()
+    elif node_type == "module":
         item = db.query(models.Module).filter(models.Module.id == node_id).first()
     elif node_type == "topic":
         item = db.query(models.Topic).filter(models.Topic.id == node_id).first()
@@ -576,7 +598,21 @@ async def admin_delete_node(node_type: str, node_id: int, request: Request, db: 
     if item:
         db.delete(item)
         db.commit()
+    
+    if "application/json" in request.headers.get("accept", "") or request.url.path.startswith("/api/"):
+        return JSONResponse(content={"status": "success", "message": f"{node_type} #{node_id} deleted"})
     return RedirectResponse(url=request.headers.get("referer", "/admin/catalogue"), status_code=303)
+
+
+@router.post("/api/admin/units/{unit_id}/delete")
+@router.delete("/api/admin/units/{unit_id}")
+async def admin_delete_unit(unit_id: int, db: Session = Depends(get_db)):
+    unit = db.query(models.Unit).filter(models.Unit.id == unit_id).first()
+    if unit:
+        db.delete(unit)
+        db.commit()
+        return JSONResponse(content={"status": "success", "message": f"Unit #{unit_id} successfully deleted"})
+    return JSONResponse(status_code=404, content={"status": "error", "message": f"Unit #{unit_id} not found"})
 
 
 @router.get("/admin/database", response_class=HTMLResponse)

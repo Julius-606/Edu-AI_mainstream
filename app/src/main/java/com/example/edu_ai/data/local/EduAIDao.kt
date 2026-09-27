@@ -14,9 +14,15 @@ interface EduAIDao {
 
     @Query("SELECT * FROM users LIMIT 1")
     fun getUser(): Flow<UserEntity?>
+
+    @Query("SELECT * FROM users WHERE id = :userId")
+    fun getUserFlow(userId: String): Flow<UserEntity?>
     
     @Query("SELECT * FROM users WHERE id = :userId")
     suspend fun getUserById(userId: String): UserEntity?
+
+    @Query("SELECT * FROM users WHERE email = :email OR username = :email LIMIT 1")
+    suspend fun getUserByEmailOrUsername(email: String): UserEntity?
 
     @Query("DELETE FROM users")
     suspend fun clearUsers()
@@ -34,6 +40,9 @@ interface EduAIDao {
 
     @Query("DELETE FROM units")
     suspend fun deleteAllUnits()
+
+    @Query("DELETE FROM units WHERE localId = :unitId")
+    suspend fun deleteUnitById(unitId: Long)
 
     // Modules
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -70,6 +79,15 @@ interface EduAIDao {
 
     @Query("SELECT * FROM subtopics WHERE subtopicId = :subtopicId LIMIT 1")
     suspend fun getSubtopicById(subtopicId: Long): SubtopicEntity?
+
+    @Query("""
+        SELECT u.unitName FROM units u
+        INNER JOIN modules m ON m.unitId = u.localId
+        INNER JOIN topics t ON t.moduleId = m.moduleId
+        INNER JOIN subtopics s ON s.topicId = t.topicId
+        WHERE s.subtopicId = :subtopicId LIMIT 1
+    """)
+    suspend fun getUnitNameBySubtopicId(subtopicId: Long): String?
 
     @Query("SELECT * FROM units WHERE unitName = :name LIMIT 1")
     suspend fun getUnitByName(name: String): UnitEntity?

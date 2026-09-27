@@ -38,7 +38,7 @@ jobs:
           
           # ⚠️ EDIT THESE VARIABLES BEFORE PUSHING ⚠️
           HF_USERNAME: "Agent606"
-          HF_SPACE_NAME: "Edu-AI"
+          HF_SPACE_NAME: "Trace"
         run: |
           echo "🪐 Booting up the Orbit Deployment EA..."
           

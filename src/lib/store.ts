@@ -123,6 +123,19 @@ export class TraceStore {
     return [...units];
   }
 
+  static deleteUnit(unitId: number): Unit[] {
+    const matchedUnit = this.getUnits().find((u) => u.id === unitId);
+    const units = this.getUnits().filter((u) => u.id !== unitId);
+    this.saveUnits(units);
+
+    if (matchedUnit) {
+      const user = this.getUser();
+      user.activeUnits = user.activeUnits.filter((n) => n !== matchedUnit.unitName);
+      this.setUser(user);
+    }
+    return [...units];
+  }
+
   static enrollUnitByName(unitName: string): Unit[] {
     const units = this.getUnits();
     const unit = units.find((u) => u.unitName.toLowerCase() === unitName.toLowerCase());

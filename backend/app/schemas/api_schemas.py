@@ -182,16 +182,21 @@ class ChatResponse(BaseModel):
 class QuizRequest(BaseModel):
     unit_name: str
     user_id: str
+    topic: Optional[str] = None
+    subtopic: Optional[str] = None
+    learning_outcomes: Optional[List[str]] = None
 
 class QuizQuestion(BaseModel):
     question_text: str
     options: List[str]
     correct_option_index: int
     explanation: str
+    learning_outcome: Optional[str] = None
 
 class QuizResponse(BaseModel):
     quiz_title: str
     questions: List[QuizQuestion]
+    learning_outcomes: Optional[List[str]] = None
 
 class QuizRecordRequest(BaseModel):
     unit_name: str
@@ -235,6 +240,7 @@ class StudyContextPayload(BaseModel):
     mastered_topics: List[str] = []
     weak_topics: List[str] = []
     recent_quizzes: List[QuizAttemptInfo] = []
+    force_refresh: Optional[bool] = False
 
 class BookmarkBase(BaseModel):
     type: str

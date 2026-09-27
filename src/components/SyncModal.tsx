@@ -129,7 +129,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({ onClose, onSnapshotRestore
                     <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                     <p className="text-xs font-bold text-white">2. Modular Python Backend</p>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5">FastAPI, SQLAlchemy, Pydantic • Deployable on Hugging Face Spaces (Agent606/Edu-AI)</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">FastAPI, SQLAlchemy, Pydantic • Deployable on Hugging Face Spaces (Agent606/Trace)</p>
                 </div>
                 <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Restored & Syncing</span>
               </div>

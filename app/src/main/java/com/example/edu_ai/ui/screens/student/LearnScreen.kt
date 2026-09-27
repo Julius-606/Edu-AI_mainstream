@@ -1,23 +1,38 @@
 package com.example.edu_ai.ui.screens.student
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.BorderColor
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FormatPaint
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -27,9 +42,15 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.edu_ai.data.local.BookmarkEntity
 import com.example.edu_ai.data.local.SubtopicEntity
+import com.example.edu_ai.data.model.HighlightColor
+import com.example.edu_ai.data.model.TextHighlight
 import com.example.edu_ai.data.remote.ChatRequest
 import com.example.edu_ai.ui.components.DynamicBackground
 import com.example.edu_ai.ui.components.FormattedText
+import com.example.edu_ai.ui.components.HighlighterBar
+import com.example.edu_ai.ui.components.QuickAddHighlightDialog
+import com.example.edu_ai.ui.components.ManageHighlightsBottomSheet
+import com.example.edu_ai.utils.HighlightManager
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,16 +60,45 @@ fun LearnScreen(
     subtopicId: Long,
     onBack: () -> Unit,
     onNavigateToBrowser: (String) -> Unit,
+    onNavigateToQuiz: (unitName: String, subtopicName: String) -> Unit = { _, _ -> },
     studentViewModel: StudentViewModel = viewModel(factory = StudentViewModel.Factory)
 ) {
     val uiState by studentViewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     val gson = remember { com.google.gson.Gson() }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     // Load subtopic directly from SQLite database to preserve local cached content and learning objectives
     var dbSubtopic by remember { mutableStateOf<SubtopicEntity?>(null) }
+    var dbSubtopicUnitName by remember { mutableStateOf<String?>(null) }
+    var showQuizPromptDialog by remember { mutableStateOf(false) }
+    var isHighlighterBarOpen by remember { mutableStateOf(false) }
+    var selectedHighlightColor by remember { mutableStateOf(HighlightColor.YELLOW) }
+    var subtopicHighlights by remember { mutableStateOf<List<TextHighlight>>(emptyList()) }
+    var showAddHighlightDialog by remember { mutableStateOf(false) }
+    var showManageHighlightsDialog by remember { mutableStateOf(false) }
+
+    val inquiries = remember { mutableStateListOf<InquiryItem>() }
+
     LaunchedEffect(subtopicId) {
         dbSubtopic = studentViewModel.getSubtopicById(subtopicId)
+        dbSubtopicUnitName = studentViewModel.getUnitNameBySubtopicId(subtopicId)
+        subtopicHighlights = HighlightManager.getHighlights(context, subtopicId)
+
+        // Load persistent inquiries
+        val inquiriesJson = com.example.edu_ai.utils.PreferenceManager.getSubtopicInquiries(context, subtopicId)
+        inquiries.clear()
+        if (!inquiriesJson.isNullOrBlank()) {
+            try {
+                val listType = object : com.google.gson.reflect.TypeToken<List<InquiryItem>>() {}.type
+                val savedList = gson.fromJson<List<InquiryItem>>(inquiriesJson, listType)
+                if (savedList != null) {
+                    inquiries.addAll(savedList)
+                }
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
     }
 
     // Find subtopic from memory state
@@ -135,8 +185,6 @@ fun LearnScreen(
     var aiResponse by remember { mutableStateOf<String?>(null) }
     var isAiLoading by remember { mutableStateOf(false) }
 
-    val context = androidx.compose.ui.platform.LocalContext.current
-
     // Check existing bookmarks
     val localBookmarks by studentViewModel.bookmarks.collectAsState(initial = emptyList())
     LaunchedEffect(localBookmarks, subtopicId) {
@@ -195,48 +243,80 @@ fun LearnScreen(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text(subtopic.name, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, maxLines = 1)
-                            Text(targetUnitName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = {
-                            com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                            onBack()
-                        }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    },
-                    actions = {
-                        if (isStudyingStarted) {
+                Column {
+                    TopAppBar(
+                        title = {
+                            Column {
+                                Text(subtopic.name, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, maxLines = 1)
+                                Text(targetUnitName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                        },
+                        navigationIcon = {
                             IconButton(onClick = {
                                 com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                if (isBookmarked) {
-                                    scope.launch {
-                                        val bm = localBookmarks.find { it.target == subtopicId.toString() && it.type == "learn" }
-                                        if (bm != null) {
-                                            studentViewModel.deleteBookmark(bm.id)
-                                        }
-                                    }
-                                } else {
-                                    showBookmarkDialog = true
-                                }
+                                onBack()
                             }) {
-                                Icon(
-                                    imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                    contentDescription = "Bookmark",
-                                    tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                )
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                             }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                        },
+                        actions = {
+                            if (isStudyingStarted) {
+                                IconButton(onClick = {
+                                    com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                    isHighlighterBarOpen = !isHighlighterBarOpen
+                                }) {
+                                    BadgedBox(badge = {
+                                        if (subtopicHighlights.isNotEmpty()) {
+                                            Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                                                Text("${subtopicHighlights.size}", fontSize = 9.sp)
+                                            }
+                                        }
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Default.BorderColor,
+                                            contentDescription = "Text Highlighter",
+                                            tint = if (isHighlighterBarOpen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+
+                                IconButton(onClick = {
+                                    com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                    if (isBookmarked) {
+                                        scope.launch {
+                                            val bm = localBookmarks.find { it.target == subtopicId.toString() && it.type == "learn" }
+                                            if (bm != null) {
+                                                studentViewModel.deleteBookmark(bm.id)
+                                            }
+                                        }
+                                    } else {
+                                        showBookmarkDialog = true
+                                    }
+                                }) {
+                                    Icon(
+                                        imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                        contentDescription = "Bookmark",
+                                        tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                        )
                     )
-                )
+
+                    AnimatedVisibility(visible = isStudyingStarted && isHighlighterBarOpen) {
+                        HighlighterBar(
+                            selectedColor = selectedHighlightColor,
+                            onColorSelected = { selectedHighlightColor = it },
+                            highlightsCount = subtopicHighlights.size,
+                            onAddHighlightClick = { showAddHighlightDialog = true },
+                            onManageHighlightsClick = { showManageHighlightsDialog = true },
+                            onCloseClick = { isHighlighterBarOpen = false }
+                        )
+                    }
+                }
             }
         ) { padding ->
             androidx.compose.animation.Crossfade(
@@ -405,6 +485,7 @@ fun LearnScreen(
                                 } else {
                                     FormattedText(
                                         text = currentContent ?: "",
+                                        highlights = subtopicHighlights,
                                         onLinkClicked = { link ->
                                             onNavigateToBrowser(link)
                                         }
@@ -438,7 +519,7 @@ fun LearnScreen(
                                 Spacer(modifier = Modifier.height(20.dp))
 
                                 // AI Consultation window
-                                if (aiResponse != null || isAiLoading) {
+                                if (inquiries.isNotEmpty() || isAiLoading) {
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -448,26 +529,88 @@ fun LearnScreen(
                                         )
                                     ) {
                                         Column(modifier = Modifier.padding(12.dp)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(
-                                                    Icons.Default.Star,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    "Socratic Consultation",
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.primary
-                                                )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        Icons.Default.Star,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        "Interactive AI Consultations",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                                if (inquiries.isNotEmpty()) {
+                                                    IconButton(
+                                                        onClick = {
+                                                            inquiries.clear()
+                                                            com.example.edu_ai.utils.PreferenceManager.saveSubtopicInquiries(context, subtopicId, "[]")
+                                                        },
+                                                        modifier = Modifier.size(24.dp)
+                                                    ) {
+                                                        Icon(
+                                                            Icons.Default.Delete,
+                                                            contentDescription = "Clear History",
+                                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                                                            modifier = Modifier.size(14.dp)
+                                                        )
+                                                    }
+                                                }
                                             }
                                             Spacer(modifier = Modifier.height(8.dp))
-                                            if (isAiLoading) {
-                                                CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                                            } else {
-                                                FormattedText(text = aiResponse ?: "")
+                                            
+                                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                inquiries.forEach { inquiry ->
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .background(
+                                                                MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                                                RoundedCornerShape(8.dp)
+                                                            )
+                                                            .padding(8.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "Q: " + inquiry.question,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 11.sp,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.padding(bottom = 4.dp)
+                                                        )
+                                                        if (inquiry.answer.isEmpty()) {
+                                                            Box(
+                                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                                                contentAlignment = Alignment.CenterStart
+                                                            ) {
+                                                                CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                                                            }
+                                                        } else {
+                                                            FormattedText(
+                                                                text = inquiry.answer,
+                                                                highlights = subtopicHighlights,
+                                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                if (isAiLoading && (inquiries.isEmpty() || inquiries.last().answer.isNotEmpty())) {
+                                                    Box(
+                                                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -494,19 +637,45 @@ fun LearnScreen(
                                     StudyChip("Explain with analogy") {
                                         com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
                                         val q = "Please explain the clinical mechanics of '${subtopic.name}' using a simple, relatable medical analogy."
-                                        aiQuestion = q
-                                        triggerAiConsultation(userId, q, studentViewModel, scope) { loading, res ->
+                                        aiQuestion = ""
+                                        val tempItem = InquiryItem(q, "")
+                                        inquiries.add(tempItem)
+                                        isAiLoading = true
+                                        val promptWithInstructions = q + " (At the end of your explanation, optionally ask a single, short, thought-provoking medical question related to the topic to keep the conversation interactive, encouraging Socratic reasoning from the student if appropriate. This is optional, do not always ask.)"
+                                        triggerAiConsultation(userId, promptWithInstructions, studentViewModel, scope) { loading, res ->
                                             isAiLoading = loading
-                                            aiResponse = res
+                                            if (!loading) {
+                                                val idx = inquiries.indexOf(tempItem)
+                                                if (idx != -1) {
+                                                    inquiries[idx] = tempItem.copy(answer = res ?: "No response received.")
+                                                } else {
+                                                    inquiries.add(InquiryItem(q, res ?: "No response received."))
+                                                }
+                                                val json = gson.toJson(inquiries.toList())
+                                                com.example.edu_ai.utils.PreferenceManager.saveSubtopicInquiries(context, subtopicId, json)
+                                            }
                                         }
                                     }
                                     StudyChip("Common exam traps") {
                                         com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
                                         val q = "What are the common medical board exam traps, distractors, and high-yield test points regarding '${subtopic.name}'?"
-                                        aiQuestion = q
-                                        triggerAiConsultation(userId, q, studentViewModel, scope) { loading, res ->
+                                        aiQuestion = ""
+                                        val tempItem = InquiryItem(q, "")
+                                        inquiries.add(tempItem)
+                                        isAiLoading = true
+                                        val promptWithInstructions = q + " (At the end of your explanation, optionally ask a single, short, thought-provoking medical question related to the topic to keep the conversation interactive, encouraging Socratic reasoning from the student if appropriate. This is optional, do not always ask.)"
+                                        triggerAiConsultation(userId, promptWithInstructions, studentViewModel, scope) { loading, res ->
                                             isAiLoading = loading
-                                            aiResponse = res
+                                            if (!loading) {
+                                                val idx = inquiries.indexOf(tempItem)
+                                                if (idx != -1) {
+                                                    inquiries[idx] = tempItem.copy(answer = res ?: "No response received.")
+                                                } else {
+                                                    inquiries.add(InquiryItem(q, res ?: "No response received."))
+                                                }
+                                                val json = gson.toJson(inquiries.toList())
+                                                com.example.edu_ai.utils.PreferenceManager.saveSubtopicInquiries(context, subtopicId, json)
+                                            }
                                         }
                                     }
                                 }
@@ -533,9 +702,23 @@ fun LearnScreen(
                                             com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
                                             val q = aiQuestion.trim()
                                             if (q.isNotEmpty()) {
-                                                triggerAiConsultation(userId, q, studentViewModel, scope) { loading, res ->
+                                                aiQuestion = ""
+                                                val tempItem = InquiryItem(q, "")
+                                                inquiries.add(tempItem)
+                                                isAiLoading = true
+                                                val promptWithInstructions = q + " (At the end of your explanation, optionally ask a single, short, thought-provoking medical question related to the topic to keep the conversation interactive, encouraging Socratic reasoning from the student if appropriate. This is optional, do not always ask.)"
+                                                triggerAiConsultation(userId, promptWithInstructions, studentViewModel, scope) { loading, res ->
                                                     isAiLoading = loading
-                                                    aiResponse = res
+                                                    if (!loading) {
+                                                        val idx = inquiries.indexOf(tempItem)
+                                                        if (idx != -1) {
+                                                            inquiries[idx] = tempItem.copy(answer = res ?: "No response received.")
+                                                        } else {
+                                                            inquiries.add(InquiryItem(q, res ?: "No response received."))
+                                                        }
+                                                        val json = gson.toJson(inquiries.toList())
+                                                        com.example.edu_ai.utils.PreferenceManager.saveSubtopicInquiries(context, subtopicId, json)
+                                                    }
                                                 }
                                             }
                                         },
@@ -579,7 +762,7 @@ fun LearnScreen(
                                         scope.launch {
                                             studentViewModel.toggleSubtopicCompleted(userId, subtopicId, true)
                                         }
-                                        onBack()
+                                        showQuizPromptDialog = true
                                     },
                                     enabled = !isCurrentLoading,
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -650,9 +833,138 @@ fun LearnScreen(
             }
         )
     }
+
+    // Subtopic Completion Quiz Prompt Dialog
+    if (showQuizPromptDialog) {
+        val subtopicName = subtopic.name
+        val unitNameForQuiz = if (targetUnitName.isNotEmpty() && targetUnitName != "Clinical Science") {
+            targetUnitName
+        } else {
+            dbSubtopicUnitName ?: targetUnitName
+        }
+
+        AlertDialog(
+            onDismissRequest = {
+                showQuizPromptDialog = false
+                onBack()
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Psychology,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Subtopic Completed!",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "You've successfully completed all learning objectives for:",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                    ) {
+                        Text(
+                            text = subtopicName,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Would you like to take the knowledge retrieval quiz on this subtopic now, or skip for now?",
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showQuizPromptDialog = false
+                        onNavigateToQuiz(unitNameForQuiz, subtopicName)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.School, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Take Quiz", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showQuizPromptDialog = false
+                        onBack()
+                    },
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Skip")
+                }
+            }
+        )
+    }
+
+    // Quick Add Highlight Dialog
+    if (showAddHighlightDialog) {
+        QuickAddHighlightDialog(
+            selectedColor = selectedHighlightColor,
+            onDismiss = { showAddHighlightDialog = false },
+            onConfirm = { text, color, note ->
+                val newHl = TextHighlight(
+                    text = text,
+                    colorHex = color.hex,
+                    label = color.displayName,
+                    subtopicId = subtopicId,
+                    targetKey = "subtopic_$subtopicId",
+                    note = note
+                )
+                subtopicHighlights = HighlightManager.saveHighlight(context, newHl)
+                showAddHighlightDialog = false
+            }
+        )
+    }
+
+    // Manage Highlights Bottom Sheet
+    if (showManageHighlightsDialog) {
+        ManageHighlightsBottomSheet(
+            highlights = subtopicHighlights,
+            onDeleteHighlight = { id ->
+                subtopicHighlights = HighlightManager.removeHighlight(context, subtopicId, id)
+            },
+            onClearAll = {
+                HighlightManager.clearAllHighlights(context, subtopicId)
+                subtopicHighlights = emptyList()
+                showManageHighlightsDialog = false
+            },
+            onDismiss = { showManageHighlightsDialog = false }
+        )
+    }
 }
 
 data class SyllabusObjective(val title: String, val description: String, val prompt: String)
+
+data class InquiryItem(val question: String, val answer: String, val timestamp: Long = System.currentTimeMillis())
 
 @Composable
 fun StudyChip(text: String, onClick: () -> Unit) {

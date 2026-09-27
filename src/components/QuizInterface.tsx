@@ -9,7 +9,8 @@ import {
   ChevronRight,
   HelpCircle,
   Award,
-  BookOpen
+  BookOpen,
+  Target
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Unit, QuizQuestion, QuizHistoryItem } from '../types';
@@ -34,6 +35,7 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
   );
   const [selectedTopic, setSelectedTopic] = useState<string>(initialTopicName || '');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [quizLearningOutcomes, setQuizLearningOutcomes] = useState<string[]>([]);
 
   // Quiz active state
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -50,11 +52,13 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
     loadQuestions(selectedUnit, selectedTopic);
   }, [selectedUnit, selectedTopic]);
 
-  // Timer effect
+  // Timer effect (counts forward)
   useEffect(() => {
     let interval: any = null;
     if (timerActive && !isCompleted) {
-      interval = setInterval(() => setSeconds((s) => s + 1), 1000);
+      interval = setInterval(() => {
+        setSeconds((s) => s + 1);
+      }, 1000);
     }
     return () => clearInterval(interval);
   }, [timerActive, isCompleted]);
@@ -74,12 +78,37 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
   const handleGenerateAiQuiz = async () => {
     setIsGenerating(true);
     try {
+      // Collect learning outcomes for the unit and subtopic from local curriculum
+      const activeUnitObj = units.find((u) => u.unitName.toLowerCase() === selectedUnit.toLowerCase());
+      const extractedOutcomes: string[] = [];
+      if (activeUnitObj) {
+        activeUnitObj.modules.forEach((m) => {
+          m.topics.forEach((t) => {
+            t.subtopics.forEach((s) => {
+              const isTargetSub = selectedTopic && s.name.toLowerCase().includes(selectedTopic.toLowerCase());
+              s.objectives?.forEach((obj) => {
+                if (obj.description && !extractedOutcomes.includes(obj.description)) {
+                  if (isTargetSub) {
+                    extractedOutcomes.unshift(obj.description);
+                  } else {
+                    extractedOutcomes.push(obj.description);
+                  }
+                }
+              });
+            });
+          });
+        });
+      }
+
       const res = await fetch(`/api/ai/quiz${selectedTopic ? `?topic=${encodeURIComponent(selectedTopic)}` : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           unit_name: selectedUnit,
-          user_id: TraceStore.getUser().id
+          user_id: TraceStore.getUser().id,
+          topic: selectedTopic || null,
+          subtopic: selectedTopic || null,
+          learning_outcomes: extractedOutcomes
         })
       });
       const data = await res.json();
@@ -91,8 +120,10 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
           question: q.question_text || q.question,
           options: q.options,
           correctIndex: typeof q.correct_option_index === 'number' ? q.correct_option_index : (q.correctIndex || 0),
-          explanation: q.explanation || 'High-yield clinical explanation confirmed.'
+          explanation: q.explanation || 'High-yield clinical explanation confirmed.',
+          learningOutcome: q.learning_outcome || null
         }));
+        setQuizLearningOutcomes(data.learning_outcomes || extractedOutcomes);
         setQuestions(mappedQuestions);
         setCurrentIndex(0);
         setSelectedOption(null);
@@ -157,7 +188,9 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
       pnlScore,
       timestamp: Date.now(),
       questions,
-      userAnswers
+      userAnswers,
+      status: 'Completed',
+      timeElapsed: seconds
     });
 
     // Record in backend database
@@ -263,6 +296,13 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
 
             {/* Question Stem */}
             <div>
+              {currentQ.learningOutcome && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 mb-3">
+                  <Target className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="font-semibold text-slate-400">Target Outcome:</span>
+                  <span className="font-medium text-amber-200">{currentQ.learningOutcome}</span>
+                </div>
+              )}
               <h2 className="text-base sm:text-lg font-bold text-white leading-relaxed">
                 {currentQ.question}
               </h2>
@@ -313,25 +353,77 @@ export const QuizInterface: React.FC<QuizInterfaceProps> = ({
 
             {/* Immediate Clinical Rationale Disclosure */}
             {revealed && (
-              <div className="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-2 animate-in fade-in duration-200">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Clinical Rationale & Analysis</span>
+              <div className="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-3 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Clinical Rationale & Analysis</span>
+                  </div>
+                  {currentQ.learningOutcome && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-amber-300 bg-amber-950/40 border border-amber-500/30 px-2.5 py-0.5 rounded-full font-medium">
+                      <Target className="w-3 h-3 text-amber-400" />
+                      <span>Outcome Verified</span>
+                    </div>
+                  )}
                 </div>
                 <div className="text-xs text-slate-300 leading-relaxed">
                   <FormattedText text={currentQ.explanation} />
                 </div>
+                {currentQ.learningOutcome && (
+                  <div className="pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-start gap-1.5">
+                    <span className="font-semibold text-amber-400 shrink-0">Assessed Unit Outcome:</span>
+                    <span className="text-slate-300">{currentQ.learningOutcome}</span>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Confirm / Next Controls */}
             <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-              <button
-                onClick={onBack}
-                className="text-xs font-semibold text-slate-400 hover:text-white"
-              >
-                Exit Assessment
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (confirm("Are you sure you want to exit? The quiz will be saved as 'Unfinished' in your performance history.")) {
+                      TraceStore.recordQuizResult({
+                        userId: TraceStore.getUser().id,
+                        unitName: selectedUnit,
+                        topicName: selectedTopic || undefined,
+                        score: Object.entries(userAnswers).filter(
+                          ([idx, ans]) => questions[Number(idx)]?.correctIndex === ans
+                        ).length,
+                        total: questions.length,
+                        pnlScore: questions.length > 0 ? Math.round((Object.entries(userAnswers).filter(
+                          ([idx, ans]) => questions[Number(idx)]?.correctIndex === ans
+                        ).length / questions.length) * 100) : 0,
+                        timestamp: Date.now(),
+                        questions,
+                        userAnswers,
+                        status: 'Unfinished',
+                        timeElapsed: seconds
+                      });
+                      onBack();
+                    }
+                  }}
+                  className="text-xs font-semibold text-slate-400 hover:text-white"
+                >
+                  Exit
+                </button>
+                <span className="text-slate-800">|</span>
+                <button
+                  onClick={() => {
+                    if (confirm("Are you sure you want to skip and discard this quiz?")) {
+                      setQuestions([]);
+                      setTimerActive(false);
+                      setUserAnswers({});
+                      setSelectedOption(null);
+                      setSeconds(0);
+                    }
+                  }}
+                  className="text-xs font-semibold text-red-400 hover:text-red-300"
+                >
+                  Skip Quiz
+                </button>
+              </div>
 
               {!revealed ? (
                 <button

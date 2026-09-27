@@ -52,12 +52,13 @@ class TimetableViewModel(
                     response.aiBrief
                 } else {
                     val weak = studyContext.weakTopics.firstOrNull()
+                    val pending = studyContext.pendingSubtopicNames.firstOrNull() ?: "core syllabus milestones"
                     val score = studyContext.averageQuizScore?.toInt()
-                    val base = "Zenith AI has formulated 4 tactical daily study quadrants."
-                    if (weak != null && score != null) {
-                        "$base Prioritizing high-yield retention in $weak based on your current $score% average diagnostic score."
+                    val base = "Zenith AI Weekly Tactical Blueprint: Calibrated around your real-time learning metrics."
+                    if (weak != null) {
+                        "$base Prioritizing high-yield retention drills in $weak (current diagnostic accuracy: ${score ?: 65}%) while systematically conquering uncovered topics like $pending. Keep pushing your boundaries!"
                     } else {
-                        "$base Dynamically calibrated around your syllabus pace and active modules."
+                        "$base Accelerating forward through uncovered milestones starting with $pending. Your quiz mastery is consistently strong—maintain this relentless momentum!"
                     }
                 }
 
@@ -68,9 +69,14 @@ class TimetableViewModel(
                 )
             } catch (e: Exception) {
                 val studyContext = try { repository.buildStudyContext(user.id) } catch (ex: Exception) { null }
+                val weak = studyContext?.weakTopics?.firstOrNull()
+                val pending = studyContext?.pendingSubtopicNames?.firstOrNull() ?: "core syllabus milestones"
+                val brief = "Local Zenith Adaptive Engine: Focused on tackling diagnostic weak areas" +
+                    (if (weak != null) " in $weak" else "") +
+                    " and mastering uncovered milestones in $pending. Stay focused!"
                 _uiState.value = TimetableUiState(
                     weeklyPlan = generateFallbackRichPlan(studyContext),
-                    aiBrief = "Local Zenith Adaptive Engine: Schedule calibrated to address diagnostic review and active curriculum milestones.",
+                    aiBrief = brief,
                     isLoading = false
                 )
             }
@@ -80,7 +86,7 @@ class TimetableViewModel(
     private fun generateFallbackRichPlan(studyContext: ApiStudyContextPayload?): List<ApiTimetableSlot> {
         val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
         
-        // Dynamically pull active units and weak topics from user's actual database
+        // Dynamically pull active units, pending subtopics, and weak topics from user's actual database
         val availableUnits = studyContext?.unitsProgress?.map { it.unitName }?.filter { it.isNotBlank() } ?: emptyList()
         val defaultUnits = if (availableUnits.isNotEmpty()) {
             availableUnits
@@ -88,17 +94,20 @@ class TimetableViewModel(
             listOf("Internal Medicine I", "Clinical Pharmacology", "General Surgery I")
         }
 
-        val weakTarget = studyContext?.weakTopics?.firstOrNull() ?: defaultUnits.first()
-        val pendingTarget = studyContext?.pendingSubtopicNames?.firstOrNull() ?: "Core Syllabus Module"
+        val weakList = if (!studyContext?.weakTopics.isNullOrEmpty()) studyContext!!.weakTopics else defaultUnits
+        val pendingList = if (!studyContext?.pendingSubtopicNames.isNullOrEmpty()) studyContext!!.pendingSubtopicNames else listOf("Pathophysiology & Core Mechanisms", "Diagnostic Confirmation Protocols", "Therapeutic Management")
 
         val slots = mutableListOf<ApiTimetableSlot>()
         days.forEachIndexed { i, day ->
             val u1 = defaultUnits[i % defaultUnits.size]
             val u2 = defaultUnits[(i + 1) % defaultUnits.size]
             val u3 = defaultUnits[(i + 2) % defaultUnits.size]
+
+            val pendingTarget = pendingList[i % pendingList.size]
+            val weakTarget = weakList[i % weakList.size]
             
-            slots.add(ApiTimetableSlot(day, "08:30 - 10:30", "Deep Study: $pendingTarget", u1, "study"))
-            slots.add(ApiTimetableSlot(day, "11:00 - 12:00", "Zenith Diagnostic: $weakTarget", u2, "assessment"))
+            slots.add(ApiTimetableSlot(day, "08:30 - 10:30", "Deep Study: $pendingTarget (Uncovered Area)", u1, "study"))
+            slots.add(ApiTimetableSlot(day, "11:00 - 12:00", "Zenith Diagnostic: $weakTarget (Weak Area Drill)", u2, "assessment"))
             slots.add(ApiTimetableSlot(day, "12:00 - 13:00", "Mental Calibration & Hydration Break", null, "break"))
             slots.add(ApiTimetableSlot(day, "14:30 - 16:30", "Differential Case Study & Peer Review", u3, "revision"))
         }

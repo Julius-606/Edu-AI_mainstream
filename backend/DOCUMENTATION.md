@@ -46,7 +46,7 @@ Powered by **Google Gemini AI**, this is the "brain" of the system.
 - **Continuity Logic**: The AI remembers previous plans to avoid repetition and ensure spaced repetition for weak areas.
 - **Active Unit Management**: Students can swap and track specific academic units.
 
-### 5. 👨‍🏫 Teacher & Parent Portals
+### 5. 👨‍🏫 Teacher & Parent Dashboards
 - **Teacher Dashboard**: Provides an "Action Required" queue identifying "At-Risk" students based on performance drops.
 - **Parent Dashboard**: Offers a simplified view of academic status, teacher remarks, and AI-generated progress reviews.
 - **Progress Reporting**: Teachers can trigger AI-generated progress reports that translate technical metrics into encouraging feedback for parents.

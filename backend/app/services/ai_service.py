@@ -109,10 +109,76 @@ class AiService:
         # Fallback response if AI model APIs are temporarily offline or unconfigured
         return "I have analyzed your clinical inquiry. Focus on foundational pathophysiological mechanisms, active recall, and structured differential diagnoses across your core units."
 
-    def _fallback_quiz(self, unit_name, topic=None):
+    def _fallback_quiz(self, unit_name, topic=None, learning_outcomes=None):
         topic_title = topic or "Clinical Core Principles"
+        outcomes = learning_outcomes or []
+
+        # If specific learning outcomes are provided, synthesize questions aligned directly with them
+        if outcomes:
+            questions = []
+            for idx, outcome in enumerate(outcomes[:5]):
+                if idx == 0:
+                    q = {
+                        "question_text": f"In evaluating the core curriculum outcome '{outcome}' within {unit_name}{f' (focusing on {topic})' if topic else ''}, what is the primary pathophysiological mechanism or rate-limiting regulatory step?",
+                        "options": [
+                            f"Allosteric feedback regulation directly governing {topic or unit_name} pathway kinetics",
+                            "Unregulated substrate saturation without feedback inhibition",
+                            "Passive non-selective ion flux across the cellular barrier",
+                            "Constitutive enzymatic inactivation via nonspecific proteolysis"
+                        ],
+                        "correct_option_index": 0,
+                        "explanation": f"CLINICAL RATIONALE: To satisfy the learning outcome ('{outcome}'), understanding the rate-limiting feedback control and molecular allosteric dynamics of {topic or unit_name} is essential for accurate clinical evaluation.",
+                        "learning_outcome": outcome
+                    }
+                elif idx == 1:
+                    q = {
+                        "question_text": f"Regarding the clinical competency '{outcome}' in {unit_name}, which diagnostic finding or laboratory biomarker establishes definitive confirmation?",
+                        "options": [
+                            "Targeted enzymatic/biomarker assay demonstrating characteristic pathway derangement",
+                            "Nonspecific baseline screening without confirmatory diagnostic criteria",
+                            "Normal serum parameters despite acute organ dysfunction",
+                            "Empirical clinical assumption without objective investigation"
+                        ],
+                        "correct_option_index": 0,
+                        "explanation": f"CLINICAL RATIONALE: Direct mastery of '{outcome}' requires identifying the gold-standard diagnostic modalities and distinguishing authentic pathophysiology from mimic presentations.",
+                        "learning_outcome": outcome
+                    }
+                elif idx == 2:
+                    q = {
+                        "question_text": f"When addressing '{outcome}' in patient care, which pharmacotherapeutic or procedural intervention aligns with current evidence-based guidelines?",
+                        "options": [
+                            "Immediate guideline-directed targeted therapy paired with hemodynamic/metabolic stabilization",
+                            "High-dose empirical monotherapy without diagnostic risk stratification",
+                            "Delayed management until secondary systemic complications arise",
+                            "Symptomatic suppression without addressing the root pathophysiological trigger"
+                        ],
+                        "correct_option_index": 0,
+                        "explanation": f"CLINICAL RATIONALE: Fulfilling '{outcome}' requires deploying guideline-directed medical management that addresses the underlying pathophysiology while optimizing patient safety.",
+                        "learning_outcome": outcome
+                    }
+                else:
+                    q = {
+                        "question_text": f"In analyzing '{outcome}' for {unit_name}, which clinical pitfall represents the most frequent diagnostic trap or adverse complication?",
+                        "options": [
+                            "Failure to recognize early atypical manifestations and subtle physiologic shifts",
+                            "Strict adherence to evidence-based multi-modal diagnostic pathways",
+                            "Appropriate electrolyte and fluid resuscitation monitoring",
+                            "Timely consultation with multidisciplinary clinical teams"
+                        ],
+                        "correct_option_index": 0,
+                        "explanation": f"CLINICAL RATIONALE: Advanced mastery of '{outcome}' demands awareness of subtle clinical presentations to avert diagnostic delay and systemic compromise.",
+                        "learning_outcome": outcome
+                    }
+                questions.append(q)
+            return {
+                "quiz_title": f"{unit_name} - {topic_title} Assessment",
+                "learning_outcomes": outcomes,
+                "questions": questions
+            }
+
         return {
             "quiz_title": f"{unit_name} - {topic_title} Assessment",
+            "learning_outcomes": outcomes,
             "questions": [
                 {
                     "question_text": f"In the evaluation of pathophysiological mechanisms in {unit_name}, which regulatory feedback loop is the primary rate-limiting step?",
@@ -123,18 +189,20 @@ class AiService:
                         "Non-selective membrane depolarization"
                     ],
                     "correct_option_index": 0,
-                    "explanation": "CLINICAL RATIONALE: Allosteric negative feedback is the predominant homeostatic regulatory mechanism preventing metabolite accumulation and energetic waste in key metabolic cascades."
+                    "explanation": "CLINICAL RATIONALE: Allosteric negative feedback is the predominant homeostatic regulatory mechanism preventing metabolite accumulation and energetic waste in key metabolic cascades.",
+                    "learning_outcome": f"Foundational regulation in {unit_name}"
                 },
                 {
-                    "question_text": "A patient presents with acute metabolic distress and altered cellular respiration. Which laboratory finding most strongly indicates uncoupling of oxidative phosphorylation?",
+                    "question_text": f"A patient presents with acute distress related to {topic or unit_name}. Which clinical or laboratory finding most strongly indicates acute decompensation?",
                     "options": [
-                        "Elevated body temperature with marked lactic acidemia and normal ATP yield",
+                        "Elevated metabolic debt with marked cellular distress and lactic acidemia",
                         "Elevated serum bicarbonate with compensatory hypoventilation",
-                        "Marked hypoglycemia with low ketone body generation",
-                        "Severe hypercalcemia with shortened QT interval"
+                        "Marked normoglycemia with stable vital parameters",
+                        "Transient asymptomatic variation in resting heart rate"
                     ],
                     "correct_option_index": 0,
-                    "explanation": "CLINICAL RATIONALE: Uncouplers dissipate the proton electrochemical gradient across the inner mitochondrial membrane, converting potential energy into heat (hyperthermia) while stalling ATP synthesis."
+                    "explanation": "CLINICAL RATIONALE: Severe cellular hypoxia or uncoupling elevates metabolic debt and manifests as systemic acidosis requiring prompt intervention.",
+                    "learning_outcome": f"Pathophysiological assessment in {unit_name}"
                 },
                 {
                     "question_text": f"When formulating a treatment strategy for acute complications in {unit_name}, what is the first-line diagnostic and stabilizing intervention?",
@@ -145,7 +213,8 @@ class AiService:
                         "Prolonged observation without diagnostic biomarker panels"
                     ],
                     "correct_option_index": 0,
-                    "explanation": "CLINICAL RATIONALE: Airway, breathing, circulation, and hemodynamic optimization precede targeted organ-specific pharmacotherapy and differential diagnostics."
+                    "explanation": "CLINICAL RATIONALE: Airway, breathing, circulation, and hemodynamic optimization precede targeted organ-specific pharmacotherapy and differential diagnostics.",
+                    "learning_outcome": f"Therapeutic intervention in {unit_name}"
                 }
             ]
         }
@@ -163,7 +232,7 @@ class AiService:
             plan.extend([
                 {"day": day, "time": "08:30 - 10:30", "activity": f"Deep Study: Core Concepts in {u1}", "unit": u1, "type": "Study"},
                 {"day": day, "time": "11:00 - 12:30", "activity": f"Targeted Diagnostic Drill in {u2}", "unit": u2, "type": "Assessment"},
-                {"day": day, "time": "13:00 - 14:00", "activity": "Socratic Mental Calibration Break", "unit": None, "type": "Break"},
+                {"day": day, "time": "13:00 - 14:00", "activity": "Cognitive Refresh Break", "unit": None, "type": "Break"},
                 {"day": day, "time": "14:30 - 16:30", "activity": f"Differential Case Synthesis in {u3}", "unit": u3, "type": "Revision"}
             ])
         return {
@@ -176,32 +245,53 @@ class AiService:
         units_str = ", ".join(active_units) if active_units else "your ongoing clinical modules"
         return f"Great focus on {units_str}, {username}. Prioritize your weakest recall areas in today's active study session and reinforce core diagnostic pathways before advancing to new material."
 
-    def generate_quiz(self, unit_name, student_level, topic=None):
-        if not GEMINI_API_KEYS: return None
+    def generate_quiz(self, unit_name, student_level, topic=None, learning_outcomes=None):
+        if not GEMINI_API_KEYS:
+            return self._fallback_quiz(unit_name, topic, learning_outcomes)
 
-        num_questions = random.randint(7, 12)
+        num_questions = random.randint(7, 10)
         task_name = f"Quiz: {unit_name}"
-        focus_clause = f" specifically focusing on '{topic}'" if topic else ""
+        focus_clause = f" specifically focusing on the subtopic: '{topic}'" if topic else ""
+
+        outcomes_prompt_block = ""
+        if learning_outcomes and len(learning_outcomes) > 0:
+            formatted_outcomes = "\n".join([f"  • {outcome}" for outcome in learning_outcomes[:8]])
+            outcomes_prompt_block = f"""
+        OFFICIAL UNIT LEARNING OUTCOMES TO ASSESS:
+        The following learning outcomes govern this unit ('{unit_name}') and must be directly tested:
+{formatted_outcomes}
+
+        MANDATORY PEDAGOGICAL INSTRUCTIONS:
+        1. Relevance: The questions must directly evaluate the student's mastery of these unit learning outcomes.
+        2. When evaluating the selected subtopic '{topic or unit_name}', construct each question to probe how this subtopic applies to and satisfies these unit learning outcomes.
+        3. For each question, specify the exact unit learning outcome it tests in the 'learning_outcome' field.
+        4. The clinical explanation must explain why the correct option is right according to the physiological principles in the unit learning outcome, and clarify why the alternatives are incorrect.
+"""
+
         prompt = f"""
         Generate a {num_questions}-question rigorous academic multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
         Level: {student_level}.
 
+        {outcomes_prompt_block}
+
         CRITICAL INSTRUCTIONS:
         1. Tone: Professional, academic, and clinical. Avoid overly casual language.
-        2. Content: Focus on high-yield medical concepts, pathophysiology, and diagnostic criteria relevant to the topic.
+        2. Content: Focus on high-yield medical concepts, pathophysiology, diagnostic criteria, and management relevant to the topic and unit learning outcomes.
         3. Explanations: For each question, the 'explanation' field must provide a deep clinical rationale.
            It should explain the physiological basis for the correct answer and clarify why the distractors are incorrect or less appropriate.
 
         Format:
         Return ONLY valid JSON.
         {{
-          "quiz_title": "{unit_name} Advanced Assessment",
+          "quiz_title": "{unit_name} - {topic or 'Unit Mastery'} Assessment",
+          "learning_outcomes": {json.dumps(learning_outcomes or [])},
           "questions": [
             {{
               "question_text": "...",
               "options": ["A", "B", "C", "D"],
               "correct_option_index": 0,
-              "explanation": "CLINICAL RATIONALE: ... DIFFERENTIAL ANALYSIS: ..."
+              "explanation": "CLINICAL RATIONALE: ... DIFFERENTIAL ANALYSIS: ...",
+              "learning_outcome": "Specific unit learning outcome tested"
             }}
           ]
         }}
@@ -226,10 +316,16 @@ class AiService:
                         raw_text = response.text.strip()
                         if "```json" in raw_text:
                             raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+                        elif "```" in raw_text:
+                            raw_text = raw_text.split("```")[1].split("```")[0].strip()
 
                         duration = time.time() - start_time
                         self._log_performance(variant, current_key_idx, duration, "SUCCESS", task_name)
-                        return json.loads(raw_text)
+                        parsed_quiz = json.loads(raw_text)
+                        if isinstance(parsed_quiz, dict):
+                            if "learning_outcomes" not in parsed_quiz or not parsed_quiz["learning_outcomes"]:
+                                parsed_quiz["learning_outcomes"] = learning_outcomes or []
+                            return parsed_quiz
                 except Exception as e:
                     duration = time.time() - start_time
                     err_msg = str(e).lower()
@@ -241,7 +337,7 @@ class AiService:
                     self._rotate_key()
                     time.sleep(1)
                     continue
-        return self._fallback_quiz(unit_name, topic)
+        return self._fallback_quiz(unit_name, topic, learning_outcomes)
 
     def generate_timetable(self, user_info, quiz_history, active_units, recent_chat_titles, previous_timetable=None, study_context=None):
         performance_summary = ""
@@ -304,7 +400,7 @@ class AiService:
           "weekly_plan": [
             {{ "day": "Monday", "time": "08:30 - 10:30", "activity": "Deep Study: Core Pathophysiology", "unit": "Biochemistry II", "type": "Study" }},
             {{ "day": "Monday", "time": "11:00 - 12:00", "activity": "Targeted Assessment: Diagnostic Traps", "unit": "General Surgery", "type": "Assessment" }},
-            {{ "day": "Monday", "time": "12:00 - 13:00", "activity": "Socratic Mental Calibration Break", "unit": null, "type": "Break" }},
+            {{ "day": "Monday", "time": "12:00 - 13:00", "activity": "Cognitive Refresh Break", "unit": null, "type": "Break" }},
             {{ "day": "Monday", "time": "14:30 - 16:30", "activity": "Differential Case Study & Revision", "unit": "Internal Medicine", "type": "Revision" }},
             ...
           ],
@@ -352,8 +448,8 @@ class AiService:
             """
 
         prompt = f"""
-        You are Zenith AI, the elite Socratic academic mentor for {user_info['username']}.
-        Persona: {user_info.get('ai_persona', 'Socratic Mentor')}
+        You are Zenith AI, the elite academic mentor and guide for {user_info['username']}.
+        Persona: {user_info.get('ai_persona', 'Academic Mentor')}
         Level: {user_info['semester_status']}
         Active Units: {', '.join(active_units)}
 

@@ -38,6 +38,11 @@ fun UnitOutlineScreen(
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
 
+    LaunchedEffect(userId) {
+        studentViewModel.setUserId(userId)
+        studentViewModel.refreshDashboard(userId)
+    }
+
     val unitWithModules = uiState.unitsWithModules.find { it.unit.localId == unitId }
 
     Box(modifier = Modifier.fillMaxSize()) {

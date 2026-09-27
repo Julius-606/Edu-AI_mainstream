@@ -17,7 +17,7 @@ function createWindow() {
   const devUrl = process.env.TRACE_APP_URL || 'http://localhost:3000';
   mainWindow.loadURL(devUrl).catch(() => {
     // Fallback to cloud HF Space if local port 3000 is not running
-    mainWindow.loadURL('https://huggingface.co/spaces/Agent606/Edu-AI');
+    mainWindow.loadURL('https://huggingface.co/spaces/Agent606/Trace');
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

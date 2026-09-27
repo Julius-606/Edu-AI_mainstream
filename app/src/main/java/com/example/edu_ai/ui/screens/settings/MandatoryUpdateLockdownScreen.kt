@@ -43,7 +43,7 @@ fun MandatoryUpdateLockdownScreen(
 
     val releaseVersion = mandatoryRelease?.version ?: "Latest"
     val releaseNotes = mandatoryRelease?.releaseNotes ?: "An essential system update has been released by the administrator containing critical security, protocol, and database updates."
-    val downloadUrl = mandatoryRelease?.downloadUrl ?: "https://github.com/Agent606/Edu-AI/releases/latest"
+    val downloadUrl = mandatoryRelease?.downloadUrl ?: "https://github.com/Agent606/Trace/releases/latest"
     val fileSize = mandatoryRelease?.fileSize ?: "14.8 MB"
 
     Box(

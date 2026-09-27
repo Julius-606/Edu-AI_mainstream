@@ -1,7 +1,7 @@
 # 🚀 Trace Multi-Service Architecture & Local Deployment Guide
 
 This guide describes how to run and deploy the **Trace Learning System** locally, and explains the complete separation between:
-1. **Frontend Student & Clinical Portal** (React 18 + Vite SPA)
+1. **Frontend Student & Clinical App** (React 18 + Vite SPA)
 2. **Superuser / Admin Console & Telemetry Engine** (Isolated Dedicated Console)
 3. **Backend Intelligence & Data Services** (Python FastAPI Backend on port 8001 / Node Express Orchestrator on port 3000)
 
@@ -13,7 +13,7 @@ This guide describes how to run and deploy the **Trace Learning System** locally
 +-----------------------------------------------------------------------------------+
 |                              CLIENT EXPERIENCES                                   |
 |                                                                                   |
-|  [Student/Teacher/Parent Portal]              [Admin Superuser Console]           |
+|  [Student/Teacher/Parent App]                 [Admin Superuser Console]           |
 |  - Dynamic Study Trail & Quizzes              - Real-Time Python/FastAPI Logs     |
 |  - Socratic AI Mentorship                     - 5-Level Syllabus Ingestion        |
 |  - Timetable & Vault Bookmarks                - Relational DB Schema & Users      |

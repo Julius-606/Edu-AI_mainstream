@@ -84,7 +84,7 @@ fun TeacherDashboard(
                                     onSendReport = {
                                         scope.launch {
                                             viewModel.sendProgressReport(student.id.toString())
-                                            snackbarHostState.showSnackbar("Progress report routed to Parent Portal for ${student.username}")
+                                            snackbarHostState.showSnackbar("Progress report routed to Parent Dashboard for ${student.username}")
                                         }
                                     }
                                 )

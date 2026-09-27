@@ -44,35 +44,25 @@ try:
         from sqlalchemy import text
         is_postgres = "postgresql" in str(engine.url)
         
-        # 1. 'type' column on bookmarks
-        try:
-            if is_postgres:
-                init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS type VARCHAR(50) DEFAULT 'general';"))
-            else:
-                init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN type VARCHAR(50) DEFAULT 'general';"))
-            init_db.commit()
-        except Exception as err:
-            init_db.rollback()
-
-        # 2. 'title' column on bookmarks
-        try:
-            if is_postgres:
-                init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS title VARCHAR(200) DEFAULT 'Saved Item';"))
-            else:
-                init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN title VARCHAR(200) DEFAULT 'Saved Item';"))
-            init_db.commit()
-        except Exception as err:
-            init_db.rollback()
-
-        # 3. 'notes' column on bookmarks
-        try:
-            if is_postgres:
-                init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS notes TEXT;"))
-            else:
-                init_db.execute(text("ALTER TABLE bookmarks ADD COLUMN notes TEXT;"))
-            init_db.commit()
-        except Exception as err:
-            init_db.rollback()
+        # 1. Ensure all columns on 'bookmarks' table exist (auto-healing schema)
+        bookmark_columns = [
+            ("type", "VARCHAR(50) DEFAULT 'general'"),
+            ("title", "VARCHAR(200) DEFAULT 'Saved Item'"),
+            ("target", "VARCHAR(500) DEFAULT ''"),
+            ("context", "TEXT"),
+            ("notes", "TEXT"),
+            ("timestamp", "DOUBLE PRECISION DEFAULT 0" if is_postgres else "FLOAT DEFAULT 0"),
+            ("owner_id", "INTEGER")
+        ]
+        for col_name, col_type in bookmark_columns:
+            try:
+                if is_postgres:
+                    init_db.execute(text(f"ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
+                else:
+                    init_db.execute(text(f"ALTER TABLE bookmarks ADD COLUMN {col_name} {col_type};"))
+                init_db.commit()
+            except Exception as err:
+                init_db.rollback()
 
         # 4. 'category' column on units
         try:
@@ -100,6 +90,16 @@ try:
                 init_db.execute(text("ALTER TABLE units ADD COLUMN IF NOT EXISTS unit_group VARCHAR(100);"))
             else:
                 init_db.execute(text("ALTER TABLE units ADD COLUMN unit_group VARCHAR(100);"))
+            init_db.commit()
+        except Exception as err:
+            init_db.rollback()
+
+        # 6b. 'learning_outcomes' column on units
+        try:
+            if is_postgres:
+                init_db.execute(text("ALTER TABLE units ADD COLUMN IF NOT EXISTS learning_outcomes TEXT;"))
+            else:
+                init_db.execute(text("ALTER TABLE units ADD COLUMN learning_outcomes TEXT;"))
             init_db.commit()
         except Exception as err:
             init_db.rollback()
@@ -542,135 +542,35 @@ def get_user_sync_data(user_id: str, db: Session = Depends(get_db)):
     user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # 1. Fetch Syllabus Progress
-    progress = db.query(models.UserSyllabusProgress).filter(models.UserSyllabusProgress.user_id == user.id).all()
-    progress_list = []
-    for p in progress:
-        progress_list.append({
-            "node_id": p.node_id,
-            "node_type": p.node_type,
-            "status": p.status,
-            "last_studied_at": p.last_studied_at
-        })
-
-    # 2. Fetch Bookmarks
-    bookmarks = db.query(models.Bookmark).filter(models.Bookmark.owner_id == user.id).all()
-    bookmarks_list = []
-    for b in bookmarks:
-        bookmarks_list.append({
-            "id": b.id,
-            "type": b.type,
-            "title": b.title,
-            "target": b.target,
-            "context": b.context,
-            "timestamp": b.timestamp
-        })
-
-    # 3. Fetch Quiz History
-    quizzes = db.query(models.QuizHistory).filter(models.QuizHistory.owner_id == user.id).all()
-    quizzes_list = []
-    for q in quizzes:
-        quizzes_list.append({
-            "id": q.id,
-            "unit_name": q.unit_name,
-            "score": q.score,
-            "total": q.total,
-            "pnl": q.pnl,
-            "timestamp": q.timestamp
-        })
-
-    # 4. Fetch Chat sessions & messages
-    sessions = db.query(models.ChatSession).filter(models.ChatSession.owner_id == user.id).all()
-    sessions_list = []
-    for s in sessions:
-        msgs = db.query(models.ChatMessage).filter(models.ChatMessage.session_id == s.id).order_by(models.ChatMessage.id.asc()).all()
-        msgs_list = []
-        for m in msgs:
-            msgs_list.append({
-                "id": m.id,
-                "role": m.role,
-                "content": m.content,
-                "timestamp": m.timestamp
-            })
-        sessions_list.append({
-            "id": s.id,
-            "title": s.title,
-            "description": s.description,
-            "timestamp": s.timestamp,
-            "is_archived": s.is_archived,
-            "messages": msgs_list
-        })
-
-    return {
-        "progress": progress_list,
-        "bookmarks": bookmarks_list,
-        "quizzes": quizzes_list,
-        "chats": sessions_list,
-        "user": {
-            "id": str(user.id),
-            "username": user.username,
-            "email": user.email,
-            "role": user.role,
-            "difficulty": user.difficulty,
-            "semesterStatus": user.semester_status,
-            "aiPersona": user.ai_persona,
-            "sensoryMode": user.sensory_mode,
-            "activeUnits": [u.name for u in user.units if u.is_active]
-        }
-    }
+    from app.sync import sync_manager
+    return sync_manager.get_full_sync_data(db, user)
 
 @app.post("/api/user/{user_id}/sync", response_model=schemas.SyncResponse)
 def sync_user_data(user_id: str, payload: schemas.SyncRequest, db: Session = Depends(get_db)):
     user = find_user(user_id, db)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # 1. Sync Syllabus Progress
-    for p_item in payload.progress:
-        existing = db.query(models.UserSyllabusProgress).filter(
-            models.UserSyllabusProgress.user_id == user.id,
-            models.UserSyllabusProgress.node_id == p_item.node_id,
-            models.UserSyllabusProgress.node_type == p_item.node_type
-        ).first()
-        is_completed_status = (p_item.status == "Completed")
-        if existing:
-            existing.status = p_item.status
-            existing.last_studied_at = p_item.last_studied_at
-        else:
-            db.add(models.UserSyllabusProgress(
-                user_id=user.id,
-                node_id=p_item.node_id,
-                node_type=p_item.node_type,
-                status=p_item.status,
-                last_studied_at=p_item.last_studied_at
-            ))
-        
-        # Keep Subtopic table in sync!
-        if p_item.node_type == "subtopic":
-            sub = db.query(models.Subtopic).filter(models.Subtopic.id == p_item.node_id).first()
-            if sub:
-                sub.is_completed = is_completed_status
-    
-    # 2. Sync Bookmarks
-    for b_item in payload.bookmarks:
-        existing_b = db.query(models.Bookmark).filter(
-            models.Bookmark.owner_id == user.id,
-            models.Bookmark.target == b_item.target,
-            models.Bookmark.type == b_item.type
-        ).first()
-        if not existing_b:
-            db.add(models.Bookmark(
-                type=b_item.type,
-                title=b_item.title,
-                target=b_item.target,
-                context=b_item.context,
-                timestamp=b_item.timestamp,
-                owner_id=user.id
-            ))
-            
+    from app.sync import sync_manager
+    return sync_manager.process_full_sync(db, user, payload)
+
+# RESTful delete endpoints for units and users
+@app.delete("/api/units/{unit_id}")
+@app.post("/api/units/{unit_id}/delete")
+async def delete_unit_api(unit_id: int, db: Session = Depends(get_db)):
+    success = ingestion_engine.delete_unit(db, unit_id)
+    if success:
+        return {"status": "success", "message": f"Unit #{unit_id} successfully deleted"}
+    return JSONResponse(status_code=404, content={"detail": "Unit not found"})
+
+@app.delete("/api/users/{user_id}")
+@app.post("/api/users/{user_id}/delete")
+async def delete_user_api(user_id: str, db: Session = Depends(get_db)):
+    user = find_user(user_id, db)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(user)
     db.commit()
-    return schemas.SyncResponse(success=True, message="Data synced successfully")
+    return {"status": "success", "message": f"User #{user_id} deleted successfully"}
 
 if __name__ == "__main__":
     import uvicorn

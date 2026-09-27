@@ -23,7 +23,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Edu_AI"
+rootProject.name = "Trace Learning"
 include(":app")
 
 

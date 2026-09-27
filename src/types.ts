@@ -71,6 +71,7 @@ export interface QuizQuestion {
   explanation: string;
   unitName: string;
   topicName?: string;
+  learningOutcome?: string;
 }
 
 export interface QuizHistoryItem {
@@ -84,6 +85,7 @@ export interface QuizHistoryItem {
   timestamp: number;
   questions?: QuizQuestion[];
   userAnswers?: Record<number, number>;
+  status?: 'Completed' | 'Unfinished';
 }
 
 export interface ChatMessage {

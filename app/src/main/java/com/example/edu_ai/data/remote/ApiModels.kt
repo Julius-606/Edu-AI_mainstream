@@ -63,7 +63,7 @@ data class ApiChatHistory(
     @SerializedName("timestamp") val timestamp: String? = null
 )
 
-// --- TEACHER PORTAL MODELS ---
+// --- TEACHER MODELS ---
 
 data class StudentSummary(
     @SerializedName("id") val id: Int,
@@ -86,7 +86,7 @@ data class ClassReportResponse(
     @SerializedName("report") val report: String
 )
 
-// --- PARENT PORTAL MODELS ---
+// --- PARENT MODELS ---
 
 data class ParentDashboardResponse(
     @SerializedName("student_name") val studentName: String,
@@ -131,19 +131,24 @@ data class ChatResponse(
 
 data class QuizRequest(
     @SerializedName("unit_name") val unit_name: String,
-    @SerializedName("user_id") val user_id: String
+    @SerializedName("user_id") val user_id: String,
+    @SerializedName("topic") val topic: String? = null,
+    @SerializedName("subtopic") val subtopic: String? = null,
+    @SerializedName("learning_outcomes") val learning_outcomes: List<String>? = null
 )
 
 data class ApiQuizQuestion(
     @SerializedName("question_text") val question_text: String,
     @SerializedName("options") val options: List<String>,
     @SerializedName("correct_option_index") val correct_option_index: Int,
-    @SerializedName("explanation") val explanation: String
+    @SerializedName("explanation") val explanation: String,
+    @SerializedName("learning_outcome") val learning_outcome: String? = null
 )
 
 data class ApiQuizResponse(
     @SerializedName("quiz_title") val quiz_title: String,
-    @SerializedName("questions") val questions: List<ApiQuizQuestion>
+    @SerializedName("questions") val questions: List<ApiQuizQuestion>,
+    @SerializedName("learning_outcomes") val learning_outcomes: List<String>? = null
 )
 
 data class QuizRecordRequest(

@@ -319,7 +319,7 @@ fun AdminDashboardScreen(
 
                 var newVersion by remember { mutableStateOf("1.1.0") }
                 var newVersionCode by remember { mutableStateOf("2") }
-                var newDownloadUrl by remember { mutableStateOf("https://github.com/Agent606/Edu-AI/releases/tag/v1.1.0") }
+                var newDownloadUrl by remember { mutableStateOf("https://github.com/Agent606/Trace/releases/tag/v1.1.0") }
                 var newReleaseNotes by remember { mutableStateOf("Critical security update and updated Socratic Clinical reasoning models.") }
                 var newIsMandatory by remember { mutableStateOf(false) }
                 var newFileSize by remember { mutableStateOf("14.8 MB") }

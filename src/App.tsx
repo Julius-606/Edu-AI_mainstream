@@ -45,11 +45,16 @@ import { ArchivesModal } from './components/ArchivesModal';
 import { ManageUnitsModal } from './components/ManageUnitsModal';
 import { SyncModal } from './components/SyncModal';
 import { BookmarksScreen } from './components/BookmarksScreen';
+import { SettingsModal, applyAppearance, getSavedAppearance } from './components/SettingsModal';
 
 export const App: React.FC = () => {
   const [user, setUser] = useState<User>(TraceStore.getUser());
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [units, setUnits] = useState<Unit[]>(TraceStore.getUnits());
+
+  useEffect(() => {
+    applyAppearance(getSavedAppearance());
+  }, []);
 
   // Preview Mode: 'mobile' (Android phone mockup preview) or 'responsive' (full-width)
   const [previewMode, setPreviewMode] = useState<'mobile' | 'responsive'>('mobile');
@@ -243,6 +248,16 @@ export const App: React.FC = () => {
 
   const handleToggleActiveUnit = (unitId: number, isActive: boolean) => {
     const updated = TraceStore.toggleUnitActive(unitId, isActive);
+    setUnits(updated);
+  };
+
+  const handleDeleteUnit = async (unitId: number) => {
+    try {
+      await fetch(`/api/units/${unitId}`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Backend unit delete note:', err);
+    }
+    const updated = TraceStore.deleteUnit(unitId);
     setUnits(updated);
   };
 
@@ -619,13 +634,18 @@ export const App: React.FC = () => {
       {/* Modals */}
       {browserUrl && <InAppBrowser url={browserUrl} onClose={() => setBrowserUrl(null)} />}
       {isAccountOpen && (
-        <AccountModal
+        <SettingsModal
           user={user}
+          units={units}
+          initialTab="account"
           onClose={() => setIsAccountOpen(false)}
-          onSave={(updated) => {
+          onSaveUser={(updated) => {
             setUser(updated);
             TraceStore.setUser(updated);
           }}
+          onDeleteUnit={handleDeleteUnit}
+          onToggleActiveUnit={handleToggleActiveUnit}
+          onSnapshotRestored={handleSnapshotRestored}
         />
       )}
       {isArchivesOpen && (
@@ -641,11 +661,21 @@ export const App: React.FC = () => {
           units={units}
           onClose={() => setIsManageUnitsOpen(false)}
           onToggleActive={handleToggleActiveUnit}
+          onDeleteUnit={handleDeleteUnit}
         />
       )}
       {isSyncOpen && (
-        <SyncModal
+        <SettingsModal
+          user={user}
+          units={units}
+          initialTab="appearance"
           onClose={() => setIsSyncOpen(false)}
+          onSaveUser={(updated) => {
+            setUser(updated);
+            TraceStore.setUser(updated);
+          }}
+          onDeleteUnit={handleDeleteUnit}
+          onToggleActiveUnit={handleToggleActiveUnit}
           onSnapshotRestored={handleSnapshotRestored}
         />
       )}

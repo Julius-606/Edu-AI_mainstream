@@ -20,7 +20,7 @@ import androidx.room.RoomDatabase
         BookmarkEntity::class,
         AppReleaseEntity::class
     ],
-    version = 12,
+    version = 15,
     exportSchema = false
 )
 abstract class EduAIDatabase : RoomDatabase() {

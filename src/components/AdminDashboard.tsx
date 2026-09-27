@@ -423,8 +423,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleDeleteUnit = (id: number) => {
+  const handleDeleteUnit = async (id: number) => {
     if (confirm('Superuser Warning: Are you sure you want to delete this unit and all its cascading modules?')) {
+      try {
+        await fetch(`/api/units/${id}`, { method: 'DELETE' });
+      } catch (err) {
+        console.warn('Backend unit delete note:', err);
+      }
       const updated = units.filter((u) => u.id !== id);
       TraceStore.saveUnits(updated);
       setUnits(updated);
@@ -464,12 +469,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setShowAddUser(false);
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (userId === currentUser.id) {
       alert('Cannot delete currently active superuser session.');
       return;
     }
     if (confirm('Superuser Warning: Delete user account and associated audit trails?')) {
+      try {
+        await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+      } catch (err) {
+        console.warn('Backend user delete note:', err);
+      }
       const updated = allUsers.filter((u) => u.id !== userId);
       localStorage.setItem('trace_users', JSON.stringify(updated));
       setAllUsers(updated);

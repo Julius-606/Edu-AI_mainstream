@@ -48,7 +48,7 @@ fun ParentDashboard(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("👪 Parent Portal") },
+                title = { Text("👪 Parent Dashboard") },
                 actions = {
                     IconButton(onClick = { loadData() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")

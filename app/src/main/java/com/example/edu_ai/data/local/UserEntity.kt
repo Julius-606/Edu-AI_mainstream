@@ -16,7 +16,9 @@ data class UserEntity(
     val role: String,
     val sensoryMode: String,
     val semesterStatus: String,
-    val aiPersona: String
+    val aiPersona: String,
+    val email: String? = null,
+    val passwordHash: String? = null
 )
 
 

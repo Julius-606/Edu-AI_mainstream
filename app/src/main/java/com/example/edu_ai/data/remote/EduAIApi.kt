@@ -22,7 +22,8 @@ interface EduAIApi {
     @POST("api/ai/quiz")
     suspend fun generateAiQuiz(
         @Body request: QuizRequest,
-        @Query("topic") topic: String? = null
+        @Query("topic") topic: String? = null,
+        @Query("subtopic") subtopic: String? = null
     ): ApiQuizResponse
 
     @POST("api/quiz/record")
@@ -49,7 +50,7 @@ interface EduAIApi {
     @POST("api/auth/login")
     suspend fun login(@Body request: com.example.edu_ai.schemas.LoginRequest): com.example.edu_ai.schemas.TokenResponse
 
-    // --- Teacher Portal Endpoints ---
+    // --- Teacher Endpoints ---
 
     @GET("api/teacher/dashboard")
     suspend fun getTeacherDashboard(): TeacherDashboardResponse
@@ -66,7 +67,7 @@ interface EduAIApi {
     @POST("api/teacher/send-report/{student_id}")
     suspend fun sendProgressReport(@Path("student_id") studentId: String): Map<String, Any?>
 
-    // --- Parent Portal Endpoints ---
+    // --- Parent Endpoints ---
 
     @GET("api/parent/dashboard/{student_id}")
     suspend fun getParentDashboard(@Path("student_id") studentId: String): ParentDashboardResponse

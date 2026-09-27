@@ -40,7 +40,7 @@
   - `backend/app/models/`: Declarative relational models (`database_models.py`)
   - `backend/app/schemas/`: Typed request/response contracts (`api_schemas.py`)
   - `backend/app/core/`: Security and JWT authentication (`security.py`)
-- **Deployment:** Deployable directly to **Hugging Face Spaces** (`Agent606/Edu-AI`) via Dockerfile or `git push`.
+- **Deployment:** Deployable directly to **Hugging Face Spaces** (`Agent606/Trace`) via Dockerfile or `git push`.
 
 ### 3. Neon DB (PostgreSQL Serverless)
 - **Engine:** PostgreSQL 16+ on Neon.tech with serverless scale-to-zero capabilities.

@@ -20,13 +20,19 @@ class EduAIRepository(
 
     suspend fun logout(context: Context) {
         PreferenceManager.clearToken(context)
-        dao.clearUsers()
-        dao.deleteAllUnits()
-        dao.clearAllChatSessions()
-        dao.clearAllChatHistory()
-        dao.clearAllQuizHistory()
-        dao.clearAllTimetables()
-        dao.clearAllNotes()
+        PreferenceManager.clearActiveUserId(context)
+    }
+
+    suspend fun insertUserPreservingCredentials(user: UserEntity) {
+        val existing = dao.getUserById(user.id)
+        if (existing != null) {
+            dao.insertUser(user.copy(
+                email = existing.email ?: user.email,
+                passwordHash = existing.passwordHash ?: user.passwordHash
+            ))
+        } else {
+            dao.insertUser(user)
+        }
     }
 
     fun getDashboardData(userId: String): Flow<UserEntity?> = flow {
@@ -49,7 +55,7 @@ class EduAIRepository(
                 semesterStatus = response.semesterStatus ?: "Active",
                 aiPersona = response.aiPersona ?: "Socratic Mentor"
             )
-            dao.insertUser(userEntity)
+            insertUserPreservingCredentials(userEntity)
             
             // Sync full hierarchy from backend if available using persistent non-destructive merge
             if (response.units != null) {
@@ -270,7 +276,8 @@ class EduAIRepository(
         val cachedTimetable = dao.getTimetableByUserId(userId)
         val oneWeekInMillis = 7 * 24 * 60 * 60 * 1000L
         
-        if (!forceRefresh && studyContext == null && cachedTimetable != null && (System.currentTimeMillis() - cachedTimetable.timestamp) < oneWeekInMillis) {
+        // Only request a new timetable if forceRefresh is true, or if 1 week has passed
+        if (!forceRefresh && cachedTimetable != null && (System.currentTimeMillis() - cachedTimetable.timestamp) < oneWeekInMillis) {
             // Return cached version
             return ApiTimetableResponse(
                 weeklyPlan = gson.fromJson(cachedTimetable.weeklyPlanJson, Array<com.example.edu_ai.data.remote.ApiTimetableSlot>::class.java).toList(),
@@ -320,13 +327,13 @@ class EduAIRepository(
         }
     }
 
-    // --- Teacher Portal Methods ---
+    // --- Teacher Methods ---
     suspend fun getTeacherDashboard(): TeacherDashboardResponse = api.getTeacherDashboard()
     suspend fun generateClassReport(): ClassReportResponse = api.generateClassReport()
     suspend fun updateStudentProfile(userId: String, updates: Map<String, Any?>) = api.updateStudentProfile(userId, updates)
     suspend fun sendProgressReport(studentId: String) = api.sendProgressReport(studentId)
 
-    // --- Parent Portal Methods ---
+    // --- Parent Methods ---
     suspend fun getParentDashboard(studentId: String) = api.getParentDashboard(studentId)
 
     // --- Ingestion / Library Methods ---

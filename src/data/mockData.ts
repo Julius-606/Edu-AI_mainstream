@@ -29,7 +29,7 @@ export const INITIAL_USERS: User[] = [
     email: "parent@trace.edu",
     role: "Parent",
     difficulty: "Standard",
-    semesterStatus: "Guardian Portal",
+    semesterStatus: "Guardian Dashboard",
     aiPersona: "Supportive Education Consultant",
     sensoryMode: "Standard",
     activeUnits: ["Biochemistry II", "General Surgery", "Internal Medicine"]

@@ -1,5 +1,5 @@
 # ==============================================================================
-# Edu-AI Trace Modular Backend Dockerfile (Monolithic 24/7 Deployment)
+# Trace Modular Backend Dockerfile (Monolithic 24/7 Deployment)
 #
 # MODULE ARCHITECTURE:
 # 1. Full-Stack Web App Module: Pre-compiled React SPA served directly by FastAPI
@@ -8,7 +8,7 @@
 #    -> Accessible at /home, /welcome, and /
 # 3. Superuser Admin Control Center & THE OVERSEER:
 #    -> Accessible at /admin/login, /admin, /admin/overseer
-# 4. Public Student Registration Portal:
+# 4. Public Student Registration:
 #    -> Accessible at /signup
 # 5. Core REST API & Socratic AI Engine:
 #    -> Accessible at /api/*, /docs, /health

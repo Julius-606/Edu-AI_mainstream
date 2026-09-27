@@ -18,6 +18,16 @@ import com.example.edu_ai.data.remote.RetrofitClient
 import com.example.edu_ai.schemas.LoginRequest
 import com.example.edu_ai.utils.PreferenceManager
 import kotlinx.coroutines.launch
+import com.example.edu_ai.EduAIApplication
+import com.example.edu_ai.data.local.UserEntity
+import java.security.MessageDigest
+
+private fun hashPassword(password: String): String {
+    val bytes = password.toByteArray()
+    val md = MessageDigest.getInstance("SHA-256")
+    val digest = md.digest(bytes)
+    return digest.fold("") { str, it -> str + "%02x".format(it) }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,7 +49,7 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Trace Learning Portal",
+            text = "Trace Learning",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
@@ -87,9 +97,48 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
                         try {
                             val response = RetrofitClient.instance.login(LoginRequest(email, password))
                             PreferenceManager.saveToken(context, response.accessToken)
+                            PreferenceManager.saveActiveUserId(context, response.userId)
+                            
+                            // Cache credentials locally in Room database for offline login
+                            val app = context.applicationContext as EduAIApplication
+                            val dao = app.database.dao()
+                            val existingUser = dao.getUserById(response.userId)
+                            val passHash = hashPassword(password)
+                            val userEntity = existingUser?.copy(
+                                email = email,
+                                passwordHash = passHash
+                            ) ?: UserEntity(
+                                id = response.userId,
+                                username = response.username,
+                                role = response.role,
+                                sensoryMode = "Visual",
+                                semesterStatus = "Active",
+                                aiPersona = "Socratic Mentor",
+                                email = email,
+                                passwordHash = passHash
+                            )
+                            dao.insertUser(userEntity)
+
                             onLoginSuccess(response.role, response.userId)
                         } catch (e: Exception) {
-                            errorMessage = "Login failed: ${e.message}"
+                            // Attempt offline login fallback
+                            try {
+                                val app = context.applicationContext as EduAIApplication
+                                val dao = app.database.dao()
+                                val localUser = dao.getUserByEmailOrUsername(email)
+                                val passHash = hashPassword(password)
+                                if (localUser != null && localUser.passwordHash == passHash) {
+                                    PreferenceManager.saveToken(context, "cached_offline_token")
+                                    PreferenceManager.saveActiveUserId(context, localUser.id)
+                                    onLoginSuccess(localUser.role, localUser.id)
+                                } else if (localUser != null) {
+                                    errorMessage = "Offline login failed: Incorrect password."
+                                } else {
+                                    errorMessage = "Login failed: No internet connection and this account is not cached on this device."
+                                }
+                            } catch (dbEx: Exception) {
+                                errorMessage = "Login failed: ${e.message}"
+                            }
                         } finally {
                             isLoading = false
                         }
@@ -110,6 +159,8 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
 
         OutlinedButton(
             onClick = {
+                PreferenceManager.saveActiveUserId(context, "admin_root")
+                PreferenceManager.saveToken(context, "admin_fast_track_token")
                 onLoginSuccess("Admin", "admin_root")
             },
             modifier = Modifier.fillMaxWidth().height(44.dp)

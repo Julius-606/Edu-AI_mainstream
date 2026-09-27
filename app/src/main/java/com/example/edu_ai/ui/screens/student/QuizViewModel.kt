@@ -31,7 +31,9 @@ data class QuizUiState(
     val selectedTopic: String? = null,
     val unitsWithModules: List<UnitWithModules> = emptyList(),
     val isReviewMode: Boolean = false,
-    val quizHistory: List<QuizHistoryEntity> = emptyList()
+    val quizHistory: List<QuizHistoryEntity> = emptyList(),
+    val timerSecondsElapsed: Int = 0,
+    val timerActive: Boolean = false
 )
 
 class QuizViewModel(
@@ -163,10 +165,33 @@ class QuizViewModel(
                 }
                 val shuffledQuiz = quiz.copy(questions = shuffledQuestions)
                 _uiState.update { it.copy(quiz = shuffledQuiz, isLoading = false) }
+                startTimer()
             } else {
                 _uiState.update { it.copy(isLoading = false, error = "Failed to ignite the Quiz Engine. No offline cache found for this assessment.") }
             }
         }
+    }
+
+    private var timerJob: kotlinx.coroutines.Job? = null
+
+    private fun startTimer() {
+        timerJob?.cancel()
+        _uiState.update { it.copy(timerSecondsElapsed = 0, timerActive = true) }
+        timerJob = viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(1000)
+                val state = _uiState.value
+                if (state.isQuizFinished || !state.timerActive) {
+                    break
+                }
+                _uiState.update { it.copy(timerSecondsElapsed = state.timerSecondsElapsed + 1) }
+            }
+        }
+    }
+
+    private fun stopTimer() {
+        timerJob?.cancel()
+        _uiState.update { it.copy(timerActive = false) }
     }
 
     fun selectOption(index: Int) {
@@ -221,6 +246,7 @@ class QuizViewModel(
     private fun finishQuiz() {
         val state = _uiState.value
         val quiz = state.quiz ?: return
+        stopTimer()
         
         val finalScorePercentage = (state.score.toDouble() / quiz.questions.size) * 100
         val recordTitle = state.selectedTopic ?: quiz.title
@@ -232,7 +258,9 @@ class QuizViewModel(
                     userId = user.id,
                     unitName = recordTitle,
                     pnlScore = finalScorePercentage,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    status = "Completed",
+                    timeElapsed = state.timerSecondsElapsed
                 )
             )
             // Save to backend
@@ -251,7 +279,52 @@ class QuizViewModel(
     }
 
     fun resetQuizSelection() {
+        stopTimer()
         _uiState.update { it.copy(quiz = null, selectedUnit = null, isQuizFinished = false, isReviewMode = false) }
+    }
+
+    val bookmarks: Flow<List<com.example.edu_ai.data.local.BookmarkEntity>> = dao.getBookmarks(user.id)
+
+    fun toggleQuestionBookmark(questionText: String) {
+        viewModelScope.launch {
+            val existing = dao.getBookmarks(user.id).firstOrNull()?.find { it.type == "quiz" && it.target == questionText }
+            if (existing != null) {
+                dao.deleteBookmark(existing.id)
+            } else {
+                val newBm = com.example.edu_ai.data.local.BookmarkEntity(
+                    id = java.util.UUID.randomUUID().toString(),
+                    userId = user.id,
+                    type = "quiz",
+                    title = "Quiz: ${questionText.take(40)}...",
+                    target = questionText,
+                    context = questionText,
+                    timestamp = System.currentTimeMillis()
+                )
+                dao.insertBookmark(newBm)
+            }
+        }
+    }
+
+    fun exitAndSaveUnfinished() {
+        val state = _uiState.value
+        val quiz = state.quiz ?: return
+        stopTimer()
+
+        val recordTitle = state.selectedTopic ?: quiz.title
+
+        viewModelScope.launch {
+            dao.insertQuizHistory(
+                QuizHistoryEntity(
+                    userId = user.id,
+                    unitName = recordTitle,
+                    pnlScore = 0.0,
+                    timestamp = System.currentTimeMillis(),
+                    status = "Unfinished",
+                    timeElapsed = state.timerSecondsElapsed
+                )
+            )
+            _uiState.update { it.copy(quiz = null, selectedUnit = null, isQuizFinished = false, isReviewMode = false) }
+        }
     }
 
     companion object {

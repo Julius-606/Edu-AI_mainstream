@@ -39,15 +39,25 @@ class GeminiAiService : AiService {
             val response = RetrofitClient.instance.generateAiQuiz(
                 request = QuizRequest(
                     unit_name = unitName,
-                    user_id = userContext.id
+                    user_id = userContext.id,
+                    topic = topic,
+                    subtopic = topic
                 ),
-                topic = topic
+                topic = topic,
+                subtopic = topic
             )
             QuizResponse(
                 title = response.quiz_title,
                 questions = response.questions.map { q ->
-                    QuizQuestion(q.question_text, q.options, q.correct_option_index, q.explanation)
-                }
+                    QuizQuestion(
+                        text = q.question_text,
+                        options = q.options,
+                        correctIndex = q.correct_option_index,
+                        explanation = q.explanation,
+                        learningOutcome = q.learning_outcome
+                    )
+                },
+                learningOutcomes = response.learning_outcomes
             )
         } catch (e: Exception) {
             null
