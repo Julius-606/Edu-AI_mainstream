@@ -14,18 +14,46 @@ load_dotenv()
 logger = logging.getLogger("AI_SERVICE")
 
 GEMINI_API_KEYS = []
+
+# 1. Collect from GEMINI_API_KEY_i / GEMINI_API_KEY
+env_keys = []
 i = 1
 while True:
     key = os.getenv(f"GEMINI_API_KEY_{i}")
     if not key:
-        if i == 1:
-            key = os.getenv("GEMINI_API_KEY")
-            if key:
-                GEMINI_API_KEYS.append(key)
         break
-    GEMINI_API_KEYS.append(key)
+    k = key.strip()
+    if k and k not in env_keys:
+        env_keys.append(k)
     i += 1
 
+if not env_keys:
+    key = os.getenv("GEMINI_API_KEY")
+    if key:
+        k = key.strip()
+        if k and k not in env_keys:
+            env_keys.append(k)
+
+# 2. Collect from GEMINI_API_KEYS (comma-separated list of plain keys: key1,key2,...)
+comma_keys = []
+comma_keys_str = os.getenv("GEMINI_API_KEYS")
+if comma_keys_str:
+    parts = comma_keys_str.split(",")
+    for part in parts:
+        pk = part.strip()
+        if pk and pk not in comma_keys:
+            comma_keys.append(pk)
+
+# Combine both sets
+for k in env_keys:
+    if k not in GEMINI_API_KEYS:
+        GEMINI_API_KEYS.append(k)
+
+for k in comma_keys:
+    if k not in GEMINI_API_KEYS:
+        GEMINI_API_KEYS.append(k)
+
+# If still empty, use fallback keys to prevent empty list errors
 if not GEMINI_API_KEYS:
     GEMINI_API_KEYS = [
         "AIzaSyDmvjVkFmt0RoTMNER8fYoIKfy7Pkw1sfo",
@@ -107,7 +135,7 @@ class AiService:
                     time.sleep(1)
                     continue
         # Fallback response if AI model APIs are temporarily offline or unconfigured
-        return "I have analyzed your clinical inquiry. Focus on foundational pathophysiological mechanisms, active recall, and structured differential diagnoses across your core units."
+        return "AI service is currently unavailable."
 
     def _fallback_quiz(self, unit_name, topic=None, learning_outcomes=None):
         topic_title = topic or "Clinical Core Principles"
@@ -247,7 +275,7 @@ class AiService:
 
     def generate_quiz(self, unit_name, student_level, topic=None, learning_outcomes=None):
         if not GEMINI_API_KEYS:
-            return self._fallback_quiz(unit_name, topic, learning_outcomes)
+            return None
 
         num_questions = random.randint(7, 10)
         task_name = f"Quiz: {unit_name}"
@@ -337,7 +365,7 @@ class AiService:
                     self._rotate_key()
                     time.sleep(1)
                     continue
-        return self._fallback_quiz(unit_name, topic, learning_outcomes)
+        return None
 
     def generate_timetable(self, user_info, quiz_history, active_units, recent_chat_titles, previous_timetable=None, study_context=None):
         performance_summary = ""
@@ -419,7 +447,7 @@ class AiService:
                 return json.loads(raw_text)
             except Exception as e:
                 logger.error(f"Failed to parse timetable JSON: {e}")
-        return self._fallback_timetable(user_info, active_units)
+        return None
 
     def get_recommendations(self, user_info, quiz_history, active_units, study_context=None):
         history_summary = ""
@@ -467,7 +495,9 @@ class AiService:
         """
 
         rec = self.ask(prompt)
-        return rec or self._fallback_recommendations(user_info, active_units)
+        if not rec or "AI service is currently unavailable" in rec:
+            return "AI service is currently unavailable."
+        return rec
 
 ai_service = AiService()
 
