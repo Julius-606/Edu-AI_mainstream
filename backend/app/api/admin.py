@@ -1112,8 +1112,8 @@ async def admin_overseer_dashboard(request: Request, db: Session = Depends(get_d
     neon_host = db_url_str.split("@")[-1].split("/")[0] if "@" in db_url_str else "Local SQLite Engine"
     db_type = "Neon PostgreSQL" if "postgres" in db_url_str else "SQLite (edu_ai_vault.db)"
 
-    hf_space_id = os.environ.get("SPACE_ID") or os.environ.get("HF_SPACE_ID") or "Agent606/Edu-AI"
-    hf_host = os.environ.get("SPACE_HOST") or "agent606-edu-ai.hf.space"
+    hf_space_id = os.environ.get("SPACE_ID") or os.environ.get("HF_SPACE_ID") or "Agent606/Trace"
+    hf_host = os.environ.get("SPACE_HOST") or "agent606-trace.hf.space"
 
     return templates.TemplateResponse(
         "admin/dashboard.html",
@@ -1232,8 +1232,8 @@ async def run_live_module_test(module_name: str, db: Session = Depends(get_db)):
 
         elif module_name in ["huggingface", "hf"]:
             # Test HF space metadata
-            space_id = os.environ.get("SPACE_ID") or os.environ.get("HF_SPACE_ID") or "Agent606/Edu-AI"
-            space_host = os.environ.get("SPACE_HOST") or "agent606-edu-ai.hf.space"
+            space_id = os.environ.get("SPACE_ID") or os.environ.get("HF_SPACE_ID") or "Agent606/Trace"
+            space_host = os.environ.get("SPACE_HOST") or "agent606-trace.hf.space"
             latency = round((time.time() - start_time) * 1000, 2)
             return {
                 "status": "PASS",
