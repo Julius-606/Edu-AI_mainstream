@@ -641,7 +641,7 @@ fun LearnScreen(
                                         val tempItem = InquiryItem(q, "")
                                         inquiries.add(tempItem)
                                         isAiLoading = true
-                                        val promptWithInstructions = q + " (Educational instruction: Always start with foundational concepts and core definitions, then nicely work your way up to major concepts and clinical applications. Optionally, you may conclude by asking a single short, thought-provoking question to test understanding, but this is optional and not mandatory.)"
+                                        val promptWithInstructions = q + " (Educational instruction: Make clear, well-structured notes. Do not view, adapt to, or assume any student status. Be strictly objective and conclusive. Start with foundational concepts and core definitions first, then work up to intermediate mechanisms and major concepts with definitive takeaways.)"
                                         triggerAiConsultation(userId, promptWithInstructions, studentViewModel, scope) { loading, res ->
                                             isAiLoading = loading
                                             if (!loading) {
@@ -663,7 +663,7 @@ fun LearnScreen(
                                         val tempItem = InquiryItem(q, "")
                                         inquiries.add(tempItem)
                                         isAiLoading = true
-                                        val promptWithInstructions = q + " (Educational instruction: Always start with foundational concepts and core definitions, then nicely work your way up to major concepts. Optionally, you may conclude by asking a single short, thought-provoking question to test understanding, but this is optional and not mandatory.)"
+                                        val promptWithInstructions = q + " (Educational instruction: Make clear, objective, and conclusive notes. Do not view or assume any student status. Start with foundational concepts using a relatable analogy, then bridge to major concepts and definitive clinical takeaways.)"
                                         triggerAiConsultation(userId, promptWithInstructions, studentViewModel, scope) { loading, res ->
                                             isAiLoading = loading
                                             if (!loading) {
@@ -685,7 +685,7 @@ fun LearnScreen(
                                         val tempItem = InquiryItem(q, "")
                                         inquiries.add(tempItem)
                                         isAiLoading = true
-                                        val promptWithInstructions = q + " (Educational instruction: Start with the foundational principles before explaining the high-yield traps and major clinical pearls. Optionally, you may conclude by asking a single short question to test understanding, but this is optional and not mandatory.)"
+                                        val promptWithInstructions = q + " (Educational instruction: Make clear, objective, and conclusive notes without viewing student status. Start with foundational principles before detailing high-yield traps and major clinical pearls with definitive conclusions.)"
                                         triggerAiConsultation(userId, promptWithInstructions, studentViewModel, scope) { loading, res ->
                                             isAiLoading = loading
                                             if (!loading) {
@@ -728,7 +728,7 @@ fun LearnScreen(
                                                 val tempItem = InquiryItem(q, "")
                                                 inquiries.add(tempItem)
                                                 isAiLoading = true
-                                                val promptWithInstructions = q + " (Educational instruction: Always start with foundational concepts and core definitions, then work your way up to major concepts and clinical applications. Optionally, you may conclude by asking a single short, thought-provoking question to test understanding, but this is optional and not mandatory.)"
+                                                val promptWithInstructions = q + " (Educational instruction: Make clear, objective, and conclusive notes. Do not view or assume any student status. Always start with foundational concepts and core definitions, then work up to major concepts with definitive conclusions.)"
                                                 triggerAiConsultation(userId, promptWithInstructions, studentViewModel, scope) { loading, res ->
                                                     isAiLoading = loading
                                                     if (!loading) {

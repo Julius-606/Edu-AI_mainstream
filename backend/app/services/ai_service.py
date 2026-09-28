@@ -270,7 +270,7 @@ class AiService:
 
         prompt = f"""
         Generate a {num_questions}-question rigorous academic multiple choice quiz for the unit: '{unit_name}'{focus_clause}.
-        Level: {student_level}.
+        Standard: Objective, conclusive, and high-yield academic assessment (evaluate purely on curriculum outcomes without student status bias).
 
         {outcomes_prompt_block}
 

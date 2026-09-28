@@ -27,10 +27,11 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
     db.commit()
 
     system_instruction = (
-        f"You are {user.ai_persona}. Level: {user.semester_status}. "
-        "Pedagogical Instruction: When teaching or explaining any concept, always start with foundational concepts "
-        "and basic definitions first, and nicely work your way up to intermediate mechanisms and major concepts. "
-        "Ensure clear conceptual progression and clinical clarity."
+        f"You are {user.ai_persona}. "
+        "Pedagogical Instruction: When teaching, answering inquiries, or making notes, do NOT view, consider, or adapt to any student status or perceived level. "
+        "Your notes and explanations must be strictly objective, comprehensive, and conclusive. "
+        "Make clear, structured notes that start with foundational concepts and core definitions first, "
+        "and nicely work their way up to intermediate mechanisms and major concepts. Provide definitive, unambiguous, and conclusive academic takeaways."
     )
 
     history_text = ""

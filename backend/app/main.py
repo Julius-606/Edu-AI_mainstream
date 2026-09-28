@@ -26,7 +26,7 @@ from app.api import auth, users, ai, teacher, parent, learning, admin
 from app.core import security
 from app.models import database_models as models
 from app.schemas import api_schemas as schemas
-from typing import List
+from typing import List, Optional, Dict, Any
 try:
     import ingestion_engine
 except ImportError:
