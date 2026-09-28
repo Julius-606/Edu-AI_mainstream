@@ -328,20 +328,26 @@
                     <span>{{ field.name }}</span>
                     <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300">{{ field.courses|length }} courses</span>
                 </button>
-                <div class="mt-4 space-y-3 pr-1">
+                <div class="mt-4 space-y-3 pr-1 hidden">
                     {% for course in field.courses %}
-                    <details class="rounded-xl border border-slate-800 bg-slate-950/60 p-4" open>
+                    <details class="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
                         <summary class="cursor-pointer font-bold text-slate-200 text-base">{{ course.name }} <span class="text-xs text-slate-500 font-normal">({{ course.unit_groups|length }} unit groups)</span></summary>
                         <div class="mt-3 grid gap-3">
                             {% for group in course.unit_groups %}
                             <div class="rounded-xl border border-slate-800/80 bg-slate-900/60 p-3.5">
-                                <p class="mb-2 text-xs font-bold uppercase tracking-wider text-indigo-400">{{ group.name }}</p>
+                                <div class="flex items-center justify-between mb-2">
+                                    <p class="text-xs font-bold uppercase tracking-wider text-indigo-400">{{ group.name }}</p>
+                                    <button type="button" onclick="toggleSelectGroup(this)" class="text-[11px] text-slate-400 hover:text-indigo-300 font-medium transition cursor-pointer px-2 py-0.5 rounded bg-slate-800/60 hover:bg-slate-800">Select All</button>
+                                </div>
                                 <div class="grid gap-2">
                                 {% for unit in group.units %}
                                     <div class="flex items-center justify-between rounded-xl bg-slate-950 px-4 py-2.5 border border-slate-800/60 hover:border-indigo-500/40 transition">
-                                        <div>
-                                            <a href="/admin/units/{{ unit.id }}" class="text-sm font-semibold text-slate-200 hover:text-indigo-300">{{ unit.name }}</a>
-                                            <span class="text-xs text-slate-500 ml-2">({{ unit.modules|length }} modules)</span>
+                                        <div class="flex items-center gap-3">
+                                            <input type="checkbox" class="unit-select-checkbox w-4 h-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-950" value="{{ unit.id }}" onchange="onUnitSelectChange()">
+                                            <div>
+                                                <a href="/admin/units/{{ unit.id }}" class="text-sm font-semibold text-slate-200 hover:text-indigo-300">{{ unit.name }}</a>
+                                                <span class="text-xs text-slate-500 ml-2">({{ unit.modules|length }} modules)</span>
+                                            </div>
                                         </div>
                                         <a href="/admin/units/{{ unit.id }}" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-3 py-1.5 rounded-lg border border-indigo-500/20 transition">Manage Unit &rarr;</a>
                                     </div>
@@ -360,6 +366,44 @@
                 <a href="/admin/ingestion" class="mt-4 inline-block rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white">Ingest your first syllabus &rarr;</a>
             </div>
             {% endfor %}
+        </div>
+
+        <!-- Floating Bulk Action Bar -->
+        <div id="bulk-edit-bar" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 border border-slate-800 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 transition-all duration-300 translate-y-24 opacity-0 pointer-events-none z-50">
+            <span class="text-xs text-slate-300 font-semibold"><span id="selected-units-count" class="text-indigo-400 font-bold">0</span> units selected</span>
+            <button type="button" onclick="openBulkEditModal()" class="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-md shadow-indigo-600/20 transition">
+                Bulk Edit Metadata
+            </button>
+            <button type="button" onclick="clearUnitSelections()" class="text-xs text-slate-400 hover:text-white transition">
+                Cancel
+            </button>
+        </div>
+
+        <!-- Bulk Edit Modal -->
+        <div id="bulk-edit-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+                <h3 class="text-xl font-bold text-white mb-2">Bulk Edit Metadata</h3>
+                <p class="text-xs text-slate-400 mb-6">Update categories and classification fields for the selected units simultaneously. Leave fields blank to keep their existing values.</p>
+                <form id="bulk-edit-form" method="post" action="/admin/units/bulk-update" class="space-y-4">
+                    <input type="hidden" name="unit_ids" id="bulk-unit-ids">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Field / Category</label>
+                        <input type="text" name="field" placeholder="e.g. Clinical Science, Nursing" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Course</label>
+                        <input type="text" name="course" placeholder="e.g. Year 4 Clinical Clerkships" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Unit Group</label>
+                        <input type="text" name="unit_group" placeholder="e.g. Cardiorespiratory Systems" class="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-600">
+                    </div>
+                    <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                        <button type="button" onclick="closeBulkEditModal()" class="rounded-xl px-4 py-2 text-xs font-bold text-slate-400 hover:text-white transition">Cancel</button>
+                        <button type="submit" class="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-md shadow-indigo-600/20 transition">Save Changes</button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <!-- SECTION: USERS & ROLES -->
@@ -1143,6 +1187,60 @@
             await runModuleTest(m);
         }
         if (btn) btn.innerHTML = `<span>⚡ RUN FULL SYSTEM DIAGNOSTIC</span>`;
+    }
+
+    function onUnitSelectChange() {
+        const checkboxes = document.querySelectorAll('.unit-select-checkbox:checked');
+        const count = checkboxes.length;
+        const bar = document.getElementById('bulk-edit-bar');
+        const countText = document.getElementById('selected-units-count');
+        
+        if (countText) countText.textContent = count;
+        
+        if (count > 0) {
+            if (bar) {
+                bar.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+                bar.classList.add('translate-y-0', 'opacity-100');
+                bar.classList.remove('pointer-events-none');
+            }
+        } else {
+            if (bar) {
+                bar.classList.add('translate-y-24', 'opacity-0');
+                bar.classList.remove('translate-y-0', 'opacity-100');
+                bar.classList.add('pointer-events-none');
+            }
+        }
+    }
+
+    function toggleSelectGroup(btn) {
+        const parent = btn.closest('.rounded-xl');
+        if (!parent) return;
+        const checkboxes = parent.querySelectorAll('.unit-select-checkbox');
+        const allChecked = Array.from(checkboxes).length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+        checkboxes.forEach(cb => cb.checked = !allChecked);
+        btn.textContent = allChecked ? "Select All" : "Deselect All";
+        onUnitSelectChange();
+    }
+
+    function clearUnitSelections() {
+        const checkboxes = document.querySelectorAll('.unit-select-checkbox');
+        checkboxes.forEach(cb => cb.checked = false);
+        onUnitSelectChange();
+    }
+
+    function openBulkEditModal() {
+        const checkboxes = document.querySelectorAll('.unit-select-checkbox:checked');
+        const ids = Array.from(checkboxes).map(cb => cb.value).join(',');
+        const idsInput = document.getElementById('bulk-unit-ids');
+        if (idsInput) idsInput.value = ids;
+        
+        const modal = document.getElementById('bulk-edit-modal');
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeBulkEditModal() {
+        const modal = document.getElementById('bulk-edit-modal');
+        if (modal) modal.classList.add('hidden');
     }
 </script>
 </body>

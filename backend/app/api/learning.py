@@ -19,7 +19,19 @@ def find_user(user_id_or_name: str, db: Session):
 
 @router.get("/syllabuses")
 def get_all_syllabuses(db: Session = Depends(get_db)):
-    return db.query(models.Unit).all()
+    units = db.query(models.Unit).all()
+    return [
+        {
+            "id": u.id,
+            "name": u.name,
+            "category": u.category or "General",
+            "course": getattr(u, "course", "Core Sciences") or "Core Sciences",
+            "unit_group": getattr(u, "unit_group", None),
+            "owner_id": u.owner_id,
+            "is_active": getattr(u, "is_active", True)
+        }
+        for u in units
+    ]
 
 @router.get("/syllabuses/{unit_id}/tree", response_model=schemas.UnitResponse)
 def get_syllabus_tree(unit_id: int, db: Session = Depends(get_db)):

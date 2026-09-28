@@ -31,10 +31,10 @@ BACKEND_VERSION = "3.2.0"
 class SafeEncoder(json.JSONEncoder):
     def default(self, obj):
         try:
-            if hasattr(obj, "__dict__"):
-                return {k: v for k, v in obj.__dict__.items() if not k.startswith('_')}
             if hasattr(obj, "__table__"):
                 return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
+            if hasattr(obj, "__dict__"):
+                return {k: v for k, v in obj.__dict__.items() if not k.startswith('_')}
         except Exception:
             pass
         return str(obj)
@@ -494,9 +494,24 @@ async def admin_create_user(
     return RedirectResponse(url="/admin/users", status_code=303)
 
 
-@router.get("/admin/ingestion", response_class=HTMLResponse)
+@router.get("/admin/ingestion")
 async def admin_ingestion_view(request: Request, db: Session = Depends(get_db)):
-    if not is_authenticated_admin(request, db):
+    is_admin = is_authenticated_admin(request, db)
+    accept_header = request.headers.get("accept", "")
+    wants_json = "application/json" in accept_header or request.query_params.get("format") == "json"
+
+    # API / Swagger inspection support
+    if wants_json:
+        catalog = build_curriculum_catalog(db)
+        return JSONResponse(content={
+            "status": "operational",
+            "message": "Curriculum Syllabus Ingestion Engine is active.",
+            "instructions": "Use POST /admin/ingestion with 'markdown' (required), 'field' (optional), 'course' (optional), 'unit_group' (optional) to ingest syllabuses.",
+            "total_fields": len(catalog),
+            "catalog": catalog
+        })
+
+    if not is_admin:
         return RedirectResponse(url="/admin/login", status_code=302)
 
     catalog = build_curriculum_catalog(db)
@@ -510,6 +525,80 @@ async def admin_ingestion_view(request: Request, db: Session = Depends(get_db)):
             "catalog_json": catalog_json
         }
     )
+
+
+@router.post("/admin/ingestion")
+async def admin_ingestion_post(
+    request: Request,
+    markdown: Optional[str] = Form(None, description="5-Level syllabus markdown (# Unit, ## Module, ### Topic, #### Subtopic, - Objective)"),
+    field: Optional[str] = Form(None, description="Academic field or category (e.g., Medicine, Clinical Sciences)"),
+    course: Optional[str] = Form(None, description="Course name (e.g., MBChB, General Surgery)"),
+    unit_group: Optional[str] = Form(None, description="Optional unit group name (e.g., Cardiovascular Systems)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Ingests 5-level syllabus markdown into the global curriculum catalog.
+    Supports form data and JSON payloads for interactive Swagger / API calls.
+    """
+    is_admin = is_authenticated_admin(request, db)
+    accept_header = request.headers.get("accept", "")
+    is_json_request = "application/json" in accept_header or request.headers.get("content-type", "").startswith("application/json")
+
+    # If unauthenticated browser request, redirect to login
+    if not is_admin and not is_json_request:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    md_text = markdown
+    field_val = field or "General"
+    course_val = course or "Core Sciences"
+    unit_group_val = unit_group
+
+    # Support JSON request bodies from Swagger or REST clients
+    if request.headers.get("content-type", "").startswith("application/json"):
+        try:
+            body = await request.json()
+            md_text = body.get("markdown") or body.get("markdown_text") or md_text
+            field_val = body.get("field") or body.get("category") or field_val
+            course_val = body.get("course") or course_val
+            unit_group_val = body.get("unit_group") or unit_group_val
+        except Exception:
+            pass
+
+    if not md_text or not md_text.strip():
+        if is_json_request:
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Field 'markdown' is required and cannot be empty."})
+        return HTMLResponse("<p>Error: Markdown text is required.</p>", status_code=400)
+
+    syllabus_data = ingestion_engine.parse_syllabus_markdown(md_text)
+    ingestion_engine.save_syllabus_to_db(
+        db,
+        syllabus_data,
+        owner_id=None,
+        field=field_val,
+        course=course_val,
+        unit_group=unit_group_val
+    )
+
+    notify_admin(
+        db=db,
+        category="SYSTEM_ALERT",
+        title="Syllabus Ingested",
+        message=f"Ingested syllabus: '{syllabus_data.get('syllabus_title', 'General')}' into Field: {field_val} / Course: {course_val}.",
+        level="info"
+    )
+
+    if is_json_request:
+        return JSONResponse(content={
+            "status": "success",
+            "message": "Syllabus successfully ingested into curriculum catalogue.",
+            "syllabus_title": syllabus_data.get("syllabus_title", "General"),
+            "field": field_val,
+            "course": course_val,
+            "unit_group": unit_group_val,
+            "units_ingested_count": len(syllabus_data.get("units", []))
+        })
+
+    return RedirectResponse(url="/admin/catalogue", status_code=303)
 
 
 @router.get("/admin/units/{unit_id}", response_class=HTMLResponse)
@@ -547,6 +636,37 @@ async def admin_unit_update(
     db.commit()
 
     return RedirectResponse(url=f"/admin/units/{unit_id}", status_code=303)
+
+
+@router.post("/admin/units/bulk-update")
+async def admin_bulk_unit_update(
+    request: Request,
+    unit_ids: str = Form(...),
+    field: Optional[str] = Form(None),
+    course: Optional[str] = Form(None),
+    unit_group: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    if not is_authenticated_admin(request, db):
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    try:
+        ids_list = [int(x.strip()) for x in unit_ids.split(",") if x.strip().isdigit()]
+    except Exception:
+        ids_list = []
+
+    if ids_list:
+        units = db.query(models.Unit).filter(models.Unit.id.in_(ids_list)).all()
+        for u in units:
+            if field and field.strip():
+                u.category = field.strip()
+            if course and course.strip():
+                u.course = course.strip()
+            if unit_group and unit_group.strip():
+                u.unit_group = unit_group.strip()
+        db.commit()
+
+    return RedirectResponse(url="/admin/catalogue", status_code=303)
 
 
 @router.post("/admin/nodes")

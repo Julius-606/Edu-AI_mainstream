@@ -62,16 +62,23 @@ def parse_syllabus_markdown(text):
 
     return syllabus
 
-def save_syllabus_to_db(db: Session, syllabus_data: dict, owner_id=None):
+def save_syllabus_to_db(db: Session, syllabus_data: dict, owner_id=None, field=None, course=None, unit_group=None):
     """
     Saves parsed syllabus data into the database.
     If owner_id is None, it's a global/available unit.
+    Supports hierarchical categorisation: field, course, and unit_group.
     """
+    category_val = (field.strip() if field and field.strip() else None) or syllabus_data.get("syllabus_title") or ("Global" if owner_id is None else "Personal")
+    course_val = (course.strip() if course and course.strip() else None) or "Core Sciences"
+    group_val = unit_group.strip() if unit_group and unit_group.strip() else None
+
     for unit_data in syllabus_data.get("units", []):
         db_unit = models.Unit(
             name=unit_data["unit_title"],
             owner_id=owner_id,
-            category="Global" if owner_id is None else "Personal"
+            category=category_val,
+            course=course_val,
+            unit_group=group_val or unit_data["unit_title"]
         )
         db.add(db_unit)
         db.flush()

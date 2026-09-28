@@ -26,7 +26,12 @@ def ai_chat(request: schemas.ChatRequest, db: Session = Depends(get_db)):
     db.add(user_msg)
     db.commit()
 
-    system_instruction = f"You are {user.ai_persona}. Level: {user.semester_status}."
+    system_instruction = (
+        f"You are {user.ai_persona}. Level: {user.semester_status}. "
+        "Pedagogical Instruction: When teaching or explaining any concept, always start with foundational concepts "
+        "and basic definitions first, and nicely work your way up to intermediate mechanisms and major concepts. "
+        "Ensure clear conceptual progression and clinical clarity."
+    )
 
     history_text = ""
     for msg in request.history:

@@ -144,7 +144,7 @@ fun LearnScreen(
                         SyllabusObjective(
                             title = "Learning Objective ${idx + 1}",
                             description = desc,
-                            prompt = "Teach me the core clinical concepts and advanced details to fulfill the objective: '$desc' regarding '${subtopic.name}'. Frame it in clear Socratic medical study notes with high-yield bullet points, formatting highlights, and YouTube / web video recommendations."
+                            prompt = "Teach me the concepts to fulfill the learning objective: '$desc' regarding '${subtopic.name}'. Educational instruction: Start with foundational concepts, basic definitions, and core principles first, then nicely and systematically work your way up to intermediate mechanisms, major concepts, and clinical applications. Structure with clear high-yield bullet points, formatting highlights, and YouTube / web video recommendations."
                         )
                     }
                 } else null
@@ -157,19 +157,19 @@ fun LearnScreen(
     val objectives = parsedObjectives ?: remember(subtopic.name) {
         listOf(
             SyllabusObjective(
-                title = "Pathophysiology & Molecular Mechanics",
-                description = "Cellular pathophysiology, biochemical regulation, and molecular mechanics of the topic.",
-                prompt = "Teach me the core cellular pathophysiology, biochemical regulation, and molecular mechanics of '${subtopic.name}'. Structure the notes with high-yield bullet points, flow diagrams, and recommended video references."
+                title = "Foundational Concepts & Core Principles",
+                description = "Basic definitions, essential physiological baselines, and fundamental principles of ${subtopic.name}.",
+                prompt = "Teach me the foundational concepts, core definitions, and basic principles of '${subtopic.name}'. Start with the ground-level fundamentals and intuitive baselines to establish a strong foundation before advancing to complex mechanics. Structure with high-yield bullet points, clear explanations, and introductory video/reference recommendations."
             ),
             SyllabusObjective(
-                title = "Clinical Presentation & Diagnoses",
-                description = "Clinical presentations, patient symptoms, laboratory markers, and diagnosis protocol.",
-                prompt = "Teach me the clinical presentations, typical patient symptoms, laboratory diagnostic markers, and diagnostic confirmation protocols for '${subtopic.name}'. Include clinical tables and video recommendations."
+                title = "Mechanisms & System Dynamics",
+                description = "Cellular pathophysiology, biochemical pathways, and intermediate system interactions.",
+                prompt = "Building directly upon the foundational principles of '${subtopic.name}', explain the intermediate mechanisms, cellular pathophysiology, biochemical regulation, and system dynamics. Connect the fundamental principles to how the system functions in normal and altered states with diagrams and clear bullet points."
             ),
             SyllabusObjective(
-                title = "Exam Traps & Therapeutic Guidelines",
-                description = "High-yield medical board exam traps, distractors, and patient management.",
-                prompt = "Explain high-yield medical board exam traps, distractors, therapeutic guidelines, and advanced patient management parameters regarding '${subtopic.name}'. Include online and YouTube resources."
+                title = "Major Concepts & Clinical Synthesis",
+                description = "Major overarching concepts, clinical presentations, diagnostic criteria, and high-yield exam pearls.",
+                prompt = "Now synthesize the major concepts, clinical presentations, diagnostic protocols, and high-yield exam pearls for '${subtopic.name}'. Work up to advanced clinical management, common diagnostic traps, and comprehensive mastery with clinical tables and high-yield video references."
             )
         )
     }
@@ -634,14 +634,14 @@ fun LearnScreen(
                                         .fillMaxWidth()
                                         .padding(bottom = 6.dp)
                                 ) {
-                                    StudyChip("Explain with analogy") {
+                                    StudyChip("Foundations to Mastery") {
                                         com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                        val q = "Please explain the clinical mechanics of '${subtopic.name}' using a simple, relatable medical analogy."
+                                        val q = "Explain '${subtopic.name}' step-by-step: start with foundational concepts and basic definitions, work through intermediate mechanisms, and culminate in major concepts and clinical takeaways."
                                         aiQuestion = ""
                                         val tempItem = InquiryItem(q, "")
                                         inquiries.add(tempItem)
                                         isAiLoading = true
-                                        val promptWithInstructions = q + " (At the end of your explanation, optionally ask a single, short, thought-provoking medical question related to the topic to keep the conversation interactive, encouraging Socratic reasoning from the student if appropriate. This is optional, do not always ask.)"
+                                        val promptWithInstructions = q + " (Educational instruction: Always start with foundational concepts and core definitions, then nicely work your way up to major concepts and clinical applications. Optionally, you may conclude by asking a single short, thought-provoking question to test understanding, but this is optional and not mandatory.)"
                                         triggerAiConsultation(userId, promptWithInstructions, studentViewModel, scope) { loading, res ->
                                             isAiLoading = loading
                                             if (!loading) {
@@ -656,14 +656,36 @@ fun LearnScreen(
                                             }
                                         }
                                     }
-                                    StudyChip("Common exam traps") {
+                                    StudyChip("Explain with analogy") {
                                         com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
-                                        val q = "What are the common medical board exam traps, distractors, and high-yield test points regarding '${subtopic.name}'?"
+                                        val q = "Please explain the foundational concepts and mechanisms of '${subtopic.name}' using a simple, relatable analogy, then bridge it to major clinical concepts."
                                         aiQuestion = ""
                                         val tempItem = InquiryItem(q, "")
                                         inquiries.add(tempItem)
                                         isAiLoading = true
-                                        val promptWithInstructions = q + " (At the end of your explanation, optionally ask a single, short, thought-provoking medical question related to the topic to keep the conversation interactive, encouraging Socratic reasoning from the student if appropriate. This is optional, do not always ask.)"
+                                        val promptWithInstructions = q + " (Educational instruction: Always start with foundational concepts and core definitions, then nicely work your way up to major concepts. Optionally, you may conclude by asking a single short, thought-provoking question to test understanding, but this is optional and not mandatory.)"
+                                        triggerAiConsultation(userId, promptWithInstructions, studentViewModel, scope) { loading, res ->
+                                            isAiLoading = loading
+                                            if (!loading) {
+                                                val idx = inquiries.indexOf(tempItem)
+                                                if (idx != -1) {
+                                                    inquiries[idx] = tempItem.copy(answer = res ?: "No response received.")
+                                                } else {
+                                                    inquiries.add(InquiryItem(q, res ?: "No response received."))
+                                                }
+                                                val json = gson.toJson(inquiries.toList())
+                                                com.example.edu_ai.utils.PreferenceManager.saveSubtopicInquiries(context, subtopicId, json)
+                                            }
+                                        }
+                                    }
+                                    StudyChip("Exam pearls") {
+                                        com.example.edu_ai.utils.TactileFeedback.triggerSubtleClick(context)
+                                        val q = "What are the core fundamentals and high-yield board exam pearls regarding '${subtopic.name}'?"
+                                        aiQuestion = ""
+                                        val tempItem = InquiryItem(q, "")
+                                        inquiries.add(tempItem)
+                                        isAiLoading = true
+                                        val promptWithInstructions = q + " (Educational instruction: Start with the foundational principles before explaining the high-yield traps and major clinical pearls. Optionally, you may conclude by asking a single short question to test understanding, but this is optional and not mandatory.)"
                                         triggerAiConsultation(userId, promptWithInstructions, studentViewModel, scope) { loading, res ->
                                             isAiLoading = loading
                                             if (!loading) {
@@ -687,7 +709,7 @@ fun LearnScreen(
                                     OutlinedTextField(
                                         value = aiQuestion,
                                         onValueChange = { aiQuestion = it },
-                                        placeholder = { Text("Ask Socratic AI about ${subtopic.name}...", fontSize = 11.sp) },
+                                        placeholder = { Text("Ask about ${subtopic.name}...", fontSize = 11.sp) },
                                         modifier = Modifier.weight(1f),
                                         textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
                                         maxLines = 2,
@@ -706,7 +728,7 @@ fun LearnScreen(
                                                 val tempItem = InquiryItem(q, "")
                                                 inquiries.add(tempItem)
                                                 isAiLoading = true
-                                                val promptWithInstructions = q + " (At the end of your explanation, optionally ask a single, short, thought-provoking medical question related to the topic to keep the conversation interactive, encouraging Socratic reasoning from the student if appropriate. This is optional, do not always ask.)"
+                                                val promptWithInstructions = q + " (Educational instruction: Always start with foundational concepts and core definitions, then work your way up to major concepts and clinical applications. Optionally, you may conclude by asking a single short, thought-provoking question to test understanding, but this is optional and not mandatory.)"
                                                 triggerAiConsultation(userId, promptWithInstructions, studentViewModel, scope) { loading, res ->
                                                     isAiLoading = loading
                                                     if (!loading) {

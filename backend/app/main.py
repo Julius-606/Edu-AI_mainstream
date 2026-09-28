@@ -368,9 +368,19 @@ def root(request: Request, db: Session = Depends(get_db)):
     )
 
 @app.post("/ingest", response_class=HTMLResponse)
-async def handle_ingestion(request: Request, markdown: str = Form(...), db: Session = Depends(get_db)):
+async def handle_ingestion(
+    request: Request,
+    markdown: str = Form(...),
+    field: Optional[str] = Form(None),
+    course: Optional[str] = Form(None),
+    unit: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
     syllabus_data = ingestion_engine.parse_syllabus_markdown(markdown)
-    ingestion_engine.save_syllabus_to_db(db, syllabus_data)
+    ingestion_engine.save_syllabus_to_db(
+        db, syllabus_data, owner_id=None,
+        field=field, course=course, unit_group=unit
+    )
     admin.notify_admin(
         db=db,
         category="SYSTEM_ALERT",
