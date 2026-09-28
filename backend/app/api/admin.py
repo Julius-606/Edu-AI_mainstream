@@ -28,6 +28,17 @@ DEFAULT_ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@trace.edu")
 DEFAULT_ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
 BACKEND_VERSION = "3.2.0"
 
+class SafeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        try:
+            if hasattr(obj, "__dict__"):
+                return {k: v for k, v in obj.__dict__.items() if not k.startswith('_')}
+            if hasattr(obj, "__table__"):
+                return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
+        except Exception:
+            pass
+        return str(obj)
+
 # Live HTTP Traffic Wiretap Ring Buffer for THE OVERSEER
 REQUEST_LOG_BUFFER: List[Dict[str, Any]] = []
 MAX_REQUEST_LOGS = 120
@@ -489,9 +500,15 @@ async def admin_ingestion_view(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(url="/admin/login", status_code=302)
 
     catalog = build_curriculum_catalog(db)
+    catalog_json = json.dumps(catalog, cls=SafeEncoder)
     return templates.TemplateResponse(
         "curriculum/ingestion.html",
-        {"request": request, "version": BACKEND_VERSION, "catalog": catalog}
+        {
+            "request": request,
+            "version": BACKEND_VERSION,
+            "catalog": catalog,
+            "catalog_json": catalog_json
+        }
     )
 
 

@@ -112,7 +112,7 @@
         </div>
     </main>
     <script>
-        const catalog = {{ catalog|tojson }};
+        const catalog = {{ catalog_json|safe }};
         const fieldSelect = document.getElementById('field-select');
         const courseSelect = document.getElementById('course-select');
         const newField = document.getElementById('new-field');

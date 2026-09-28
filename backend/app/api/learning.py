@@ -39,17 +39,22 @@ def update_subtopic_progress(subtopic_id: int, is_completed: bool, db: Session =
     db.refresh(subtopic)
     return {"status": "success", "subtopic_id": subtopic_id, "is_completed": is_completed}
 
+from pydantic import BaseModel
+
+class SyllabusIngestRequest(BaseModel):
+    user_id: str
+    markdown_text: str
+
 @router.post("/syllabuses/ingest-markdown")
 def ingest_syllabus_markdown(
-    user_id: str,
-    markdown_text: str = Body(..., embed=True),
+    payload: SyllabusIngestRequest,
     db: Session = Depends(get_db)
 ):
     """
     Parses Markdown syllabus and uploads it to the database for the specified user.
     """
-    structured_data = parse_syllabus_markdown(markdown_text)
-    return upload_syllabus(structured_data, user_id, db)
+    structured_data = parse_syllabus_markdown(payload.markdown_text)
+    return upload_syllabus(structured_data, payload.user_id, db)
 
 @router.post("/syllabuses/upload")
 def upload_syllabus(payload: dict, user_id: str, db: Session = Depends(get_db)):
