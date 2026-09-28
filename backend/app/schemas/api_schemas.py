@@ -270,8 +270,11 @@ class SyncRequest(BaseModel):
     bookmarks: List[BookmarkBase] = []
 
 class SyncResponse(BaseModel):
-    success: bool
+    success: bool = True
+    status: Optional[str] = "success"
     message: str
+    synced_at: Optional[float] = None
+    details: Optional[Dict[str, Any]] = None
 
 
  

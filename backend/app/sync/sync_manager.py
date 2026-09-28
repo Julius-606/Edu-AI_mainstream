@@ -106,6 +106,7 @@ class SyncManager:
         logger.info(f"Client sync processed in {elapsed:.3f}s. Sub-module statistics: {stats}")
 
         return {
+            "success": True,
             "status": "success",
             "message": "User data successfully synchronized across clinical sub-modules.",
             "synced_at": time.time(),
