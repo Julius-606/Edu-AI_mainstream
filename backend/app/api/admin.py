@@ -1372,3 +1372,368 @@ async def run_live_module_test(module_name: str, db: Session = Depends(get_db)):
             content={"status": "FAIL", "module": module_name, "latency_ms": latency, "detail": str(e)}
         )
 
+
+# ==============================================================================
+# AI CANVAS AUTO-INGESTION API & VIEWS
+# ==============================================================================
+from pydantic import BaseModel
+from google import genai
+from google.genai import types
+
+class CanvasSessionUpdatePayload(BaseModel):
+    title: Optional[str] = None
+    canvas_content: Optional[str] = None
+    field_name: Optional[str] = None
+    course_name: Optional[str] = None
+    unit_group_name: Optional[str] = None
+
+class CanvasSessionChatPayload(BaseModel):
+    message: str
+
+
+@router.get("/admin/ingestion/canvas", response_class=HTMLResponse)
+async def admin_canvas_view(request: Request, db: Session = Depends(get_db)):
+    """
+    Renders the high-end full-screen interactive Gemini Canvas workspace
+    for administrative auto-ingestion.
+    """
+    if not is_authenticated_admin(request, db):
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    sessions = db.query(models.CanvasSession).order_by(models.CanvasSession.last_updated.desc()).all()
+    catalog = build_curriculum_catalog(db)
+    
+    return templates.TemplateResponse(
+        "curriculum/canvas.html",
+        {
+            "request": request,
+            "version": BACKEND_VERSION,
+            "sessions": sessions,
+            "catalog": catalog
+        }
+    )
+
+
+@router.get("/api/admin/canvas/sessions")
+async def list_canvas_sessions(request: Request, db: Session = Depends(get_db)):
+    if not is_authenticated_admin(request, db):
+        raise HTTPException(status_code=401, detail="Unauthorized admin session")
+    
+    sessions = db.query(models.CanvasSession).order_by(models.CanvasSession.last_updated.desc()).all()
+    return [{
+        "id": s.id,
+        "title": s.title,
+        "field_name": s.field_name,
+        "course_name": s.course_name,
+        "unit_group_name": s.unit_group_name,
+        "last_updated": s.last_updated,
+        "chat_history_count": len(s.chat_history)
+    } for s in sessions]
+
+
+@router.post("/api/admin/canvas/sessions")
+async def create_canvas_session(request: Request, db: Session = Depends(get_db)):
+    if not is_authenticated_admin(request, db):
+        raise HTTPException(status_code=401, detail="Unauthorized admin session")
+    
+    placeholder_markdown = """# General Pathology Syllabus
+## Unit 1: Introduction to Cell Injury & Adaptations
+### Module 1.1: Reversible vs Irreversible Cell Damage
+#### Topic 1.1.1: Cellular Swelling & Fatty Change
+##### Subtopic 1.1.1.1: Hydropic degeneration pathways
+- Define hydropic change and identify the molecular rate-limiting ATP depletion triggers.
+- Explain the role of the Na+/K+ ATPase pump failure in cellular swelling.
+##### Subtopic 1.1.1.2: Pathophysiology of fatty change (steatosis)
+- Explain lipid accumulation mechanisms in hepatocytes under hypoxia.
+- Detail the clinical takeaways of steatosis and differentiation from necrosis.
+"""
+    new_session = models.CanvasSession(
+        title="Syllabus Draft: " + time.strftime("%b %d, %H:%M"),
+        canvas_content=placeholder_markdown,
+        chat_history=[],
+        field_name="Clinical Medicine",
+        course_name="MBChB",
+        unit_group_name="Pathology Basics",
+        last_updated=time.time()
+    )
+    db.add(new_session)
+    db.commit()
+    db.refresh(new_session)
+    
+    return {
+        "id": new_session.id,
+        "title": new_session.title,
+        "canvas_content": new_session.canvas_content,
+        "field_name": new_session.field_name,
+        "course_name": new_session.course_name,
+        "unit_group_name": new_session.unit_group_name,
+        "chat_history": new_session.chat_history
+    }
+
+
+@router.get("/api/admin/canvas/sessions/{session_id}")
+async def get_canvas_session_details(session_id: int, request: Request, db: Session = Depends(get_db)):
+    if not is_authenticated_admin(request, db):
+        raise HTTPException(status_code=401, detail="Unauthorized admin session")
+    
+    session = db.query(models.CanvasSession).filter(models.CanvasSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Canvas session not found")
+        
+    return {
+        "id": session.id,
+        "title": session.title,
+        "canvas_content": session.canvas_content,
+        "chat_history": session.chat_history,
+        "field_name": session.field_name,
+        "course_name": session.course_name,
+        "unit_group_name": session.unit_group_name,
+        "last_updated": session.last_updated
+    }
+
+
+@router.put("/api/admin/canvas/sessions/{session_id}")
+async def update_canvas_session(session_id: int, payload: CanvasSessionUpdatePayload, request: Request, db: Session = Depends(get_db)):
+    if not is_authenticated_admin(request, db):
+        raise HTTPException(status_code=401, detail="Unauthorized admin session")
+        
+    session = db.query(models.CanvasSession).filter(models.CanvasSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Canvas session not found")
+        
+    if payload.title is not None:
+        session.title = payload.title
+    if payload.canvas_content is not None:
+        session.canvas_content = payload.canvas_content
+    if payload.field_name is not None:
+        session.field_name = payload.field_name
+    if payload.course_name is not None:
+        session.course_name = payload.course_name
+    if payload.unit_group_name is not None:
+        session.unit_group_name = payload.unit_group_name
+        
+    session.last_updated = time.time()
+    db.commit()
+    return {"status": "success", "message": "Session successfully saved"}
+
+
+@router.post("/api/admin/canvas/sessions/{session_id}/chat")
+async def chat_canvas_session(session_id: int, payload: CanvasSessionChatPayload, request: Request, db: Session = Depends(get_db)):
+    if not is_authenticated_admin(request, db):
+        raise HTTPException(status_code=401, detail="Unauthorized admin session")
+        
+    session = db.query(models.CanvasSession).filter(models.CanvasSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Canvas session not found")
+        
+    # Append the new user message to chat history
+    history = list(session.chat_history)
+    history.append({"role": "user", "content": payload.message})
+    
+    # Construct history dialogue context
+    history_dialogue = ""
+    for msg in history[-8:]: # Pass last 8 turns of dialogue for tight context
+        history_dialogue += f"{'Admin' if msg['role']=='user' else 'Gemini AI'}: {msg['content']}\n"
+        
+    # Standard instruction prompt with JSON constraints
+    prompt = f"""
+    You are the Google Gemini Ingestion & Curriculum Engineering Agent for Trace Modular.
+    You and the administrator are collaborating on a shared Interactive Canvas to construct a high-yield, academically precise, and pedagogical syllabus.
+    
+    CRITICAL PEDAGOGICAL DIRECTIVES:
+    1. Do NOT view, consider, or adapt to any student status or perceived level. Keep explanations strictly objective, comprehensive, and conclusive.
+    2. Always start with foundational concepts and core definitions first, and nicely work your way up to intermediate mechanisms and major concepts. Provide definitive, unambiguous, and conclusive academic takeaways.
+    3. The syllabus must be formatted in a strict 5-level Markdown structure:
+       # Syllabus Title
+       ## Unit Title
+       ### Module Title
+       #### Topic Title
+       ##### Subtopic Title
+       - Objective description
+
+    CURRENT SHARED CANVAS STATE:
+    - Target Field / Category: {session.field_name}
+    - Target Course: {session.course_name}
+    - Target Unit Group: {session.unit_group_name or 'Not specified'}
+    
+    CURRENT CANVAS SYLLABUS CONTENT:
+    \"\"\"
+    {session.canvas_content}
+    \"\"\"
+    
+    DIALOGUE HISTORY:
+    {history_dialogue}
+    
+    ADMIN'S NEW DIRECTIVE:
+    \"{payload.message}\"
+    
+    INSTRUCTIONS:
+    - Conduct research using your available tools (search/code execution) if needed to find gold-standard medical syllabus structures, clinical board pearls, and exact medical curricula.
+    - Evaluate the current syllabus content, apply the admin's requested additions, expansions or modifications, and construct an expanded, optimized course structure.
+    - Preserve the parts of the syllabus that are already good, but refine, restructure, or expand based on the user's guidance.
+    - Return your response ONLY in a valid JSON object matching this schema. Do not output any other text or markdown outside of this JSON:
+    {{
+      "chat_response": "A detailed, professional, and conclusive explanation of the changes made, the pedagogical rationales behind them, and what is next to review.",
+      "canvas_update": "The complete, revised, and fully updated 5-level syllabus in Markdown format. Ensure it is fully comprehensive and formatted perfectly."
+    }}
+    """
+
+    from app.services.ai_service import GEMINI_API_KEYS
+    if not GEMINI_API_KEYS:
+        raise HTTPException(status_code=500, detail="Gemini API key is unconfigured.")
+        
+    key = GEMINI_API_KEYS[0]
+    client = genai.Client(api_key=key)
+    
+    response_text = ""
+    agent_used = "Gemini Flash Canvas Ingestion Agent"
+    
+    # 1. Attempt using interactions API with antigravity agent as specified by the user
+    try:
+        tools = [
+            {'type': 'code_execution'},
+            {'type': 'google_search'}
+        ]
+        if hasattr(client, "interactions"):
+            logger.info("Initializing interactions agent for canvas ingestion research...")
+            interaction = client.interactions.create(
+                agent='antigravity-preview-09-2026',
+                input=prompt,
+                background=True,
+                tools=tools,
+                environment={
+                    'type': 'remote',
+                    'network': 'disabled',
+                },
+            )
+            
+            # Poll for completion
+            for _ in range(12): # Wait up to 120 seconds
+                interaction = client.interactions.get(interaction.id)
+                if interaction.status == "completed":
+                    response_text = interaction.output_text
+                    agent_used = "antigravity-preview-09-2026 (Interactive AI Agent)"
+                    break
+                elif interaction.status == "failed":
+                    logger.warning(f"interactions agent failed: {interaction.error}. Falling back to standard model.")
+                    break
+                time.sleep(10)
+    except Exception as e:
+        logger.warning(f"Google interactions API not supported or failed: {e}. Trying fallback standard generation...")
+        
+    # 2. Fallback to standard generate_content with search tool enabled
+    if not response_text:
+        try:
+            config = types.GenerateContentConfig(
+                tools=[{"google_search": {}}],
+                response_mime_type="application/json"
+            )
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=config
+            )
+            if response and response.text:
+                response_text = response.text
+                agent_used = "Gemini 2.5 Flash with Google Search Integration"
+        except Exception as e:
+            logger.error(f"Fallback standard generation failed: {e}")
+            # Clean fallback without JSON constraint if that failed
+            try:
+                config = types.GenerateContentConfig(tools=[{"google_search": {}}])
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt + " Please output in JSON format with 'chat_response' and 'canvas_update'.",
+                    config=config
+                )
+                if response and response.text:
+                    response_text = response.text
+                    agent_used = "Gemini 2.5 Flash Basic fallback"
+            except Exception as ex:
+                raise HTTPException(status_code=500, detail=f"Failed to communicate with Google AI model: {ex}")
+                
+    # Extract JSON fields
+    chat_reply = "AI response generated successfully."
+    canvas_reply = session.canvas_content
+    
+    try:
+        clean_text = response_text.strip()
+        if "```json" in clean_text:
+            clean_text = clean_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in clean_text:
+            clean_text = clean_text.split("```")[1].split("```")[0].strip()
+            
+        parsed = json.loads(clean_text)
+        chat_reply = parsed.get("chat_response", "Canvas updated.")
+        canvas_reply = parsed.get("canvas_update", session.canvas_content)
+    except Exception:
+        # If extraction failed completely, use regex or manual fallback split
+        start_idx = response_text.find("{")
+        end_idx = response_text.rfind("}")
+        if start_idx != -1 and end_idx != -1:
+            try:
+                parsed = json.loads(response_text[start_idx:end_idx+1])
+                chat_reply = parsed.get("chat_response", "Canvas updated.")
+                canvas_reply = parsed.get("canvas_update", session.canvas_content)
+            except Exception:
+                chat_reply = response_text
+        else:
+            chat_reply = response_text
+            
+    # Append response and save canvas update
+    history.append({"role": "model", "content": chat_reply})
+    
+    session.chat_history = history
+    session.canvas_content = canvas_reply
+    session.last_updated = time.time()
+    
+    db.commit()
+    db.refresh(session)
+    
+    return {
+        "status": "success",
+        "chat_response": chat_reply,
+        "canvas_content": canvas_reply,
+        "agent": agent_used,
+        "session_id": session.id
+    }
+
+
+@router.post("/api/admin/canvas/sessions/{session_id}/publish")
+async def publish_canvas_session(session_id: int, request: Request, db: Session = Depends(get_db)):
+    if not is_authenticated_admin(request, db):
+        raise HTTPException(status_code=401, detail="Unauthorized admin session")
+        
+    session = db.query(models.CanvasSession).filter(models.CanvasSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Canvas session not found")
+        
+    md_text = session.canvas_content
+    if not md_text or not md_text.strip():
+        raise HTTPException(status_code=400, detail="Canvas is empty. Cannot publish.")
+        
+    # Run through ingestion engine
+    syllabus_data = ingestion_engine.parse_syllabus_markdown(md_text)
+    ingestion_engine.save_syllabus_to_db(
+        db,
+        syllabus_data,
+        owner_id=None,
+        field=session.field_name,
+        course=session.course_name,
+        unit_group=session.unit_group_name
+    )
+    
+    notify_admin(
+        db=db,
+        category="SYSTEM_ALERT",
+        title="Canvas Syllabus Published",
+        message=f"Admin published auto-ingested syllabus '{syllabus_data.get('syllabus_title', 'General')}' to the curriculum catalogue.",
+        level="info"
+    )
+    
+    return {
+        "status": "success",
+        "message": f"Successfully published syllabus '{syllabus_data.get('syllabus_title', 'General')}' to the database!",
+        "units_count": len(syllabus_data.get("units", []))
+    }
+

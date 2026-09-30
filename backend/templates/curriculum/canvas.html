@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trace | AI Ingestion Canvas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0b1329; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col overflow-hidden">
+
+    <!-- Top Navigation -->
+    <nav class="border-b border-slate-800 bg-slate-950/70 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+            <a href="/admin/ingestion" class="w-9 h-9 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl flex items-center justify-center font-bold text-slate-300 transition duration-150 text-sm">&larr;</a>
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-extrabold text-white text-base">T</div>
+            <div>
+                <span class="text-sm font-extrabold tracking-wider text-slate-200 uppercase">TRACE ADMIN</span>
+                <h1 class="text-xs text-indigo-400 font-bold uppercase tracking-widest leading-none mt-0.5">Interactive Gemini Ingestion Canvas</h1>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="px-3 py-1 bg-green-500/10 text-green-400 rounded-full text-[10px] font-extrabold tracking-widest border border-green-500/20 uppercase">Agent Online</span>
+            <span class="text-xs font-bold text-slate-500">v{{ version }}</span>
+        </div>
+    </nav>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Column: Session and Chat Ingestion Assistant -->
+        <section class="w-full lg:w-[450px] border-r border-slate-800 bg-slate-900/40 flex flex-col overflow-hidden shrink-0">
+            
+            <!-- Session Selector and Creation -->
+            <div class="p-4 border-b border-slate-800 bg-slate-950/40 flex items-center justify-between gap-2">
+                <div class="flex-1">
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Canvas Session</label>
+                    <select id="session-select" onchange="loadSession(this.value)" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-indigo-500 transition">
+                        {% for s in sessions %}
+                        <option value="{{ s.id }}">{{ s.title }}</option>
+                        {% else %}
+                        <option value="">No Active Sessions</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="button" onclick="createNewSession()" class="h-9 px-3 bg-indigo-600/15 hover:bg-indigo-600/35 text-indigo-300 border border-indigo-500/20 hover:border-indigo-500/40 rounded-xl text-xs font-extrabold tracking-wider transition shrink-0 self-end flex items-center gap-1.5 uppercase">
+                    <span>+ New</span>
+                </button>
+            </div>
+
+            <!-- Dialogue History List -->
+            <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/20">
+                <div class="text-center py-8">
+                    <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Session Initialized</p>
+                    <p class="text-[11px] text-slate-400 mt-1 max-w-[280px] mx-auto">Ask the Gemini agent to search, structure, or adapt curriculum outcomes below.</p>
+                </div>
+            </div>
+
+            <!-- Dynamic Agent State / Search Tracker -->
+            <div id="agent-state-bar" class="hidden px-4 py-2 bg-indigo-900/30 border-t border-indigo-500/10 text-xs text-indigo-300 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></span>
+                    <span class="font-semibold text-[11px]" id="agent-state-text">Gemini Agent researching medical curricula...</span>
+                </div>
+                <span class="text-[10px] font-bold opacity-60">interactions API</span>
+            </div>
+
+            <!-- Chat Input Box -->
+            <div class="p-4 border-t border-slate-800 bg-slate-950/40 shrink-0">
+                <form id="chat-form" onsubmit="sendChatMessage(event)" class="space-y-3">
+                    <div class="relative">
+                        <textarea id="chat-input" rows="3" required placeholder="Type changes (e.g. 'Research and expand Unit 1 with a new module on Chronic Inflammation pearls')" class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-4 pr-12 py-3 text-xs text-slate-100 placeholder-slate-500 outline-none focus:ring-1 focus:ring-indigo-500 resize-none transition duration-150"></textarea>
+                        <button type="submit" id="send-btn" class="absolute bottom-3 right-3 w-8 h-8 bg-indigo-600 hover:bg-indigo-500 rounded-lg flex items-center justify-center text-white transition duration-150">
+                            <svg class="w-4 h-4 transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input type="checkbox" id="search-tool" checked class="w-3.5 h-3.5 rounded border-slate-800 bg-slate-900 text-indigo-600 focus:ring-0">
+                                <span class="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Google Search</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input type="checkbox" id="code-tool" checked class="w-3.5 h-3.5 rounded border-slate-800 bg-slate-900 text-indigo-600 focus:ring-0">
+                                <span class="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Code Execution</span>
+                            </label>
+                        </div>
+                        <span id="active-agent-badge" class="text-[9px] font-extrabold text-slate-500 uppercase tracking-widest">Model: gemini-2.5-flash</span>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Right Column: Interactive Course Structure Canvas -->
+        <section class="flex-1 flex flex-col overflow-hidden bg-slate-950">
+            
+            <!-- Metadata & Hierarchy Settings -->
+            <div class="p-4 border-b border-slate-800 bg-slate-900/20 flex flex-wrap items-center justify-between gap-4 shrink-0">
+                <div class="flex items-center gap-3 flex-1 min-w-[300px]">
+                    <div class="w-1/3 min-w-[100px]">
+                        <label class="block text-[9px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Academic Field</label>
+                        <input type="text" id="canvas-field" value="Clinical Medicine" onchange="saveCanvasLocal()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 transition font-bold">
+                    </div>
+                    <div class="w-1/3 min-w-[100px]">
+                        <label class="block text-[9px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Course Name</label>
+                        <input type="text" id="canvas-course" value="MBChB" onchange="saveCanvasLocal()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 transition font-bold">
+                    </div>
+                    <div class="w-1/3 min-w-[100px]">
+                        <label class="block text-[9px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Unit Group (Optional)</label>
+                        <input type="text" id="canvas-unit-group" value="Pathology Basics" onchange="saveCanvasLocal()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 transition font-bold">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button type="button" onclick="formatMarkdown()" class="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-bold text-slate-300 transition duration-150">
+                        Format MD
+                    </button>
+                    <button type="button" onclick="publishCanvasToCatalog()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-xl text-xs tracking-wider uppercase transition duration-200 shadow-md shadow-emerald-600/30 flex items-center gap-1.5">
+                        <span>🚀 Publish to Database</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Rich Canvas Text Area Workspace -->
+            <div class="flex-1 flex flex-col p-6 overflow-hidden relative">
+                <div class="flex items-center justify-between mb-2 shrink-0">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-pulse"></span>
+                        <h2 class="text-xs font-extrabold text-indigo-400 uppercase tracking-widest">Shared Course Canvas Workspace</h2>
+                    </div>
+                    <div id="save-status" class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">All changes saved in cloud</div>
+                </div>
+
+                <div class="flex-1 border border-slate-800 bg-slate-950 rounded-2xl overflow-hidden flex flex-col relative shadow-2xl">
+                    <textarea id="canvas-editor" oninput="triggerLocalSaveDebounce()" placeholder="# Syllabus Title&#10;## Unit Title&#10;### Module Title&#10;#### Topic Title&#10;##### Subtopic Title&#10;- Objective" class="flex-1 p-6 w-full h-full bg-slate-950/80 outline-none resize-none font-mono text-xs leading-relaxed text-slate-200 focus:bg-slate-950 transition duration-300 select-text" style="tab-size: 4;"></textarea>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Success Modal -->
+    <div id="publish-success-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 text-center shadow-2xl">
+            <div class="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold mb-4">✓</div>
+            <h3 class="text-lg font-bold text-white mb-2">Curriculum Successfully Ingested</h3>
+            <p class="text-xs text-slate-400 mb-6" id="success-message">The generated 5-level syllabus hierarchy was successfully processed, and published to the live Trace Learning Database.</p>
+            <div class="flex items-center justify-center gap-3">
+                <a href="/admin/catalogue" class="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-600/20 transition">Go to Catalogue</a>
+                <button type="button" onclick="closeSuccessModal()" class="rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2.5 text-xs font-bold text-slate-300 transition">Continue Editing</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        let currentSessionId = null;
+        let localSaveTimeout = null;
+
+        // Load sessions and load first or most recent session on startup
+        document.addEventListener('DOMContentLoaded', () => {
+            const select = document.getElementById('session-select');
+            if (select && select.value) {
+                loadSession(select.value);
+            } else {
+                createNewSession();
+            }
+        });
+
+        // Fetch session detail from backend
+        async function loadSession(sessionId) {
+            if (!sessionId) return;
+            currentSessionId = sessionId;
+            document.getElementById('session-select').value = sessionId;
+            
+            try {
+                const res = await fetch(`/api/admin/canvas/sessions/${sessionId}`);
+                if (!res.ok) throw new Error("Failed to load session details");
+                const data = await res.json();
+                
+                // Load Canvas editor and metadata
+                document.getElementById('canvas-editor').value = data.canvas_content || '';
+                document.getElementById('canvas-field').value = data.field_name || '';
+                document.getElementById('canvas-course').value = data.course_name || '';
+                document.getElementById('canvas-unit-group').value = data.unit_group_name || '';
+                
+                // Load chat dialogue messages
+                renderChatHistory(data.chat_history || []);
+                updateSaveStatus("All changes loaded");
+            } catch (err) {
+                console.error(err);
+                alert("Error loading canvas session.");
+            }
+        }
+
+        // Render chat log in Left Panel
+        function renderChatHistory(history) {
+            const container = document.getElementById('chat-messages');
+            container.innerHTML = '';
+            
+            if (history.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12">
+                        <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Syllabus Canvas Ready</p>
+                        <p class="text-[11px] text-slate-400 mt-1 max-w-[280px] mx-auto">Instruct Gemini to construct, refine, or review your syllabus on the right.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            history.forEach(msg => {
+                const isUser = msg.role === 'user';
+                const wrapper = document.createElement('div');
+                wrapper.className = `flex ${isUser ? 'justify-end' : 'justify-start'} w-full mb-3`;
+                
+                const bubble = document.createElement('div');
+                bubble.className = `max-w-[85%] rounded-2xl px-4 py-2.5 text-xs ${
+                    isUser 
+                    ? 'bg-indigo-600 text-white rounded-br-sm' 
+                    : 'bg-slate-800/80 border border-slate-700/50 text-slate-200 rounded-bl-sm leading-relaxed whitespace-pre-wrap'
+                }`;
+                bubble.textContent = msg.content;
+                
+                wrapper.appendChild(bubble);
+                container.appendChild(wrapper);
+            });
+            
+            // Auto scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Create a new canvas session
+        async function createNewSession() {
+            try {
+                const res = await fetch('/api/admin/canvas/sessions', { method: 'POST' });
+                if (!res.ok) throw new Error("Failed to create session");
+                const session = await res.json();
+                
+                // Add option dynamically to select list
+                const select = document.getElementById('session-select');
+                const opt = new Option(session.title, session.id);
+                select.add(opt, 0);
+                select.value = session.id;
+                
+                currentSessionId = session.id;
+                loadSession(session.id);
+            } catch (err) {
+                console.error(err);
+                alert("Error creating new session.");
+            }
+        }
+
+        // Debounce local manual canvas edit saves
+        function triggerLocalSaveDebounce() {
+            updateSaveStatus("Saving changes...");
+            clearTimeout(localSaveTimeout);
+            localSaveTimeout = setTimeout(saveCanvasLocal, 1500);
+        }
+
+        // Save metadata and current editor text
+        async function saveCanvasLocal() {
+            if (!currentSessionId) return;
+            
+            const payload = {
+                canvas_content: document.getElementById('canvas-editor').value,
+                field_name: document.getElementById('canvas-field').value,
+                course_name: document.getElementById('canvas-course').value,
+                unit_group_name: document.getElementById('canvas-unit-group').value
+            };
+            
+            try {
+                const res = await fetch(`/api/admin/canvas/sessions/${currentSessionId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    updateSaveStatus("All changes saved in cloud");
+                } else {
+                    updateSaveStatus("Auto-save failed");
+                }
+            } catch (err) {
+                console.error(err);
+                updateSaveStatus("Sync issue - offline");
+            }
+        }
+
+        // Send a message to the AI
+        async function sendChatMessage(e) {
+            if (e) e.preventDefault();
+            if (!currentSessionId) return;
+            
+            const textarea = document.getElementById('chat-input');
+            const message = textarea.value.trim();
+            if (!message) return;
+            
+            // Save manual edits first
+            await saveCanvasLocal();
+            
+            // Append user bubble to UI locally
+            const container = document.getElementById('chat-messages');
+            const userWrapper = document.createElement('div');
+            userWrapper.className = "flex justify-end w-full mb-3";
+            const userBubble = document.createElement('div');
+            userBubble.className = "max-w-[85%] rounded-2xl px-4 py-2.5 text-xs bg-indigo-600 text-white rounded-br-sm";
+            userBubble.textContent = message;
+            userWrapper.appendChild(userBubble);
+            container.appendChild(userWrapper);
+            container.scrollTop = container.scrollHeight;
+            
+            textarea.value = '';
+            
+            // Show loading bar
+            const stateBar = document.getElementById('agent-state-bar');
+            stateBar.classList.remove('hidden');
+            document.getElementById('send-btn').disabled = true;
+            
+            try {
+                const res = await fetch(`/api/admin/canvas/sessions/${currentSessionId}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                if (!res.ok) throw new Error("AI agent failed to generate response.");
+                const data = await res.json();
+                
+                // Update canvas and chat panel
+                document.getElementById('canvas-editor').value = data.canvas_content;
+                renderChatHistory(data.chat_response ? [...getChatLogsLocal(), {role: 'model', content: data.chat_response}] : []);
+                document.getElementById('active-agent-badge').textContent = `Agent: ${data.agent}`;
+                updateSaveStatus("AI updates loaded");
+            } catch (err) {
+                console.error(err);
+                alert("Error sending message to Gemini Agent.");
+            } finally {
+                stateBar.classList.add('hidden');
+                document.getElementById('send-btn').disabled = false;
+            }
+        }
+
+        // Helper to grab local logs in DOM to append
+        function getChatLogsLocal() {
+            // Reload from session fetch to get fresh accurate logs
+            return [];
+        }
+
+        // Publish current canvas to the database
+        async function publishCanvasToCatalog() {
+            if (!currentSessionId) return;
+            updateSaveStatus("Publishing syllabus...");
+            
+            // Save edits first
+            await saveCanvasLocal();
+            
+            try {
+                const res = await fetch(`/api/admin/canvas/sessions/${currentSessionId}/publish`, { method: 'POST' });
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Publishing failed");
+                }
+                const data = await res.json();
+                
+                // Show success modal
+                document.getElementById('success-message').textContent = data.message;
+                document.getElementById('publish-success-modal').classList.remove('hidden');
+                updateSaveStatus("Syllabus published successfully");
+            } catch (err) {
+                console.error(err);
+                alert("Failed to publish: " + err.message);
+                updateSaveStatus("Publishing failed");
+            }
+        }
+
+        // Format Markdown spaces and line endings
+        function formatMarkdown() {
+            const editor = document.getElementById('canvas-editor');
+            let content = editor.value;
+            // Trim excessive blank lines, normalize spacing
+            content = content.replace(/\n{3,}/g, '\n\n').trim();
+            editor.value = content;
+            triggerLocalSaveDebounce();
+        }
+
+        // Update UI Auto Save status
+        function updateSaveStatus(text) {
+            document.getElementById('save-status').textContent = text;
+        }
+
+        function closeSuccessModal() {
+            document.getElementById('publish-success-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

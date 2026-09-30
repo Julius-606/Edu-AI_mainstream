@@ -222,5 +222,18 @@ class SystemRelease(Base):
     timestamp = Column(Float)
 
 
+class CanvasSession(Base):
+    __tablename__ = "canvas_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), default="New Ingestion Session")
+    chat_history = Column(JSON, default=list) # List of dicts: [{"role": "user" | "model", "content": "..."}]
+    canvas_content = Column(Text, default="")  # Course structure/syllabus Markdown
+    field_name = Column(String(100), default="Clinical Medicine")
+    course_name = Column(String(100), default="MBChB")
+    unit_group_name = Column(String(100), nullable=True)
+    last_updated = Column(Float)
+
+
 
  
