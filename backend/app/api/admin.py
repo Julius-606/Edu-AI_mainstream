@@ -1580,12 +1580,12 @@ async def chat_canvas_session(session_id: int, payload: CanvasSessionChatPayload
     }}
     """
 
-    from app.services.ai_service import GEMINI_API_KEYS
+    from app.services.ai_service import ai_service, GEMINI_API_KEYS
     if not GEMINI_API_KEYS:
         raise HTTPException(status_code=500, detail="Gemini API key is unconfigured.")
         
-    key = GEMINI_API_KEYS[0]
-    client = genai.Client(api_key=key)
+    # Bind to the globally managed self-healing GenAI client
+    client = ai_service.client
     
     response_text = ""
     agent_used = "Gemini Flash Canvas Ingestion Agent"
@@ -1625,7 +1625,9 @@ async def chat_canvas_session(session_id: int, payload: CanvasSessionChatPayload
                         break
                     time.sleep(10)
         except Exception as e:
-            logger.warning(f"Google interactions API not supported or failed: {e}. Trying fallback standard generation...")
+            logger.warning(f"Google interactions API failed: {e}. Rotating keys and trying standard model cascade...")
+            ai_service._rotate_key()
+            client = ai_service.client
         
     # 2. Fallback to standard generate_content with search tool enabled if requested
     if not response_text:
@@ -1652,7 +1654,9 @@ async def chat_canvas_session(session_id: int, payload: CanvasSessionChatPayload
                         agent_used = f"{model_name} with Grounded Google Search"
                         break
                 except Exception as e:
-                    logger.warning(f"Failed standard grounded generation with {model_name}: {e}. Retrying cascade...")
+                    logger.warning(f"Failed standard grounded generation with {model_name}: {e}. Rotating keys...")
+                    ai_service._rotate_key()
+                    client = ai_service.client
                     
             # Try without strict JSON schema constraint
             if not response_text:
@@ -1669,7 +1673,9 @@ async def chat_canvas_session(session_id: int, payload: CanvasSessionChatPayload
                             agent_used = f"{model_name} (Basic Search ground)"
                             break
                     except Exception as e:
-                        logger.warning(f"Failed standard non-JSON generation with {model_name}: {e}")
+                        logger.warning(f"Failed standard non-JSON generation with {model_name}: {e}. Rotating keys...")
+                        ai_service._rotate_key()
+                        client = ai_service.client
 
         # 3. ULTIMATE SAFETY NET: Tool-free basic generation (guarantees success on any free-tier or tool-restricted key)
         if not response_text:
@@ -1688,7 +1694,9 @@ async def chat_canvas_session(session_id: int, payload: CanvasSessionChatPayload
                         agent_used = f"{model_name} (Standard Tool-free)"
                         break
                 except Exception as e_basic:
-                    logger.warning(f"Failed basic JSON generation on model {model_name}: {e_basic}. Trying without constraint...")
+                    logger.warning(f"Failed basic JSON generation on model {model_name}: {e_basic}. Rotating keys...")
+                    ai_service._rotate_key()
+                    client = ai_service.client
                     try:
                         response = client.models.generate_content(
                             model=model_name,
@@ -1699,7 +1707,9 @@ async def chat_canvas_session(session_id: int, payload: CanvasSessionChatPayload
                             agent_used = f"{model_name} (Basic Tool-free)"
                             break
                     except Exception as e_ultimate:
-                        logger.error(f"Ultimate tool-free failure on {model_name}: {e_ultimate}")
+                        logger.error(f"Ultimate tool-free failure on {model_name}: {e_ultimate}. Rotating keys...")
+                        ai_service._rotate_key()
+                        client = ai_service.client
                         
         if not response_text:
             raise HTTPException(
