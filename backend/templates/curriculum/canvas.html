@@ -322,14 +322,29 @@
             stateBar.classList.remove('hidden');
             document.getElementById('send-btn').disabled = true;
             
+            const payload = {
+                message: message,
+                search_enabled: document.getElementById('search-tool').checked,
+                code_enabled: document.getElementById('code-tool').checked
+            };
+            
             try {
                 const res = await fetch(`/api/admin/canvas/sessions/${currentSessionId}/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message })
+                    body: JSON.stringify(payload)
                 });
                 
-                if (!res.ok) throw new Error("AI agent failed to generate response.");
+                if (!res.ok) {
+                    let errMsg = "AI agent failed to generate response.";
+                    try {
+                        const errData = await res.json();
+                        if (errData && errData.detail) {
+                            errMsg = errData.detail;
+                        }
+                    } catch (e) {}
+                    throw new Error(errMsg);
+                }
                 const data = await res.json();
                 
                 // Update canvas and chat panel
@@ -339,7 +354,7 @@
                 updateSaveStatus("AI updates loaded");
             } catch (err) {
                 console.error(err);
-                alert("Error sending message to Gemini Agent.");
+                alert("Error sending message to Gemini Agent:\n\n" + err.message);
             } finally {
                 stateBar.classList.add('hidden');
                 document.getElementById('send-btn').disabled = false;

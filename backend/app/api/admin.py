@@ -1389,6 +1389,8 @@ class CanvasSessionUpdatePayload(BaseModel):
 
 class CanvasSessionChatPayload(BaseModel):
     message: str
+    search_enabled: Optional[bool] = True
+    code_enabled: Optional[bool] = True
 
 
 @router.get("/admin/ingestion/canvas", response_class=HTMLResponse)
@@ -1589,68 +1591,121 @@ async def chat_canvas_session(session_id: int, payload: CanvasSessionChatPayload
     agent_used = "Gemini Flash Canvas Ingestion Agent"
     
     # 1. Attempt using interactions API with antigravity agent as specified by the user
-    try:
-        tools = [
-            {'type': 'code_execution'},
-            {'type': 'google_search'}
-        ]
-        if hasattr(client, "interactions"):
-            logger.info("Initializing interactions agent for canvas ingestion research...")
-            interaction = client.interactions.create(
-                agent='antigravity-preview-09-2026',
-                input=prompt,
-                background=True,
-                tools=tools,
-                environment={
-                    'type': 'remote',
-                    'network': 'disabled',
-                },
-            )
-            
-            # Poll for completion
-            for _ in range(12): # Wait up to 120 seconds
-                interaction = client.interactions.get(interaction.id)
-                if interaction.status == "completed":
-                    response_text = interaction.output_text
-                    agent_used = "antigravity-preview-09-2026 (Interactive AI Agent)"
-                    break
-                elif interaction.status == "failed":
-                    logger.warning(f"interactions agent failed: {interaction.error}. Falling back to standard model.")
-                    break
-                time.sleep(10)
-    except Exception as e:
-        logger.warning(f"Google interactions API not supported or failed: {e}. Trying fallback standard generation...")
-        
-    # 2. Fallback to standard generate_content with search tool enabled
-    if not response_text:
+    # ONLY try interactions if both tools or at least one tool is requested
+    if payload.code_enabled or payload.search_enabled:
         try:
-            config = types.GenerateContentConfig(
-                tools=[{"google_search": {}}],
-                response_mime_type="application/json"
-            )
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-                config=config
-            )
-            if response and response.text:
-                response_text = response.text
-                agent_used = "Gemini 2.5 Flash with Google Search Integration"
-        except Exception as e:
-            logger.error(f"Fallback standard generation failed: {e}")
-            # Clean fallback without JSON constraint if that failed
-            try:
-                config = types.GenerateContentConfig(tools=[{"google_search": {}}])
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=prompt + " Please output in JSON format with 'chat_response' and 'canvas_update'.",
-                    config=config
+            tools = []
+            if payload.code_enabled:
+                tools.append({'type': 'code_execution'})
+            if payload.search_enabled:
+                tools.append({'type': 'google_search'})
+                
+            if hasattr(client, "interactions") and tools:
+                logger.info("Initializing interactions agent for canvas ingestion research...")
+                interaction = client.interactions.create(
+                    agent='antigravity-preview-09-2026',
+                    input=prompt,
+                    background=True,
+                    tools=tools,
+                    environment={
+                        'type': 'remote',
+                        'network': 'disabled',
+                    },
                 )
-                if response and response.text:
-                    response_text = response.text
-                    agent_used = "Gemini 2.5 Flash Basic fallback"
-            except Exception as ex:
-                raise HTTPException(status_code=500, detail=f"Failed to communicate with Google AI model: {ex}")
+                
+                # Poll for completion
+                for _ in range(12): # Wait up to 120 seconds
+                    interaction = client.interactions.get(interaction.id)
+                    if interaction.status == "completed":
+                        response_text = interaction.output_text
+                        agent_used = "antigravity-preview-09-2026 (Interactive AI Agent)"
+                        break
+                    elif interaction.status == "failed":
+                        logger.warning(f"interactions agent failed: {interaction.error}. Falling back to standard model.")
+                        break
+                    time.sleep(10)
+        except Exception as e:
+            logger.warning(f"Google interactions API not supported or failed: {e}. Trying fallback standard generation...")
+        
+    # 2. Fallback to standard generate_content with search tool enabled if requested
+    if not response_text:
+        models_to_try = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite"]
+        tools_list = []
+        if payload.search_enabled:
+            tools_list.append({"google_search": {}})
+            
+        # Try generation with tools first (if any tools are specified/supported)
+        if tools_list:
+            for model_name in models_to_try:
+                try:
+                    config = types.GenerateContentConfig(
+                        tools=tools_list,
+                        response_mime_type="application/json"
+                    )
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=config
+                    )
+                    if response and response.text:
+                        response_text = response.text
+                        agent_used = f"{model_name} with Grounded Google Search"
+                        break
+                except Exception as e:
+                    logger.warning(f"Failed standard grounded generation with {model_name}: {e}. Retrying cascade...")
+                    
+            # Try without strict JSON schema constraint
+            if not response_text:
+                for model_name in models_to_try:
+                    try:
+                        config = types.GenerateContentConfig(tools=tools_list)
+                        response = client.models.generate_content(
+                            model=model_name,
+                            contents=prompt + " Please output raw JSON format with chat_response and canvas_update.",
+                            config=config
+                        )
+                        if response and response.text:
+                            response_text = response.text
+                            agent_used = f"{model_name} (Basic Search ground)"
+                            break
+                    except Exception as e:
+                        logger.warning(f"Failed standard non-JSON generation with {model_name}: {e}")
+
+        # 3. ULTIMATE SAFETY NET: Tool-free basic generation (guarantees success on any free-tier or tool-restricted key)
+        if not response_text:
+            logger.info("Executing ultimate tool-free standard model generation fallback...")
+            for model_name in models_to_try:
+                try:
+                    # Let's try basic JSON schema model first
+                    config = types.GenerateContentConfig(response_mime_type="application/json")
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=config
+                    )
+                    if response and response.text:
+                        response_text = response.text
+                        agent_used = f"{model_name} (Standard Tool-free)"
+                        break
+                except Exception as e_basic:
+                    logger.warning(f"Failed basic JSON generation on model {model_name}: {e_basic}. Trying without constraint...")
+                    try:
+                        response = client.models.generate_content(
+                            model=model_name,
+                            contents=prompt + " Please format response in strict JSON containing 'chat_response' and 'canvas_update'."
+                        )
+                        if response and response.text:
+                            response_text = response.text
+                            agent_used = f"{model_name} (Basic Tool-free)"
+                            break
+                    except Exception as e_ultimate:
+                        logger.error(f"Ultimate tool-free failure on {model_name}: {e_ultimate}")
+                        
+        if not response_text:
+            raise HTTPException(
+                status_code=500,
+                detail="All attempts to connect to Gemini AI failed. This usually indicates that the configured Google API key is either invalid, expired, or has hit its rate limits."
+            )
                 
     # Extract JSON fields
     chat_reply = "AI response generated successfully."
