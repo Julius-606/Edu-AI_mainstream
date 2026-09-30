@@ -616,6 +616,43 @@ async def admin_unit_detail(unit_id: int, request: Request, db: Session = Depend
     )
 
 
+@router.post("/admin/units/bulk-update")
+async def admin_bulk_unit_update(
+    request: Request,
+    unit_ids: str = Form(...),
+    field: Optional[str] = Form(None),
+    course: Optional[str] = Form(None),
+    unit_group: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    if not is_authenticated_admin(request, db):
+        return RedirectResponse(url="/admin/login", status_code=302)
+
+    try:
+        id_list = [int(x.strip()) for x in unit_ids.split(",") if x.strip().isdigit()]
+        if id_list:
+            units = db.query(models.Unit).filter(models.Unit.id.in_(id_list)).all()
+            for unit in units:
+                if field and field.strip():
+                    unit.category = field.strip()
+                if course and course.strip():
+                    unit.course = course.strip()
+                if unit_group and unit_group.strip():
+                    unit.unit_group = unit_group.strip()
+            db.commit()
+            notify_admin(
+                db=db,
+                category="SYSTEM_ALERT",
+                title="Bulk Metadata Updated",
+                message=f"Admin updated metadata for {len(units)} units successfully.",
+                level="info"
+            )
+    except Exception as e:
+        logger.error(f"Bulk update failed: {e}")
+
+    return RedirectResponse(url="/admin/catalogue", status_code=303)
+
+
 @router.post("/admin/units/{unit_id}")
 async def admin_unit_update(
     unit_id: int,
@@ -636,37 +673,6 @@ async def admin_unit_update(
     db.commit()
 
     return RedirectResponse(url=f"/admin/units/{unit_id}", status_code=303)
-
-
-@router.post("/admin/units/bulk-update")
-async def admin_bulk_unit_update(
-    request: Request,
-    unit_ids: str = Form(...),
-    field: Optional[str] = Form(None),
-    course: Optional[str] = Form(None),
-    unit_group: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
-):
-    if not is_authenticated_admin(request, db):
-        return RedirectResponse(url="/admin/login", status_code=302)
-
-    try:
-        ids_list = [int(x.strip()) for x in unit_ids.split(",") if x.strip().isdigit()]
-    except Exception:
-        ids_list = []
-
-    if ids_list:
-        units = db.query(models.Unit).filter(models.Unit.id.in_(ids_list)).all()
-        for u in units:
-            if field and field.strip():
-                u.category = field.strip()
-            if course and course.strip():
-                u.course = course.strip()
-            if unit_group and unit_group.strip():
-                u.unit_group = unit_group.strip()
-        db.commit()
-
-    return RedirectResponse(url="/admin/catalogue", status_code=303)
 
 
 @router.post("/admin/nodes")
